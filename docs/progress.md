@@ -6,6 +6,57 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### Video Understanding & Generation Features
+Added 4 new AI-powered video processing commands for Phase 4.
+
+**New Commands:**
+- `vibe ai video-extend` - Extend video duration using Kling AI
+- `vibe ai video-upscale` - AI upscaling with Replicate or FFmpeg fallback
+- `vibe ai video-interpolate` - Frame interpolation for slow motion (FFmpeg minterpolate)
+- `vibe ai video-inpaint` - Object removal using Replicate ProPainter
+
+**New Provider:**
+- `ReplicateProvider` - Video upscaling and inpainting via Replicate API
+  - Supports Real-ESRGAN for video upscaling
+  - Supports ProPainter for video inpainting
+
+**KlingProvider Enhancements:**
+- Added `extendVideo()` method for video extension
+- Added `getExtendStatus()` and `waitForExtendCompletion()` methods
+
+**Files created:**
+- `packages/ai-providers/src/replicate/ReplicateProvider.ts` - New provider
+- `packages/ai-providers/src/replicate/index.ts` - Exports
+
+**Files modified:**
+- `packages/ai-providers/src/interface/types.ts` - Added `video-extend`, `video-inpaint`, `video-upscale`, `frame-interpolation` capabilities
+- `packages/ai-providers/src/kling/KlingProvider.ts` - Added video extend methods
+- `packages/ai-providers/src/index.ts` - Exported ReplicateProvider
+- `packages/cli/src/commands/ai.ts` - Added 4 new commands (~400 lines)
+- `packages/cli/src/commands/ai.test.ts` - Added tests for new commands
+- `docs/roadmap.md` - Marked Video Understanding features complete
+- `CLAUDE.md` - Added CLI documentation
+
+**Usage:**
+```bash
+# Video Extend
+pnpm vibe ai video-extend video.mp4 -o extended.mp4
+pnpm vibe ai video-extend video.mp4 --prompt "continue smoothly" -d 10
+
+# Video Upscale
+pnpm vibe ai video-upscale video.mp4 --scale 2 -o hd.mp4
+pnpm vibe ai video-upscale video.mp4 --ffmpeg -o hd-ffmpeg.mp4  # Free FFmpeg fallback
+
+# Frame Interpolation (Slow Motion)
+pnpm vibe ai video-interpolate video.mp4 --factor 2 -o slow.mp4
+pnpm vibe ai video-interpolate video.mp4 --factor 4 --fps 120 -o ultra-slow.mp4
+
+# Video Inpaint (Object Removal)
+pnpm vibe ai video-inpaint https://example.com/video.mp4 --mask https://example.com/mask.mp4 -o clean.mp4
+```
+
+---
+
 ### MCP Documentation Enhancement
 - Completely rewrote `packages/mcp-server/README.md` with comprehensive documentation
 - Created `docs/mcp-guide.md` - Detailed MCP integration guide

@@ -25,7 +25,11 @@ export type AICapability =
   | "outpaint"
   | "highlight-detection"
   | "b-roll-matching"
-  | "viral-optimization";
+  | "viral-optimization"
+  | "video-extend"
+  | "video-inpaint"
+  | "video-upscale"
+  | "frame-interpolation";
 
 /**
  * Generation status

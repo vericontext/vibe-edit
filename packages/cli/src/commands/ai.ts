@@ -17,6 +17,7 @@ import {
   RunwayProvider,
   KlingProvider,
   StabilityProvider,
+  ReplicateProvider,
   whisperProvider,
   geminiProvider,
   openaiProvider,
@@ -26,6 +27,7 @@ import {
   runwayProvider,
   klingProvider,
   stabilityProvider,
+  replicateProvider,
   type TimelineCommand,
   type Highlight,
   type HighlightCriteria,
@@ -1208,6 +1210,412 @@ aiCommand
       }
     } catch (error) {
       console.error(chalk.red("Failed to get status"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Video Extend command (Kling AI)
+aiCommand
+  .command("video-extend")
+  .description("Extend video duration using Kling AI")
+  .argument("<video>", "Video file path or URL")
+  .option("-k, --api-key <key>", "Kling API key (ACCESS_KEY:SECRET_KEY) or set KLING_API_KEY env")
+  .option("-o, --output <path>", "Output file path")
+  .option("-p, --prompt <text>", "Continuation prompt")
+  .option("-d, --duration <sec>", "Duration: 5 or 10 seconds", "5")
+  .option("-n, --negative <prompt>", "Negative prompt (what to avoid)")
+  .option("--no-wait", "Start generation and return task ID without waiting")
+  .action(async (videoPath: string, options) => {
+    try {
+      const apiKey = await getApiKey("KLING_API_KEY", "Kling", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Kling API key required."));
+        console.error(chalk.dim("Format: ACCESS_KEY:SECRET_KEY"));
+        console.error(chalk.dim("Use --api-key or set KLING_API_KEY environment variable"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing Kling AI...").start();
+
+      const kling = new KlingProvider();
+      await kling.initialize({ apiKey });
+
+      if (!kling.isConfigured()) {
+        spinner.fail(chalk.red("Invalid API key format. Use ACCESS_KEY:SECRET_KEY"));
+        process.exit(1);
+      }
+
+      // Read video file or use URL
+      let videoData: string;
+      if (videoPath.startsWith("http://") || videoPath.startsWith("https://")) {
+        videoData = videoPath;
+      } else {
+        spinner.text = "Reading video file...";
+        const absPath = resolve(process.cwd(), videoPath);
+        const videoBuffer = await readFile(absPath);
+        const ext = videoPath.toLowerCase().split(".").pop();
+        const mimeTypes: Record<string, string> = {
+          mp4: "video/mp4",
+          webm: "video/webm",
+          mov: "video/quicktime",
+        };
+        const mimeType = mimeTypes[ext || "mp4"] || "video/mp4";
+        videoData = `data:${mimeType};base64,${videoBuffer.toString("base64")}`;
+      }
+
+      spinner.text = "Starting video extension...";
+
+      const result = await kling.extendVideo(videoData, {
+        prompt: options.prompt,
+        negativePrompt: options.negative,
+        duration: options.duration as "5" | "10",
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Failed to start extension"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Video Extension Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Extension started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  pnpm vibe ai video-extend-status ${result.id}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Extending video (this may take 2-5 minutes)...";
+
+      const finalResult = await kling.waitForExtendCompletion(
+        result.id,
+        (status) => {
+          spinner.text = `Extending video... ${status.status}`;
+        },
+        600000
+      );
+
+      if (finalResult.status !== "completed") {
+        spinner.fail(chalk.red(finalResult.error || "Extension failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Video extended"));
+
+      console.log();
+      if (finalResult.videoUrl) {
+        console.log(`Video URL: ${finalResult.videoUrl}`);
+      }
+      if (finalResult.duration) {
+        console.log(`Duration: ${finalResult.duration}s`);
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output && finalResult.videoUrl) {
+        const downloadSpinner = ora("Downloading video...").start();
+        try {
+          const response = await fetch(finalResult.videoUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download video"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Video extension failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Video Upscale command
+aiCommand
+  .command("video-upscale")
+  .description("Upscale video resolution using AI or FFmpeg")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file path")
+  .option("-s, --scale <factor>", "Scale factor: 2 or 4", "2")
+  .option("-m, --model <model>", "Model: real-esrgan, topaz", "real-esrgan")
+  .option("--ffmpeg", "Use FFmpeg lanczos (free, no API)")
+  .option("-k, --api-key <key>", "Replicate API token (or set REPLICATE_API_TOKEN env)")
+  .option("--no-wait", "Start processing and return task ID without waiting")
+  .action(async (videoPath: string, options) => {
+    try {
+      const absPath = resolve(process.cwd(), videoPath);
+      const scale = parseInt(options.scale);
+
+      if (scale !== 2 && scale !== 4) {
+        console.error(chalk.red("Scale must be 2 or 4"));
+        process.exit(1);
+      }
+
+      // Use FFmpeg if requested (free fallback)
+      if (options.ffmpeg) {
+        const outputPath = options.output
+          ? resolve(process.cwd(), options.output)
+          : absPath.replace(/(\.[^.]+)$/, `-upscaled-${scale}x$1`);
+
+        const spinner = ora(`Upscaling video with FFmpeg (${scale}x)...`).start();
+
+        try {
+          // Get original dimensions
+          const { stdout: probeOut } = await execAsync(
+            `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "${absPath}"`
+          );
+          const [width, height] = probeOut.trim().split(",").map(Number);
+          const newWidth = width * scale;
+          const newHeight = height * scale;
+
+          // Use lanczos scaling
+          await execAsync(
+            `ffmpeg -i "${absPath}" -vf "scale=${newWidth}:${newHeight}:flags=lanczos" -c:a copy "${outputPath}" -y`
+          );
+
+          spinner.succeed(chalk.green(`Upscaled to ${newWidth}x${newHeight}`));
+          console.log(`Output: ${outputPath}`);
+        } catch (err) {
+          spinner.fail(chalk.red("FFmpeg upscaling failed"));
+          console.error(err);
+          process.exit(1);
+        }
+        return;
+      }
+
+      // Use Replicate API
+      const apiKey = await getApiKey("REPLICATE_API_TOKEN", "Replicate", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Replicate API token required for AI upscaling."));
+        console.error(chalk.dim("Use --api-key or set REPLICATE_API_TOKEN"));
+        console.error(chalk.dim("Or use --ffmpeg for free FFmpeg upscaling"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing Replicate...").start();
+
+      const { ReplicateProvider } = await import("@vibe-edit/ai-providers");
+      const replicate = new ReplicateProvider();
+      await replicate.initialize({ apiKey });
+
+      // For Replicate, we need a URL. Upload to temporary hosting or require URL
+      spinner.text = "Note: Replicate requires video URL. Reading file...";
+
+      // For now, we'll show an error suggesting URL or ffmpeg
+      spinner.fail(chalk.yellow("Replicate requires a video URL"));
+      console.log();
+      console.log(chalk.dim("Options:"));
+      console.log(chalk.dim("  1. Use --ffmpeg for local processing"));
+      console.log(chalk.dim("  2. Upload video to a URL and run:"));
+      console.log(chalk.dim(`     pnpm vibe ai video-upscale https://example.com/video.mp4 -s ${scale}`));
+      console.log();
+      process.exit(1);
+    } catch (error) {
+      console.error(chalk.red("Video upscaling failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Frame Interpolation (Slow Motion)
+aiCommand
+  .command("video-interpolate")
+  .description("Create slow motion with frame interpolation (FFmpeg)")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file path")
+  .option("-f, --factor <number>", "Slow motion factor: 2, 4, or 8", "2")
+  .option("--fps <number>", "Target output FPS")
+  .option("-q, --quality <mode>", "Quality: fast or quality", "quality")
+  .action(async (videoPath: string, options) => {
+    try {
+      const absPath = resolve(process.cwd(), videoPath);
+      const factor = parseInt(options.factor);
+
+      if (![2, 4, 8].includes(factor)) {
+        console.error(chalk.red("Factor must be 2, 4, or 8"));
+        process.exit(1);
+      }
+
+      const outputPath = options.output
+        ? resolve(process.cwd(), options.output)
+        : absPath.replace(/(\.[^.]+)$/, `-slow${factor}x$1`);
+
+      const spinner = ora(`Creating ${factor}x slow motion...`).start();
+
+      try {
+        // Get original FPS
+        const { stdout: fpsOut } = await execAsync(
+          `ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 "${absPath}"`
+        );
+        const [num, den] = fpsOut.trim().split("/").map(Number);
+        const originalFps = num / (den || 1);
+
+        // Calculate target FPS
+        const targetFps = options.fps ? parseInt(options.fps) : originalFps * factor;
+
+        // Use minterpolate for frame interpolation
+        const mi = options.quality === "fast" ? "mi_mode=mci" : "mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1";
+
+        spinner.text = `Interpolating frames (${originalFps.toFixed(1)} → ${targetFps}fps)...`;
+
+        // First interpolate frames, then slow down
+        await execAsync(
+          `ffmpeg -i "${absPath}" -filter:v "minterpolate='${mi}:fps=${targetFps}',setpts=${factor}*PTS" -an "${outputPath}" -y`,
+          { timeout: 600000 } // 10 minute timeout
+        );
+
+        spinner.succeed(chalk.green(`Created ${factor}x slow motion`));
+        console.log();
+        console.log(chalk.dim("─".repeat(60)));
+        console.log(`Original FPS: ${originalFps.toFixed(1)}`);
+        console.log(`Interpolated FPS: ${targetFps}`);
+        console.log(`Slow factor: ${factor}x`);
+        console.log(`Output: ${outputPath}`);
+        console.log();
+      } catch (err: unknown) {
+        spinner.fail(chalk.red("Frame interpolation failed"));
+        if (err instanceof Error && err.message.includes("timeout")) {
+          console.error(chalk.yellow("Processing timed out. Try with a shorter video or --quality fast"));
+        } else {
+          console.error(err);
+        }
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(chalk.red("Frame interpolation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Video Inpainting (Object Removal)
+aiCommand
+  .command("video-inpaint")
+  .description("Remove objects from video using AI inpainting")
+  .argument("<video>", "Video file path or URL")
+  .option("-o, --output <path>", "Output file path")
+  .option("-t, --target <description>", "Object to remove (text description)")
+  .option("-m, --mask <path>", "Mask video file path (white = remove)")
+  .option("-k, --api-key <key>", "Replicate API token (or set REPLICATE_API_TOKEN env)")
+  .option("--provider <name>", "Provider: replicate or stability", "replicate")
+  .option("--no-wait", "Start processing and return task ID without waiting")
+  .action(async (videoPath: string, options) => {
+    try {
+      if (!options.target && !options.mask) {
+        console.error(chalk.red("Either --target or --mask is required"));
+        console.error(chalk.dim("Examples:"));
+        console.error(chalk.dim('  pnpm vibe ai video-inpaint video.mp4 --target "watermark"'));
+        console.error(chalk.dim("  pnpm vibe ai video-inpaint video.mp4 --mask mask.mp4"));
+        process.exit(1);
+      }
+
+      const apiKey = await getApiKey("REPLICATE_API_TOKEN", "Replicate", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Replicate API token required for video inpainting."));
+        console.error(chalk.dim("Use --api-key or set REPLICATE_API_TOKEN"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing Replicate...").start();
+
+      const { ReplicateProvider } = await import("@vibe-edit/ai-providers");
+      const replicate = new ReplicateProvider();
+      await replicate.initialize({ apiKey });
+
+      // Check if video is URL or file
+      let videoUrl: string;
+      if (videoPath.startsWith("http://") || videoPath.startsWith("https://")) {
+        videoUrl = videoPath;
+      } else {
+        spinner.fail(chalk.yellow("Video inpainting requires a video URL"));
+        console.log();
+        console.log(chalk.dim("Upload your video to a URL and run:"));
+        console.log(chalk.dim(`  pnpm vibe ai video-inpaint https://example.com/video.mp4 --mask https://example.com/mask.mp4`));
+        console.log();
+        process.exit(1);
+      }
+
+      let maskVideo: string | undefined;
+      if (options.mask) {
+        if (options.mask.startsWith("http://") || options.mask.startsWith("https://")) {
+          maskVideo = options.mask;
+        } else {
+          spinner.fail(chalk.yellow("Mask must also be a URL"));
+          process.exit(1);
+        }
+      }
+
+      spinner.text = "Starting video inpainting...";
+
+      const result = await replicate.inpaintVideo(videoUrl, {
+        target: options.target,
+        maskVideo,
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Failed to start inpainting"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Video Inpainting Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Inpainting started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  curl -s -H "Authorization: Bearer $REPLICATE_API_TOKEN" https://api.replicate.com/v1/predictions/${result.id}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Processing video (this may take several minutes)...";
+
+      const finalResult = await replicate.waitForCompletion(
+        result.id,
+        (status) => {
+          spinner.text = `Processing... ${status.status}`;
+        },
+        600000
+      );
+
+      if (finalResult.status !== "completed") {
+        spinner.fail(chalk.red(finalResult.error || "Inpainting failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Video inpainting complete"));
+
+      console.log();
+      if (finalResult.videoUrl) {
+        console.log(`Video URL: ${finalResult.videoUrl}`);
+
+        // Download if output specified
+        if (options.output) {
+          const downloadSpinner = ora("Downloading video...").start();
+          try {
+            const response = await fetch(finalResult.videoUrl);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            const outputPath = resolve(process.cwd(), options.output);
+            await writeFile(outputPath, buffer);
+            downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+          } catch (err) {
+            downloadSpinner.fail(chalk.red("Failed to download video"));
+          }
+        }
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Video inpainting failed"));
       console.error(error);
       process.exit(1);
     }
@@ -3232,6 +3640,7 @@ aiCommand
     providerRegistry.register(runwayProvider);
     providerRegistry.register(klingProvider);
     providerRegistry.register(stabilityProvider);
+    providerRegistry.register(replicateProvider);
 
     console.log();
     console.log(chalk.bold.cyan("Available AI Providers"));

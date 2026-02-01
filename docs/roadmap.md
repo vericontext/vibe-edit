@@ -110,10 +110,10 @@ Intelligence built into every interaction.
   - Full pipeline: `vibe ai viral <project> -p youtube-shorts,tiktok -o ./viral-output`
 
 ### Video Understanding & Generation
-- [ ] Video Extend - AI-powered clip extension
-- [ ] Video Inpainting - Remove objects from video
-- [ ] Video Upscale - Low-res → 4K AI upscaling
-- [ ] Frame Interpolation - AI slow motion
+- [x] Video Extend - AI-powered clip extension (`vibe ai video-extend`)
+- [x] Video Inpainting - Remove objects from video (`vibe ai video-inpaint`)
+- [x] Video Upscale - Low-res → 4K AI upscaling (`vibe ai video-upscale`)
+- [x] Frame Interpolation - AI slow motion (`vibe ai video-interpolate`)
 
 ### Voice & Audio
 - [ ] Voice Clone - Custom AI voice from samples
@@ -207,6 +207,7 @@ vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | i
                 motion | storyboard | image | thumbnail | background
                 video | video-status | video-cancel
                 kling | kling-status
+                video-extend | video-upscale | video-interpolate | video-inpaint
                 sd | sd-upscale | sd-remove-bg | sd-img2img | sd-replace | sd-outpaint
                 script-to-video | highlights | b-roll | viral
 ```

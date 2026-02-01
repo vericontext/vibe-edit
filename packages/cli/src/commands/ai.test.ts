@@ -177,4 +177,112 @@ describe("ai commands", () => {
       }).toThrow();
     });
   });
+
+  describe("ai video-extend", () => {
+    it("shows help", () => {
+      const output = execSync(`${CLI} ai video-extend --help`, {
+        cwd: process.cwd(),
+        encoding: "utf-8",
+      });
+
+      expect(output).toContain("Extend video duration");
+      expect(output).toContain("--output");
+      expect(output).toContain("--prompt");
+      expect(output).toContain("--duration");
+      expect(output).toContain("--negative");
+    });
+
+    it("fails without API key", () => {
+      expect(() => {
+        execSync(`${CLI} ai video-extend /tmp/video.mp4`, {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+          env: { ...process.env, KLING_API_KEY: undefined },
+        });
+      }).toThrow();
+    });
+  });
+
+  describe("ai video-upscale", () => {
+    it("shows help", () => {
+      const output = execSync(`${CLI} ai video-upscale --help`, {
+        cwd: process.cwd(),
+        encoding: "utf-8",
+      });
+
+      expect(output).toContain("Upscale video resolution");
+      expect(output).toContain("--output");
+      expect(output).toContain("--scale");
+      expect(output).toContain("--model");
+      expect(output).toContain("--ffmpeg");
+    });
+
+    it("validates scale option", () => {
+      expect(() => {
+        execSync(`${CLI} ai video-upscale /tmp/video.mp4 --scale 3 --ffmpeg`, {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+        });
+      }).toThrow();
+    });
+  });
+
+  describe("ai video-interpolate", () => {
+    it("shows help", () => {
+      const output = execSync(`${CLI} ai video-interpolate --help`, {
+        cwd: process.cwd(),
+        encoding: "utf-8",
+      });
+
+      expect(output).toContain("slow motion");
+      expect(output).toContain("--output");
+      expect(output).toContain("--factor");
+      expect(output).toContain("--fps");
+      expect(output).toContain("--quality");
+    });
+
+    it("validates factor option", () => {
+      expect(() => {
+        execSync(`${CLI} ai video-interpolate /tmp/video.mp4 --factor 3`, {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+        });
+      }).toThrow();
+    });
+  });
+
+  describe("ai video-inpaint", () => {
+    it("shows help", () => {
+      const output = execSync(`${CLI} ai video-inpaint --help`, {
+        cwd: process.cwd(),
+        encoding: "utf-8",
+      });
+
+      expect(output).toContain("Remove objects from video");
+      expect(output).toContain("--output");
+      expect(output).toContain("--target");
+      expect(output).toContain("--mask");
+      expect(output).toContain("--provider");
+    });
+
+    it("fails without target or mask", () => {
+      expect(() => {
+        execSync(`${CLI} ai video-inpaint https://example.com/video.mp4`, {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+          env: { ...process.env, REPLICATE_API_TOKEN: "test" },
+        });
+      }).toThrow();
+    });
+
+    it("fails without API key", () => {
+      expect(() => {
+        execSync(`${CLI} ai video-inpaint https://example.com/video.mp4 --target "watermark"`, {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+          env: { ...process.env, REPLICATE_API_TOKEN: undefined },
+        });
+      }).toThrow();
+    });
+  });
 });

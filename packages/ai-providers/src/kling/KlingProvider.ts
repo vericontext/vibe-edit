@@ -68,11 +68,23 @@ interface KlingTaskResponse {
  * Kling AI provider for high-quality video generation
  * Uses Kling v1.5 model with text-to-video and image-to-video
  */
+/**
+ * Options for video extension
+ */
+export interface KlingVideoExtendOptions {
+  /** Text prompt for continuation */
+  prompt?: string;
+  /** Negative prompt (what to avoid) */
+  negativePrompt?: string;
+  /** Duration in seconds: 5 or 10 */
+  duration?: "5" | "10";
+}
+
 export class KlingProvider implements AIProvider {
   id = "kling";
   name = "Kling AI";
   description = "High-quality AI video generation with Kling v1.5";
-  capabilities: AICapability[] = ["text-to-video", "image-to-video"];
+  capabilities: AICapability[] = ["text-to-video", "image-to-video", "video-extend"];
   iconUrl = "/icons/kling.svg";
   isAvailable = true;
 
@@ -364,6 +376,166 @@ export class KlingProvider implements AIProvider {
       id,
       status: "failed",
       error: "Generation timed out",
+    };
+  }
+
+  /**
+   * Extend an existing video using Kling AI
+   * Uses the video-extend endpoint to continue the video
+   */
+  async extendVideo(
+    videoData: string | Blob,
+    options?: KlingVideoExtendOptions
+  ): Promise<VideoResult> {
+    if (!this.isConfigured()) {
+      return {
+        id: "",
+        status: "failed",
+        error: "Kling API credentials not configured. Use format: KLING_ACCESS_KEY:KLING_SECRET_KEY",
+      };
+    }
+
+    try {
+      const token = this.generateToken();
+
+      // Convert video to data URI if needed
+      const videoUri = typeof videoData === "string"
+        ? videoData
+        : await this.blobToDataUri(videoData);
+
+      const body: Record<string, unknown> = {
+        video: videoUri,
+        duration: options?.duration || "5",
+      };
+
+      if (options?.prompt) {
+        body.prompt = options.prompt;
+      }
+
+      if (options?.negativePrompt) {
+        body.negative_prompt = options.negativePrompt;
+      }
+
+      const response = await fetch(`${this.baseUrl}/videos/video-extend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      return this.handleResponse(response);
+    } catch (error) {
+      return {
+        id: "",
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Get video extension status
+   */
+  async getExtendStatus(id: string): Promise<VideoResult> {
+    if (!this.isConfigured()) {
+      return {
+        id,
+        status: "failed",
+        error: "Kling API credentials not configured",
+      };
+    }
+
+    try {
+      const token = this.generateToken();
+
+      const response = await fetch(`${this.baseUrl}/videos/video-extend/${id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          id,
+          status: "failed",
+          error: `Failed to get status: ${errorText}`,
+        };
+      }
+
+      const data = (await response.json()) as KlingTaskResponse;
+
+      if (data.code !== 0) {
+        return {
+          id,
+          status: "failed",
+          error: data.message,
+        };
+      }
+
+      const statusMap: Record<string, VideoResult["status"]> = {
+        submitted: "pending",
+        processing: "processing",
+        succeed: "completed",
+        failed: "failed",
+      };
+
+      const result: VideoResult = {
+        id: data.data.task_id,
+        status: statusMap[data.data.task_status] || "pending",
+      };
+
+      if (data.data.task_status === "succeed" && data.data.task_result?.videos?.length) {
+        const video = data.data.task_result.videos[0];
+        result.videoUrl = video.url;
+        result.duration = parseFloat(video.duration);
+      }
+
+      if (data.data.task_status === "failed") {
+        result.error = data.data.task_status_msg || "Extension failed";
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        id,
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Wait for video extension to complete
+   */
+  async waitForExtendCompletion(
+    id: string,
+    onProgress?: (result: VideoResult) => void,
+    maxWaitMs: number = 600000
+  ): Promise<VideoResult> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const result = await this.getExtendStatus(id);
+
+      if (onProgress) {
+        onProgress(result);
+      }
+
+      if (result.status === "completed" || result.status === "failed" || result.status === "cancelled") {
+        return result;
+      }
+
+      await this.sleep(this.pollingInterval);
+    }
+
+    return {
+      id,
+      status: "failed",
+      error: "Extension timed out",
     };
   }
 
