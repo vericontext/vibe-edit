@@ -37,6 +37,41 @@ vibe ai transcribe interview.mp3 -l ko -o captions.vtt
 
 ---
 
+### Claude Integration (Motion Graphics & Storyboarding)
+- Added `vibe ai motion` command for AI-generated motion graphics
+  - Natural language → Remotion code generation
+  - Configurable duration, size, FPS, style presets
+  - Outputs ready-to-render TSX component
+- Added `vibe ai storyboard` command for content analysis
+  - Breaks content into video segments
+  - Suggests visuals, audio, text overlays
+  - Outputs structured JSON storyboard
+- Created ClaudeProvider with:
+  - generateMotion() - Remotion code generation
+  - analyzeContent() - Storyboard generation
+  - autoEdit() - Edit suggestions
+
+**Files created:**
+- `packages/ai-providers/src/claude/ClaudeProvider.ts`
+- `packages/ai-providers/src/claude/index.ts`
+
+**Usage:**
+```bash
+# Generate motion graphic
+vibe ai motion "로고가 바운스하면서 등장하는 인트로" -o intro.tsx
+
+# With style preset
+vibe ai motion "타이틀 페이드인" -s cinematic -d 3
+
+# Generate storyboard from text
+vibe ai storyboard "Product launch video script..." -o storyboard.json
+
+# From file
+vibe ai storyboard script.txt -f -d 60 -o storyboard.json
+```
+
+---
+
 ### Scene Detection & Media Analysis
 - Added `vibe detect` command for automatic media analysis
 - Commands:

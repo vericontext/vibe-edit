@@ -20,22 +20,7 @@ Core infrastructure and basic editing capabilities.
 
 ---
 
-## Phase 2: Rendering Infrastructure 📋
-
-Overcome browser memory limits for AI-generated content.
-
-- [ ] **Hybrid rendering architecture**
-  - FFmpeg.wasm for lightweight edits (draft preview, <4GB)
-  - Server-side FFmpeg for final export & heavy AI content
-- [ ] Server rendering service (Docker-based)
-- [ ] Chunked upload/download for large media
-- [ ] Project state persistence (Supabase/Postgres)
-- [ ] **Live Link**: CLI ↔ Web UI sync via WebSocket
-  - CLI commands trigger real-time UI preview updates
-
----
-
-## Phase 3: AI Provider Integration 🚧
+## Phase 2: AI Provider Integration 🚧
 
 Unified interface for AI services.
 
@@ -44,12 +29,14 @@ Unified interface for AI services.
 - [x] Provider registry system
 - [x] **OpenAI GPT** - Natural language timeline commands (`vibe ai edit`)
 - [x] **Gemini** - Multimodal understanding, auto-edit suggestions
-- [ ] **Claude** - Long-form content analysis, timeline planning
+- [x] **Claude** - AI-powered content creation
+  - Natural language → Remotion motion graphics (`vibe ai motion`)
+  - Long-form content analysis & storyboarding (`vibe ai storyboard`)
+  - Timeline planning with AI suggestions
 
 ### Audio
 - [x] **Whisper** - Speech-to-text, auto-subtitles (SRT/VTT export)
 - [x] **ElevenLabs** - Text-to-speech (`vibe ai tts`)
-- [ ] ~~**Audiocraft (Meta)**~~ - Skipped (regional availability)
 - [x] Beat detection & silence detection (`vibe detect beats/silence`)
 
 ### Image
@@ -58,17 +45,15 @@ Unified interface for AI services.
 - [ ] Background removal / replacement
 
 ### Video
+- [x] Scene detection & auto-cutting (`vibe detect scenes`)
 - [ ] **Runway Gen-3** - Video generation, inpainting
 - [ ] **Kling** - Video generation
 - [ ] **Pika** - Video-to-video transformation
 - [ ] **HeyGen** - AI avatars, lip sync
-- [x] Scene detection & auto-cutting (`vibe detect scenes`)
-
-> **Note**: AI video outputs are processed server-side due to file size.
 
 ---
 
-## Phase 4: MCP Integration 📋
+## Phase 3: MCP Integration 📋
 
 Model Context Protocol for extensible AI workflows.
 
@@ -95,7 +80,7 @@ vibe://prompts/suggest-edits
 
 ---
 
-## Phase 5: AI-Native Editing 📋
+## Phase 4: AI-Native Editing 📋
 
 Intelligence built into every interaction.
 
@@ -107,6 +92,23 @@ Intelligence built into every interaction.
 - [ ] Content-aware speed ramping
 - [ ] AI-powered audio ducking
 - [ ] Auto-generate shorts from long-form content
+
+---
+
+## Phase 5: Server Infrastructure 📋
+
+Overcome browser memory limits for AI-generated content.
+
+- [ ] **Hybrid rendering architecture**
+  - FFmpeg.wasm for lightweight edits (draft preview, <4GB)
+  - Server-side FFmpeg for final export & heavy AI content
+- [ ] Server rendering service (Docker-based)
+- [ ] Chunked upload/download for large media
+- [ ] Project state persistence (Supabase/Postgres)
+- [ ] **Live Link**: CLI ↔ Web UI sync via WebSocket
+  - CLI commands trigger real-time UI preview updates
+
+> **Note**: AI video outputs (Runway, Kling, etc.) require server-side processing due to file size.
 
 ---
 
@@ -162,7 +164,9 @@ vibe timeline   add-source | add-clip | add-track | add-effect | trim | list
 vibe batch      import | concat | apply-effect | remove-clips | info
 vibe media      info | duration
 vibe export     <project> -o <output> -p <preset>
-vibe ai         providers | transcribe | suggest
+vibe detect     scenes | silence | beats
+vibe ai         providers | transcribe | suggest | edit | tts | voices
+                motion | storyboard
 ```
 
 ---

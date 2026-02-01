@@ -8,10 +8,12 @@ import {
   WhisperProvider,
   GeminiProvider,
   OpenAIProvider,
+  ClaudeProvider,
   ElevenLabsProvider,
   whisperProvider,
   geminiProvider,
   openaiProvider,
+  claudeProvider,
   elevenLabsProvider,
   runwayProvider,
   klingProvider,
@@ -353,6 +355,140 @@ aiCommand
   });
 
 aiCommand
+  .command("motion")
+  .description("Generate motion graphics using Claude + Remotion")
+  .argument("<description>", "Natural language description of the motion graphic")
+  .option("-k, --api-key <key>", "Anthropic API key (or set ANTHROPIC_API_KEY env)")
+  .option("-o, --output <path>", "Output file path for generated code", "motion.tsx")
+  .option("-d, --duration <sec>", "Duration in seconds", "5")
+  .option("-w, --width <px>", "Width in pixels", "1920")
+  .option("-h, --height <px>", "Height in pixels", "1080")
+  .option("--fps <fps>", "Frame rate", "30")
+  .option("-s, --style <style>", "Style preset: minimal, corporate, playful, cinematic")
+  .action(async (description: string, options) => {
+    try {
+      const apiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Anthropic API key required. Use --api-key or set ANTHROPIC_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating motion graphic...").start();
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey });
+
+      const result = await claude.generateMotion(description, {
+        duration: parseFloat(options.duration),
+        width: parseInt(options.width),
+        height: parseInt(options.height),
+        fps: parseInt(options.fps),
+        style: options.style,
+      });
+
+      if (!result.success || !result.component) {
+        spinner.fail(chalk.red(result.error || "Motion generation failed"));
+        process.exit(1);
+      }
+
+      const { component } = result;
+      spinner.succeed(chalk.green("Motion graphic generated"));
+
+      console.log();
+      console.log(chalk.bold.cyan("Generated Component"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Name: ${chalk.bold(component.name)}`);
+      console.log(`Size: ${component.width}x${component.height} @ ${component.fps}fps`);
+      console.log(`Duration: ${component.durationInFrames} frames (${options.duration}s)`);
+      console.log(`Description: ${component.description}`);
+      console.log();
+
+      // Save the component code
+      const outputPath = resolve(process.cwd(), options.output);
+      await writeFile(outputPath, component.code, "utf-8");
+      console.log(chalk.green(`Saved to: ${outputPath}`));
+
+      console.log();
+      console.log(chalk.dim("To render, use Remotion CLI:"));
+      console.log(chalk.dim(`  npx remotion render ${options.output} ${component.name} out.mp4`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Motion generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("storyboard")
+  .description("Generate video storyboard from content using Claude")
+  .argument("<content>", "Content to analyze (text or file path)")
+  .option("-k, --api-key <key>", "Anthropic API key (or set ANTHROPIC_API_KEY env)")
+  .option("-o, --output <path>", "Output JSON file path")
+  .option("-d, --duration <sec>", "Target total duration in seconds")
+  .option("-f, --file", "Treat content argument as file path")
+  .action(async (content: string, options) => {
+    try {
+      const apiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Anthropic API key required. Use --api-key or set ANTHROPIC_API_KEY"));
+        process.exit(1);
+      }
+
+      let textContent = content;
+      if (options.file) {
+        const filePath = resolve(process.cwd(), content);
+        textContent = await readFile(filePath, "utf-8");
+      }
+
+      const spinner = ora("Analyzing content...").start();
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey });
+
+      const segments = await claude.analyzeContent(
+        textContent,
+        options.duration ? parseFloat(options.duration) : undefined
+      );
+
+      if (segments.length === 0) {
+        spinner.fail(chalk.red("Could not generate storyboard"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green(`Generated ${segments.length} segments`));
+
+      console.log();
+      console.log(chalk.bold.cyan("Storyboard"));
+      console.log(chalk.dim("─".repeat(60)));
+
+      for (const seg of segments) {
+        console.log();
+        console.log(chalk.yellow(`[${seg.index + 1}] ${formatTime(seg.startTime)} - ${formatTime(seg.startTime + seg.duration)}`));
+        console.log(`  ${seg.description}`);
+        console.log(chalk.dim(`  Visuals: ${seg.visuals}`));
+        if (seg.audio) {
+          console.log(chalk.dim(`  Audio: ${seg.audio}`));
+        }
+        if (seg.textOverlays && seg.textOverlays.length > 0) {
+          console.log(chalk.dim(`  Text: ${seg.textOverlays.join(", ")}`));
+        }
+      }
+      console.log();
+
+      if (options.output) {
+        const outputPath = resolve(process.cwd(), options.output);
+        await writeFile(outputPath, JSON.stringify(segments, null, 2), "utf-8");
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Storyboard generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
   .command("providers")
   .description("List available AI providers")
   .action(async () => {
@@ -360,6 +496,7 @@ aiCommand
     providerRegistry.register(whisperProvider);
     providerRegistry.register(geminiProvider);
     providerRegistry.register(openaiProvider);
+    providerRegistry.register(claudeProvider);
     providerRegistry.register(elevenLabsProvider);
     providerRegistry.register(runwayProvider);
     providerRegistry.register(klingProvider);

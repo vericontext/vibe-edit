@@ -123,6 +123,8 @@ pnpm vibe ai transcribe <audio> -o sub.srt   # Export as SRT subtitles
 pnpm vibe ai edit <project> "trim to 5s"     # Natural language editing (GPT)
 pnpm vibe ai suggest <project> "add fade"    # Get suggestions (Gemini)
 pnpm vibe ai tts "Hello" -o voice.mp3        # Text-to-speech (ElevenLabs)
+pnpm vibe ai motion "logo intro" -o intro.tsx    # Motion graphics (Claude)
+pnpm vibe ai storyboard "script..." -o story.json  # Storyboard (Claude)
 
 # Detection (FFmpeg-based)
 pnpm vibe detect scenes <video>              # Auto-detect scene changes

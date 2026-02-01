@@ -6,6 +6,8 @@ export { providerRegistry, getBestProviderForCapability } from "./interface/regi
 export { WhisperProvider, whisperProvider } from "./whisper";
 export { GeminiProvider, geminiProvider } from "./gemini";
 export { OpenAIProvider, openaiProvider } from "./openai";
+export { ClaudeProvider, claudeProvider } from "./claude";
+export type { MotionOptions, MotionResult, RemotionComponent, StoryboardSegment } from "./claude";
 export { ElevenLabsProvider, elevenLabsProvider } from "./elevenlabs";
 export type { Voice, TTSOptions, TTSResult } from "./elevenlabs";
 export { RunwayProvider, runwayProvider } from "./runway";
