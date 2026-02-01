@@ -6,6 +6,18 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### Media Info Command
+- Added `vibe media` command for media file analysis
+- Uses `music-metadata` package for audio/video metadata parsing
+- Commands:
+  - `vibe media info <file>` - Shows file info, format, duration, bitrate, codec, tags
+  - `vibe media duration <file>` - Returns duration in seconds (for scripting)
+
+**Files created:**
+- `packages/cli/src/commands/media.ts`
+
+---
+
 ### CLI Integration Tests
 - Added integration tests for CLI commands (project, timeline, ai)
 - 30 additional test cases for CLI commands:

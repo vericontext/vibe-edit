@@ -20,6 +20,7 @@
     "@vibe-edit/core": "workspace:*",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
+    "music-metadata": "^11.11.1",
     "ora": "^8.0.1"
   },
   "devDependencies": {
