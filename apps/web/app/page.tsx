@@ -80,8 +80,8 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-secondary to-secondary/50 rounded-xl p-1 max-w-xl mx-auto mb-8 animate-fade-in-up delay-200 shadow-xl">
             <div className="flex items-center gap-2 px-4 py-3 bg-background rounded-lg font-mono text-sm">
               <span className="text-primary">$</span>
-              <span className="text-foreground">curl -fsSL vibeframe.ai/install.sh | bash</span>
-              <CopyButton text="curl -fsSL vibeframe.ai/install.sh | bash" />
+              <span className="text-foreground">curl -fsSL https://vibeframe.ai/install.sh | bash</span>
+              <CopyButton text="curl -fsSL https://vibeframe.ai/install.sh | bash" />
             </div>
           </div>
 

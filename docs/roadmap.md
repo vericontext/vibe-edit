@@ -132,7 +132,7 @@ Intelligence built into every interaction.
 - [x] Object Tracking - SAM-2/co-tracker tracking (`vibe ai track-object`)
 
 ### Installation & Interactive Mode
-- [x] **Install Script** - One-line installation: `curl -fsSL vibeframe.ai/install.sh | bash`
+- [x] **Install Script** - One-line installation: `curl -fsSL https://vibeframe.ai/install.sh | bash`
 - [x] **Setup Wizard** - Interactive API key configuration (`vibe setup`)
 - [x] **Interactive REPL** - Natural language editing mode (run `vibe` with no args)
   - Built-in commands: new, open, save, info, list, add, export, undo

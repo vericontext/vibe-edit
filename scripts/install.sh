@@ -20,11 +20,12 @@ VIBE_HOME="${VIBE_HOME:-$HOME/.vibeframe}"
 # Print banner
 banner() {
   echo ""
-  echo -e "${MAGENTA} ██╗   ██╗██╗██████╗ ███████╗${NC}"
-  echo -e "${MAGENTA} ██║   ██║██║██╔══██╗██╔════╝${NC}"
-  echo -e "${MAGENTA} ╚██╗ ██╗██║██████╔╝█████╗  ${NC}"
-  echo -e "${MAGENTA}  ╚████╔╝██║██████╔╝███████╗${NC}  ${DIM}edit${NC}"
-  echo -e "${MAGENTA}   ╚═══╝ ╚═╝╚═════╝ ╚══════╝${NC}"
+  echo -e "${MAGENTA}██╗   ██╗██╗██████╗ ███████╗${NC}  ${MAGENTA}███████╗██████╗  █████╗ ███╗   ███╗███████╗${NC}"
+  echo -e "${MAGENTA}██║   ██║██║██╔══██╗██╔════╝${NC}  ${MAGENTA}██╔════╝██╔══██╗██╔══██╗████╗ ████║██╔════╝${NC}"
+  echo -e "${MAGENTA}██║   ██║██║██████╔╝█████╗  ${NC}  ${MAGENTA}█████╗  ██████╔╝███████║██╔████╔██║█████╗  ${NC}"
+  echo -e "${MAGENTA}╚██╗ ██╔╝██║██╔══██╗██╔══╝  ${NC}  ${MAGENTA}██╔══╝  ██╔══██╗██╔══██║██║╚██╔╝██║██╔══╝  ${NC}"
+  echo -e "${MAGENTA} ╚████╔╝ ██║██████╔╝███████╗${NC}  ${MAGENTA}██║     ██║  ██║██║  ██║██║ ╚═╝ ██║███████╗${NC}"
+  echo -e "${MAGENTA}  ╚═══╝  ╚═╝╚═════╝ ╚══════╝${NC}  ${MAGENTA}╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝${NC}"
   echo ""
   echo -e "${DIM}AI-First Video Editor${NC}"
   echo ""
@@ -156,7 +157,7 @@ echo ""
 # Ask to run setup
 echo -e "${DIM}─────────────────────────────────────────${NC}"
 echo ""
-read -p "Run setup wizard now? (Y/n) " -n 1 -r
+read -p "Run setup wizard now? (Y/n) " -n 1 -r < /dev/tty
 echo ""
 
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then

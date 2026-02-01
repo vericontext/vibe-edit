@@ -10,7 +10,7 @@ Detailed changelog of development progress. Updated after each significant chang
 Added curl-installable setup and interactive REPL mode for VibeFrame.
 
 **Install Script:**
-- `curl -fsSL vibeframe.ai/install.sh | bash` - One-line installation
+- `curl -fsSL https://vibeframe.ai/install.sh | bash` - One-line installation
 - Checks for Node.js 18+, git, FFmpeg (optional)
 - Clones repo, installs dependencies, builds, creates symlink
 - Runs setup wizard automatically
@@ -60,7 +60,7 @@ Added curl-installable setup and interactive REPL mode for VibeFrame.
 **Usage:**
 ```bash
 # Install
-curl -fsSL vibeframe.ai/install.sh | bash
+curl -fsSL https://vibeframe.ai/install.sh | bash
 
 # Configure
 vibe setup
