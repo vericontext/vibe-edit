@@ -6,6 +6,28 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-02
 
+### Fix: vibe setup fails when called from install.sh
+Fixed `vibe setup` failing with "Interactive setup requires a terminal" when run via `curl ... | bash`.
+
+**Root Cause:**
+- `install.sh` line 160 used `read -p "..." < /dev/tty` for the Y/n prompt (works correctly)
+- But line 165 called `vibe setup` without redirecting stdin, so it inherited the exhausted curl pipe
+
+**Solution:**
+- Changed `vibe setup` to `vibe setup < /dev/tty` in install.sh
+- This ensures the Node.js process receives terminal input directly
+
+**Files Modified:**
+- `scripts/install.sh` - Added `/dev/tty` redirect for vibe setup command
+
+**Verification:**
+1. `rm -rf ~/.vibeframe`
+2. `curl -fsSL https://vibeframe.ai/install.sh | bash`
+3. Select "Y" when asked to run setup
+4. Setup wizard should now work correctly
+
+---
+
 ### Fix: ESM Module Resolution for CLI Installation
 Fixed `vibe setup` failing after curl installation with `ERR_MODULE_NOT_FOUND`.
 

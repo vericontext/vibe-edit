@@ -162,5 +162,5 @@ echo ""
 
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
   echo ""
-  vibe setup
+  vibe setup < /dev/tty
 fi
