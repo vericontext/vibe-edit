@@ -215,7 +215,7 @@ pnpm vibe ai video-inpaint https://example.com/video.mp4 --mask https://example.
 
 ### MCP Documentation Enhancement
 - Completely rewrote `packages/mcp-server/README.md` with comprehensive documentation
-- Created `docs/mcp-guide.md` - Detailed MCP integration guide
+- Created `docs/mcp.md` - Detailed MCP integration guide
 
 **README.md improvements:**
 - Quick start guide with step-by-step setup
@@ -228,7 +228,7 @@ pnpm vibe ai video-inpaint https://example.com/video.mp4 --mask https://example.
 - Architecture diagram
 - Development commands
 
-**docs/mcp-guide.md includes:**
+**docs/mcp.md includes:**
 - Detailed setup instructions for all platforms
 - Core concepts (project files, ID system, time units, media types)
 - 5 complete workflow examples:
@@ -243,7 +243,7 @@ pnpm vibe ai video-inpaint https://example.com/video.mp4 --mask https://example.
 
 **Files modified:**
 - `packages/mcp-server/README.md` - Complete rewrite (~500 lines)
-- `docs/mcp-guide.md` - New comprehensive guide (~600 lines)
+- `docs/mcp.md` - New comprehensive guide (~600 lines)
 
 ---
 

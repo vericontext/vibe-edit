@@ -494,6 +494,6 @@ The MCP server exposes VibeEdit's CLI functionality through the Model Context Pr
 
 ## Related Documentation
 
-- [Full MCP Guide](../../docs/mcp-guide.md) - Detailed setup and workflow documentation
+- [Full MCP Guide](../../docs/mcp.md) - Detailed setup and workflow documentation
 - [CLI Reference](../cli/README.md) - Command-line interface
 - [AI Providers](../ai-providers/README.md) - AI integration details
