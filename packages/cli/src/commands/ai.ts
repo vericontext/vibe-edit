@@ -10,13 +10,19 @@ import {
   OpenAIProvider,
   ClaudeProvider,
   ElevenLabsProvider,
+  DalleProvider,
+  RunwayProvider,
+  KlingProvider,
+  StabilityProvider,
   whisperProvider,
   geminiProvider,
   openaiProvider,
   claudeProvider,
   elevenLabsProvider,
+  dalleProvider,
   runwayProvider,
   klingProvider,
+  stabilityProvider,
   type TimelineCommand,
 } from "@vibe-edit/ai-providers";
 import { Project, type ProjectFile } from "../engine/index.js";
@@ -355,6 +361,94 @@ aiCommand
   });
 
 aiCommand
+  .command("sfx")
+  .description("Generate sound effect using ElevenLabs")
+  .argument("<prompt>", "Description of the sound effect")
+  .option("-k, --api-key <key>", "ElevenLabs API key (or set ELEVENLABS_API_KEY env)")
+  .option("-o, --output <path>", "Output audio file path", "sound-effect.mp3")
+  .option("-d, --duration <seconds>", "Duration in seconds (0.5-22, default: auto)")
+  .option("-p, --prompt-influence <value>", "Prompt influence (0-1, default: 0.3)")
+  .action(async (prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("ELEVENLABS_API_KEY", "ElevenLabs", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("ElevenLabs API key required. Use --api-key or set ELEVENLABS_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating sound effect...").start();
+
+      const elevenlabs = new ElevenLabsProvider();
+      await elevenlabs.initialize({ apiKey });
+
+      const result = await elevenlabs.generateSoundEffect(prompt, {
+        duration: options.duration ? parseFloat(options.duration) : undefined,
+        promptInfluence: options.promptInfluence ? parseFloat(options.promptInfluence) : undefined,
+      });
+
+      if (!result.success || !result.audioBuffer) {
+        spinner.fail(chalk.red(result.error || "Sound effect generation failed"));
+        process.exit(1);
+      }
+
+      const outputPath = resolve(process.cwd(), options.output);
+      await writeFile(outputPath, result.audioBuffer);
+
+      spinner.succeed(chalk.green("Sound effect generated"));
+      console.log(chalk.green(`Saved to: ${outputPath}`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Sound effect generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("isolate")
+  .description("Isolate vocals from audio using ElevenLabs")
+  .argument("<audio>", "Input audio file path")
+  .option("-k, --api-key <key>", "ElevenLabs API key (or set ELEVENLABS_API_KEY env)")
+  .option("-o, --output <path>", "Output audio file path", "vocals.mp3")
+  .action(async (audioPath: string, options) => {
+    try {
+      const apiKey = await getApiKey("ELEVENLABS_API_KEY", "ElevenLabs", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("ElevenLabs API key required. Use --api-key or set ELEVENLABS_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading audio file...").start();
+
+      const absPath = resolve(process.cwd(), audioPath);
+      const audioBuffer = await readFile(absPath);
+
+      spinner.text = "Isolating vocals...";
+
+      const elevenlabs = new ElevenLabsProvider();
+      await elevenlabs.initialize({ apiKey });
+
+      const result = await elevenlabs.isolateVocals(audioBuffer);
+
+      if (!result.success || !result.audioBuffer) {
+        spinner.fail(chalk.red(result.error || "Audio isolation failed"));
+        process.exit(1);
+      }
+
+      const outputPath = resolve(process.cwd(), options.output);
+      await writeFile(outputPath, result.audioBuffer);
+
+      spinner.succeed(chalk.green("Vocals isolated"));
+      console.log(chalk.green(`Saved to: ${outputPath}`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Audio isolation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
   .command("motion")
   .description("Generate motion graphics using Claude + Remotion")
   .argument("<description>", "Natural language description of the motion graphic")
@@ -489,6 +583,990 @@ aiCommand
   });
 
 aiCommand
+  .command("image")
+  .description("Generate image using DALL-E")
+  .argument("<prompt>", "Image description prompt")
+  .option("-k, --api-key <key>", "OpenAI API key (or set OPENAI_API_KEY env)")
+  .option("-o, --output <path>", "Output file path (downloads image)")
+  .option("-s, --size <size>", "Image size: 1024x1024, 1792x1024, 1024x1792", "1024x1024")
+  .option("-q, --quality <quality>", "Quality: standard, hd", "standard")
+  .option("--style <style>", "Style: vivid, natural", "vivid")
+  .option("-n, --count <n>", "Number of images to generate", "1")
+  .action(async (prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("OPENAI_API_KEY", "OpenAI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("OpenAI API key required. Use --api-key or set OPENAI_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating image...").start();
+
+      const dalle = new DalleProvider();
+      await dalle.initialize({ apiKey });
+
+      const result = await dalle.generateImage(prompt, {
+        size: options.size,
+        quality: options.quality,
+        style: options.style,
+        n: parseInt(options.count),
+      });
+
+      if (!result.success || !result.images) {
+        spinner.fail(chalk.red(result.error || "Image generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green(`Generated ${result.images.length} image(s)`));
+
+      console.log();
+      console.log(chalk.bold.cyan("Generated Images"));
+      console.log(chalk.dim("─".repeat(60)));
+
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        console.log();
+        console.log(`${chalk.yellow(`[${i + 1}]`)} ${img.url}`);
+        if (img.revisedPrompt) {
+          console.log(chalk.dim(`    Revised: ${img.revisedPrompt.slice(0, 100)}...`));
+        }
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output && result.images.length > 0) {
+        const downloadSpinner = ora("Downloading image...").start();
+        try {
+          const response = await fetch(result.images[0].url);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download image"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Image generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("thumbnail")
+  .description("Generate video thumbnail using DALL-E")
+  .argument("<description>", "Thumbnail description")
+  .option("-k, --api-key <key>", "OpenAI API key (or set OPENAI_API_KEY env)")
+  .option("-o, --output <path>", "Output file path (downloads image)")
+  .option("-s, --style <style>", "Platform style: youtube, instagram, tiktok, twitter")
+  .action(async (description: string, options) => {
+    try {
+      const apiKey = await getApiKey("OPENAI_API_KEY", "OpenAI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("OpenAI API key required. Use --api-key or set OPENAI_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating thumbnail...").start();
+
+      const dalle = new DalleProvider();
+      await dalle.initialize({ apiKey });
+
+      const result = await dalle.generateThumbnail(description, options.style);
+
+      if (!result.success || !result.images) {
+        spinner.fail(chalk.red(result.error || "Thumbnail generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Thumbnail generated"));
+
+      const img = result.images[0];
+      console.log();
+      console.log(chalk.bold.cyan("Generated Thumbnail"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`URL: ${img.url}`);
+      if (img.revisedPrompt) {
+        console.log(chalk.dim(`Prompt: ${img.revisedPrompt.slice(0, 100)}...`));
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output) {
+        const downloadSpinner = ora("Downloading thumbnail...").start();
+        try {
+          const response = await fetch(img.url);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download thumbnail"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Thumbnail generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("background")
+  .description("Generate video background using DALL-E")
+  .argument("<description>", "Background description")
+  .option("-k, --api-key <key>", "OpenAI API key (or set OPENAI_API_KEY env)")
+  .option("-o, --output <path>", "Output file path (downloads image)")
+  .option("-a, --aspect <ratio>", "Aspect ratio: 16:9, 9:16, 1:1", "16:9")
+  .action(async (description: string, options) => {
+    try {
+      const apiKey = await getApiKey("OPENAI_API_KEY", "OpenAI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("OpenAI API key required. Use --api-key or set OPENAI_API_KEY"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating background...").start();
+
+      const dalle = new DalleProvider();
+      await dalle.initialize({ apiKey });
+
+      const result = await dalle.generateBackground(description, options.aspect);
+
+      if (!result.success || !result.images) {
+        spinner.fail(chalk.red(result.error || "Background generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Background generated"));
+
+      const img = result.images[0];
+      console.log();
+      console.log(chalk.bold.cyan("Generated Background"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`URL: ${img.url}`);
+      if (img.revisedPrompt) {
+        console.log(chalk.dim(`Prompt: ${img.revisedPrompt.slice(0, 100)}...`));
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output) {
+        const downloadSpinner = ora("Downloading background...").start();
+        try {
+          const response = await fetch(img.url);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download background"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Background generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("video")
+  .description("Generate video using Runway Gen-3")
+  .argument("<prompt>", "Text prompt describing the video")
+  .option("-k, --api-key <key>", "Runway API key (or set RUNWAY_API_SECRET env)")
+  .option("-o, --output <path>", "Output file path (downloads video)")
+  .option("-i, --image <path>", "Reference image for image-to-video")
+  .option("-d, --duration <sec>", "Duration: 5 or 10 seconds", "5")
+  .option("-r, --ratio <ratio>", "Aspect ratio: 16:9 or 9:16", "16:9")
+  .option("-s, --seed <number>", "Random seed for reproducibility")
+  .option("--no-wait", "Start generation and return task ID without waiting")
+  .action(async (prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("RUNWAY_API_SECRET", "Runway", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Runway API key required. Use --api-key or set RUNWAY_API_SECRET"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing Runway Gen-3...").start();
+
+      const runway = new RunwayProvider();
+      await runway.initialize({ apiKey });
+
+      // If image provided, read it
+      let referenceImage: string | undefined;
+      if (options.image) {
+        spinner.text = "Reading reference image...";
+        const imagePath = resolve(process.cwd(), options.image);
+        const imageBuffer = await readFile(imagePath);
+        const ext = options.image.toLowerCase().split(".").pop();
+        const mimeTypes: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+        };
+        const mimeType = mimeTypes[ext || "png"] || "image/png";
+        referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+      }
+
+      spinner.text = "Starting video generation...";
+
+      const result = await runway.generateVideo(prompt, {
+        prompt,
+        referenceImage,
+        duration: parseInt(options.duration) as 5 | 10,
+        aspectRatio: options.ratio as "16:9" | "9:16",
+        seed: options.seed ? parseInt(options.seed) : undefined,
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Failed to start generation"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Video Generation Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Generation started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  pnpm vibe ai video-status ${result.id}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Generating video (this may take 1-2 minutes)...";
+
+      const finalResult = await runway.waitForCompletion(
+        result.id,
+        (status) => {
+          if (status.progress !== undefined) {
+            spinner.text = `Generating video... ${status.progress}%`;
+          }
+        },
+        300000 // 5 minute timeout
+      );
+
+      if (finalResult.status !== "completed") {
+        spinner.fail(chalk.red(finalResult.error || "Generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Video generated"));
+
+      console.log();
+      if (finalResult.videoUrl) {
+        console.log(`Video URL: ${finalResult.videoUrl}`);
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output && finalResult.videoUrl) {
+        const downloadSpinner = ora("Downloading video...").start();
+        try {
+          const response = await fetch(finalResult.videoUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download video"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Video generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("video-status")
+  .description("Check Runway video generation status")
+  .argument("<task-id>", "Task ID from video generation")
+  .option("-k, --api-key <key>", "Runway API key (or set RUNWAY_API_SECRET env)")
+  .option("-w, --wait", "Wait for completion")
+  .option("-o, --output <path>", "Download video when complete")
+  .action(async (taskId: string, options) => {
+    try {
+      const apiKey = await getApiKey("RUNWAY_API_SECRET", "Runway", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Runway API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Checking status...").start();
+
+      const runway = new RunwayProvider();
+      await runway.initialize({ apiKey });
+
+      let result = await runway.getGenerationStatus(taskId);
+
+      if (options.wait && result.status !== "completed" && result.status !== "failed" && result.status !== "cancelled") {
+        spinner.text = "Waiting for completion...";
+        result = await runway.waitForCompletion(
+          taskId,
+          (status) => {
+            if (status.progress !== undefined) {
+              spinner.text = `Generating... ${status.progress}%`;
+            }
+          }
+        );
+      }
+
+      spinner.stop();
+
+      console.log();
+      console.log(chalk.bold.cyan("Generation Status"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${taskId}`);
+      console.log(`Status: ${getStatusColor(result.status)}`);
+      if (result.progress !== undefined) {
+        console.log(`Progress: ${result.progress}%`);
+      }
+      if (result.videoUrl) {
+        console.log(`Video URL: ${result.videoUrl}`);
+      }
+      if (result.error) {
+        console.log(`Error: ${chalk.red(result.error)}`);
+      }
+      console.log();
+
+      // Download if output specified and completed
+      if (options.output && result.videoUrl) {
+        const downloadSpinner = ora("Downloading video...").start();
+        try {
+          const response = await fetch(result.videoUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download video"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Failed to get status"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("video-cancel")
+  .description("Cancel Runway video generation")
+  .argument("<task-id>", "Task ID to cancel")
+  .option("-k, --api-key <key>", "Runway API key (or set RUNWAY_API_SECRET env)")
+  .action(async (taskId: string, options) => {
+    try {
+      const apiKey = await getApiKey("RUNWAY_API_SECRET", "Runway", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Runway API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Cancelling generation...").start();
+
+      const runway = new RunwayProvider();
+      await runway.initialize({ apiKey });
+
+      const success = await runway.cancelGeneration(taskId);
+
+      if (success) {
+        spinner.succeed(chalk.green("Generation cancelled"));
+      } else {
+        spinner.fail(chalk.red("Failed to cancel generation"));
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(chalk.red("Failed to cancel"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Kling video generation commands
+aiCommand
+  .command("kling")
+  .description("Generate video using Kling AI")
+  .argument("<prompt>", "Text prompt describing the video")
+  .option("-k, --api-key <key>", "Kling API key (ACCESS_KEY:SECRET_KEY) or set KLING_API_KEY env")
+  .option("-o, --output <path>", "Output file path (downloads video)")
+  .option("-i, --image <path>", "Reference image for image-to-video")
+  .option("-d, --duration <sec>", "Duration: 5 or 10 seconds", "5")
+  .option("-r, --ratio <ratio>", "Aspect ratio: 16:9, 9:16, or 1:1", "16:9")
+  .option("-m, --mode <mode>", "Generation mode: std (standard) or pro", "std")
+  .option("-n, --negative <prompt>", "Negative prompt (what to avoid)")
+  .option("--no-wait", "Start generation and return task ID without waiting")
+  .action(async (prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("KLING_API_KEY", "Kling", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Kling API key required."));
+        console.error(chalk.dim("Format: ACCESS_KEY:SECRET_KEY"));
+        console.error(chalk.dim("Use --api-key or set KLING_API_KEY environment variable"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing Kling AI...").start();
+
+      const kling = new KlingProvider();
+      await kling.initialize({ apiKey });
+
+      if (!kling.isConfigured()) {
+        spinner.fail(chalk.red("Invalid API key format. Use ACCESS_KEY:SECRET_KEY"));
+        process.exit(1);
+      }
+
+      // If image provided, read it
+      let referenceImage: string | undefined;
+      let isImageToVideo = false;
+      if (options.image) {
+        spinner.text = "Reading reference image...";
+        const imagePath = resolve(process.cwd(), options.image);
+        const imageBuffer = await readFile(imagePath);
+        const ext = options.image.toLowerCase().split(".").pop();
+        const mimeTypes: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+        };
+        const mimeType = mimeTypes[ext || "png"] || "image/png";
+        referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+        isImageToVideo = true;
+      }
+
+      spinner.text = "Starting video generation...";
+
+      const result = await kling.generateVideo(prompt, {
+        prompt,
+        referenceImage,
+        duration: parseInt(options.duration) as 5 | 10,
+        aspectRatio: options.ratio as "16:9" | "9:16" | "1:1",
+        negativePrompt: options.negative,
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Failed to start generation"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Kling Video Generation Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+      console.log(`Type: ${isImageToVideo ? "image2video" : "text2video"}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Generation started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  pnpm vibe ai kling-status ${result.id}${isImageToVideo ? " --type image2video" : ""}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Generating video (this may take 2-5 minutes)...";
+
+      const taskType = isImageToVideo ? "image2video" : "text2video";
+      const finalResult = await kling.waitForCompletion(
+        result.id,
+        taskType,
+        (status) => {
+          spinner.text = `Generating video... ${status.status}`;
+        },
+        600000 // 10 minute timeout
+      );
+
+      if (finalResult.status !== "completed") {
+        spinner.fail(chalk.red(finalResult.error || "Generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Video generated"));
+
+      console.log();
+      if (finalResult.videoUrl) {
+        console.log(`Video URL: ${finalResult.videoUrl}`);
+      }
+      if (finalResult.duration) {
+        console.log(`Duration: ${finalResult.duration}s`);
+      }
+      console.log();
+
+      // Download if output specified
+      if (options.output && finalResult.videoUrl) {
+        const downloadSpinner = ora("Downloading video...").start();
+        try {
+          const response = await fetch(finalResult.videoUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download video"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Video generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("kling-status")
+  .description("Check Kling video generation status")
+  .argument("<task-id>", "Task ID from video generation")
+  .option("-k, --api-key <key>", "Kling API key (or set KLING_API_KEY env)")
+  .option("-t, --type <type>", "Task type: text2video or image2video", "text2video")
+  .option("-w, --wait", "Wait for completion")
+  .option("-o, --output <path>", "Download video when complete")
+  .action(async (taskId: string, options) => {
+    try {
+      const apiKey = await getApiKey("KLING_API_KEY", "Kling", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Kling API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Checking status...").start();
+
+      const kling = new KlingProvider();
+      await kling.initialize({ apiKey });
+
+      const taskType = options.type as "text2video" | "image2video";
+      let result = await kling.getGenerationStatus(taskId, taskType);
+
+      if (options.wait && result.status !== "completed" && result.status !== "failed" && result.status !== "cancelled") {
+        spinner.text = "Waiting for completion...";
+        result = await kling.waitForCompletion(
+          taskId,
+          taskType,
+          (status) => {
+            spinner.text = `Generating... ${status.status}`;
+          }
+        );
+      }
+
+      spinner.stop();
+
+      console.log();
+      console.log(chalk.bold.cyan("Kling Generation Status"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${taskId}`);
+      console.log(`Type: ${taskType}`);
+      console.log(`Status: ${getStatusColor(result.status)}`);
+      if (result.videoUrl) {
+        console.log(`Video URL: ${result.videoUrl}`);
+      }
+      if (result.duration) {
+        console.log(`Duration: ${result.duration}s`);
+      }
+      if (result.error) {
+        console.log(`Error: ${chalk.red(result.error)}`);
+      }
+      console.log();
+
+      // Download if output specified and completed
+      if (options.output && result.videoUrl) {
+        const downloadSpinner = ora("Downloading video...").start();
+        try {
+          const response = await fetch(result.videoUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = resolve(process.cwd(), options.output);
+          await writeFile(outputPath, buffer);
+          downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+        } catch (err) {
+          downloadSpinner.fail(chalk.red("Failed to download video"));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Failed to get status"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Stability AI (Stable Diffusion) commands
+aiCommand
+  .command("sd")
+  .description("Generate image using Stable Diffusion (Stability AI)")
+  .argument("<prompt>", "Text prompt describing the image")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "output.png")
+  .option("-m, --model <model>", "Model: sd3.5-large, sd3.5-medium, stable-image-ultra", "sd3.5-large")
+  .option("-r, --ratio <ratio>", "Aspect ratio: 16:9, 1:1, 9:16, 21:9, etc.", "1:1")
+  .option("-n, --negative <prompt>", "Negative prompt (what to avoid)")
+  .option("-s, --seed <number>", "Random seed for reproducibility")
+  .option("--style <preset>", "Style preset: photographic, anime, digital-art, cinematic, etc.")
+  .option("-f, --format <format>", "Output format: png, jpeg, webp", "png")
+  .action(async (prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required."));
+        console.error(chalk.dim("Use --api-key or set STABILITY_API_KEY environment variable"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Generating image with Stable Diffusion...").start();
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.generateImage(prompt, {
+        model: options.model,
+        aspectRatio: options.ratio,
+        negativePrompt: options.negative,
+        seed: options.seed ? parseInt(options.seed) : undefined,
+        stylePreset: options.style,
+        outputFormat: options.format,
+      });
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Image generation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Image generated"));
+
+      const img = result.images[0];
+      if (img.seed) {
+        console.log(chalk.dim(`Seed: ${img.seed}`));
+      }
+
+      // Save the image
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Image generation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("sd-upscale")
+  .description("Upscale image using Stability AI")
+  .argument("<image>", "Input image file path")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "upscaled.png")
+  .option("-t, --type <type>", "Upscale type: fast, conservative, creative", "fast")
+  .option("-c, --creativity <value>", "Creativity (0-0.35, for creative upscale)")
+  .option("-f, --format <format>", "Output format: png, jpeg, webp", "png")
+  .action(async (imagePath: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading image...").start();
+
+      const absPath = resolve(process.cwd(), imagePath);
+      const imageBuffer = await readFile(absPath);
+
+      spinner.text = "Upscaling image...";
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.upscaleImage(imageBuffer, {
+        type: options.type as "fast" | "conservative" | "creative",
+        creativity: options.creativity ? parseFloat(options.creativity) : undefined,
+        outputFormat: options.format,
+      });
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Upscale failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Image upscaled"));
+
+      const img = result.images[0];
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Upscale failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("sd-remove-bg")
+  .description("Remove background from image using Stability AI")
+  .argument("<image>", "Input image file path")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "no-bg.png")
+  .option("-f, --format <format>", "Output format: png, webp", "png")
+  .action(async (imagePath: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading image...").start();
+
+      const absPath = resolve(process.cwd(), imagePath);
+      const imageBuffer = await readFile(absPath);
+
+      spinner.text = "Removing background...";
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.removeBackground(imageBuffer, options.format as "png" | "webp");
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Background removal failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Background removed"));
+
+      const img = result.images[0];
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Background removal failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("sd-img2img")
+  .description("Transform image using Stable Diffusion (image-to-image)")
+  .argument("<image>", "Input image file path")
+  .argument("<prompt>", "Text prompt describing the transformation")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "transformed.png")
+  .option("-t, --strength <value>", "Transformation strength (0-1)", "0.35")
+  .option("-n, --negative <prompt>", "Negative prompt (what to avoid)")
+  .option("-s, --seed <number>", "Random seed for reproducibility")
+  .option("-f, --format <format>", "Output format: png, jpeg, webp", "png")
+  .action(async (imagePath: string, prompt: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading image...").start();
+
+      const absPath = resolve(process.cwd(), imagePath);
+      const imageBuffer = await readFile(absPath);
+
+      spinner.text = "Transforming image...";
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.imageToImage(imageBuffer, prompt, {
+        strength: parseFloat(options.strength),
+        negativePrompt: options.negative,
+        seed: options.seed ? parseInt(options.seed) : undefined,
+        outputFormat: options.format,
+      });
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Transformation failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Image transformed"));
+
+      const img = result.images[0];
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Transformation failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("sd-replace")
+  .description("Search and replace objects in image using Stability AI")
+  .argument("<image>", "Input image file path")
+  .argument("<search>", "What to search for in the image")
+  .argument("<replace>", "What to replace it with")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "replaced.png")
+  .option("-n, --negative <prompt>", "Negative prompt (what to avoid)")
+  .option("-s, --seed <number>", "Random seed for reproducibility")
+  .option("-f, --format <format>", "Output format: png, jpeg, webp", "png")
+  .action(async (imagePath: string, search: string, replace: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading image...").start();
+
+      const absPath = resolve(process.cwd(), imagePath);
+      const imageBuffer = await readFile(absPath);
+
+      spinner.text = "Replacing objects...";
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.searchAndReplace(imageBuffer, search, replace, {
+        negativePrompt: options.negative,
+        seed: options.seed ? parseInt(options.seed) : undefined,
+        outputFormat: options.format,
+      });
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Search and replace failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Objects replaced"));
+
+      const img = result.images[0];
+      if (img.seed) {
+        console.log(chalk.dim(`Seed: ${img.seed}`));
+      }
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Search and replace failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+aiCommand
+  .command("sd-outpaint")
+  .description("Extend image canvas (outpainting) using Stability AI")
+  .argument("<image>", "Input image file path")
+  .option("-k, --api-key <key>", "Stability AI API key (or set STABILITY_API_KEY env)")
+  .option("-o, --output <path>", "Output file path", "outpainted.png")
+  .option("--left <pixels>", "Pixels to extend on the left (0-2000)")
+  .option("--right <pixels>", "Pixels to extend on the right (0-2000)")
+  .option("--up <pixels>", "Pixels to extend upward (0-2000)")
+  .option("--down <pixels>", "Pixels to extend downward (0-2000)")
+  .option("-p, --prompt <text>", "Prompt for the extended area")
+  .option("-c, --creativity <value>", "Creativity level (0-1, default: 0.5)")
+  .option("-f, --format <format>", "Output format: png, jpeg, webp", "png")
+  .action(async (imagePath: string, options) => {
+    try {
+      const apiKey = await getApiKey("STABILITY_API_KEY", "Stability AI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Stability AI API key required"));
+        process.exit(1);
+      }
+
+      const left = options.left ? parseInt(options.left) : 0;
+      const right = options.right ? parseInt(options.right) : 0;
+      const up = options.up ? parseInt(options.up) : 0;
+      const down = options.down ? parseInt(options.down) : 0;
+
+      if (left === 0 && right === 0 && up === 0 && down === 0) {
+        console.error(chalk.red("At least one direction (--left, --right, --up, --down) must be specified"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Reading image...").start();
+
+      const absPath = resolve(process.cwd(), imagePath);
+      const imageBuffer = await readFile(absPath);
+
+      spinner.text = "Extending image...";
+
+      const stability = new StabilityProvider();
+      await stability.initialize({ apiKey });
+
+      const result = await stability.outpaint(imageBuffer, {
+        left,
+        right,
+        up,
+        down,
+        prompt: options.prompt,
+        creativity: options.creativity ? parseFloat(options.creativity) : undefined,
+        outputFormat: options.format,
+      });
+
+      if (!result.success || !result.images || result.images.length === 0) {
+        spinner.fail(chalk.red(result.error || "Outpainting failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Image extended"));
+
+      const img = result.images[0];
+      if (img.seed) {
+        console.log(chalk.dim(`Seed: ${img.seed}`));
+      }
+      if (img.base64) {
+        const outputPath = resolve(process.cwd(), options.output);
+        const buffer = Buffer.from(img.base64, "base64");
+        await writeFile(outputPath, buffer);
+        console.log(chalk.green(`Saved to: ${outputPath}`));
+      }
+    } catch (error) {
+      console.error(chalk.red("Outpainting failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case "completed":
+      return chalk.green(status);
+    case "failed":
+    case "cancelled":
+      return chalk.red(status);
+    case "processing":
+      return chalk.yellow(status);
+    default:
+      return chalk.dim(status);
+  }
+}
+
+aiCommand
   .command("providers")
   .description("List available AI providers")
   .action(async () => {
@@ -498,8 +1576,10 @@ aiCommand
     providerRegistry.register(openaiProvider);
     providerRegistry.register(claudeProvider);
     providerRegistry.register(elevenLabsProvider);
+    providerRegistry.register(dalleProvider);
     providerRegistry.register(runwayProvider);
     providerRegistry.register(klingProvider);
+    providerRegistry.register(stabilityProvider);
 
     console.log();
     console.log(chalk.bold.cyan("Available AI Providers"));

@@ -15,7 +15,11 @@ export type AICapability =
   | "object-removal"
   | "background-removal"
   | "upscale"
-  | "slow-motion";
+  | "slow-motion"
+  | "sound-generation"
+  | "audio-isolation"
+  | "search-replace"
+  | "outpaint";
 
 /**
  * Generation status

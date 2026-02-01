@@ -9,9 +9,13 @@ export { OpenAIProvider, openaiProvider } from "./openai";
 export { ClaudeProvider, claudeProvider } from "./claude";
 export type { MotionOptions, MotionResult, RemotionComponent, StoryboardSegment } from "./claude";
 export { ElevenLabsProvider, elevenLabsProvider } from "./elevenlabs";
-export type { Voice, TTSOptions, TTSResult } from "./elevenlabs";
+export type { Voice, TTSOptions, TTSResult, SoundEffectOptions, SoundEffectResult, AudioIsolationResult } from "./elevenlabs";
+export { DalleProvider, dalleProvider } from "./dalle";
+export type { ImageOptions, ImageResult, ImageEditOptions } from "./dalle";
 export { RunwayProvider, runwayProvider } from "./runway";
 export { KlingProvider, klingProvider } from "./kling";
+export { StabilityProvider, stabilityProvider } from "./stability";
+export type { StabilityImageOptions, StabilityImageResult, StabilityImg2ImgOptions, StabilityUpscaleOptions, StabilitySearchReplaceOptions, StabilityOutpaintOptions } from "./stability";
 
 // Re-export commonly used types
 export type {

@@ -15,8 +15,8 @@ describe("ai commands", () => {
       expect(output).toContain("Available AI Providers");
       expect(output).toContain("OpenAI Whisper");
       expect(output).toContain("Google Gemini");
-      expect(output).toContain("Runway Gen-4");
-      expect(output).toContain("Kling 2.x");
+      expect(output).toContain("Runway Gen-3");
+      expect(output).toContain("Kling AI");
     });
 
     it("shows provider capabilities", () => {

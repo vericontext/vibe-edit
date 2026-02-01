@@ -6,6 +6,291 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### Phase 2 AI Provider Extensions
+- Added ElevenLabs Sound Effects generation (`vibe ai sfx`)
+  - Text-to-sound effect using ElevenLabs API
+  - Duration (0.5-22 seconds) and prompt influence options
+- Added ElevenLabs Audio Isolation (`vibe ai isolate`)
+  - Separates vocals from background audio
+- Added Stability AI Search & Replace (`vibe ai sd-replace`)
+  - AI-powered object replacement in images
+  - Search for objects/text and replace with new content
+- Added Stability AI Outpainting (`vibe ai sd-outpaint`)
+  - Extend image canvas in any direction (left/right/up/down)
+  - Optional prompt for extended area content
+  - Creativity level control
+
+**Files modified:**
+- `packages/ai-providers/src/elevenlabs/ElevenLabsProvider.ts`
+  - Added `generateSoundEffect()` method
+  - Added `isolateVocals()` method
+  - Added `sound-generation`, `audio-isolation` capabilities
+- `packages/ai-providers/src/stability/StabilityProvider.ts`
+  - Added `searchAndReplace()` method
+  - Added `outpaint()` method
+  - Added `search-replace`, `outpaint` capabilities
+- `packages/ai-providers/src/interface/types.ts`
+  - Added new AI capabilities: sound-generation, audio-isolation, search-replace, outpaint
+- `packages/cli/src/commands/ai.ts`
+  - Added `sfx`, `isolate`, `sd-replace`, `sd-outpaint` commands
+
+**Usage:**
+```bash
+# Generate sound effect
+vibe ai sfx "explosion" -o boom.mp3
+vibe ai sfx "footsteps on gravel" --duration 5 -o steps.mp3
+vibe ai sfx "gentle rain" --prompt-influence 0.5 -o rain.mp3
+
+# Isolate vocals from audio
+vibe ai isolate song.mp3 -o vocals.mp3
+
+# Search and replace objects in image
+vibe ai sd-replace image.png "cat" "dog" -o output.png
+vibe ai sd-replace photo.jpg "old car" "sports car" -n "blurry" -o replaced.jpg
+
+# Outpaint - extend image canvas
+vibe ai sd-outpaint image.png --left 512 --right 512 -o wider.png
+vibe ai sd-outpaint portrait.png --up 200 --down 200 --prompt "blue sky" -o taller.png
+vibe ai sd-outpaint photo.png --right 256 --creativity 0.7 -o extended.png
+```
+
+---
+
+### MCP (Model Context Protocol) Integration
+- Created `packages/mcp-server/` - MCP server for AI assistant integration
+- Enables Claude Desktop, Cursor, and other MCP clients to control VibeEdit
+
+**Tools (12):**
+- Project: `project_create`, `project_info`
+- Timeline: `timeline_add_source`, `timeline_add_clip`, `timeline_split_clip`, `timeline_trim_clip`, `timeline_move_clip`, `timeline_delete_clip`, `timeline_duplicate_clip`, `timeline_add_effect`, `timeline_add_track`, `timeline_list`
+
+**Resources (5):**
+- `vibe://project/current` - Full project state
+- `vibe://project/clips` - Clip list
+- `vibe://project/sources` - Media sources
+- `vibe://project/tracks` - Track list
+- `vibe://project/settings` - Project settings
+
+**Prompts (7):**
+- `edit_video` - Natural language editing
+- `create_montage` - Auto montage creation
+- `add_transitions` - Batch transitions
+- `color_grade` - Color grading presets
+- `generate_subtitles` - AI transcription
+- `create_shorts` - Short-form generation
+- `sync_to_music` - Beat-synced editing
+
+**Files created:**
+- `packages/mcp-server/package.json`
+- `packages/mcp-server/tsconfig.json`
+- `packages/mcp-server/src/index.ts` - MCP server entry
+- `packages/mcp-server/src/tools/index.ts` - Timeline tools
+- `packages/mcp-server/src/resources/index.ts` - Project resources
+- `packages/mcp-server/src/prompts/index.ts` - Prompt templates
+- `packages/mcp-server/README.md` - Setup guide
+
+**Claude Desktop Configuration:**
+```json
+{
+  "mcpServers": {
+    "vibe-edit": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/vibe-edit/packages/mcp-server/src/index.ts"],
+      "env": {
+        "VIBE_PROJECT_PATH": "/path/to/project.vibe.json"
+      }
+    }
+  }
+}
+```
+
+---
+
+### Stability AI (Stable Diffusion) Integration
+- Added `vibe ai sd` command for Stable Diffusion image generation
+  - SD3.5 Large, Medium, and Ultra models
+  - Aspect ratio presets (16:9, 1:1, 9:16, 21:9, etc.)
+  - Style presets (photographic, anime, cinematic, etc.)
+  - Negative prompts support
+  - Seed for reproducibility
+- Added `vibe ai sd-upscale` command for image upscaling
+  - Fast, conservative, and creative upscale modes
+- Added `vibe ai sd-remove-bg` command for background removal
+- Added `vibe ai sd-img2img` command for image-to-image transformation
+  - Adjustable strength parameter
+- Created StabilityProvider with methods:
+  - `generateImage()` - Text-to-image with SD3.5
+  - `generateImageSDXL()` - Legacy SDXL generation
+  - `imageToImage()` - Image transformation
+  - `upscaleImage()` - Image upscaling
+  - `removeBackground()` - Background removal
+  - `inpaint()` - Inpainting/outpainting
+
+**Files created:**
+- `packages/ai-providers/src/stability/StabilityProvider.ts`
+- `packages/ai-providers/src/stability/index.ts`
+
+**Usage:**
+```bash
+# Generate image with Stable Diffusion
+vibe ai sd "A majestic mountain landscape at sunset" -o landscape.png
+
+# With style preset
+vibe ai sd "Portrait of a warrior" --style cinematic -r 9:16 -o portrait.png
+
+# With negative prompt
+vibe ai sd "A cat" -n "blurry, low quality, distorted" -o cat.png
+
+# Upscale image
+vibe ai sd-upscale input.png -o upscaled.png -t creative
+
+# Remove background
+vibe ai sd-remove-bg photo.jpg -o no-bg.png
+
+# Image-to-image transformation
+vibe ai sd-img2img sketch.png "detailed oil painting style" -t 0.5 -o painting.png
+```
+
+---
+
+### Kling AI Video Generation
+- Added `vibe ai kling` command for AI video generation
+  - Text-to-video with Kling v1.5 model
+  - Image-to-video with reference image support
+  - Duration options: 5 or 10 seconds
+  - Aspect ratio: 16:9, 9:16, 1:1
+  - Standard/Pro generation modes
+  - Negative prompts support
+- Added `vibe ai kling-status` command to check generation status
+  - Separate tracking for text2video and image2video tasks
+  - Video download when complete
+- Updated KlingProvider with full API implementation:
+  - JWT token authentication (ACCESS_KEY:SECRET_KEY format)
+  - `generateVideo()` - Text/image to video
+  - `generateFromImage()` - Image-to-video helper
+  - `getGenerationStatus()` - Task status polling
+  - `waitForCompletion()` - Async polling with callback
+
+**Files modified:**
+- `packages/ai-providers/src/kling/KlingProvider.ts` - Full API implementation
+- `packages/cli/src/commands/ai.ts` - Added kling commands
+
+**Usage:**
+```bash
+# Generate video from text
+vibe ai kling "A beautiful sunset over the ocean" -o sunset.mp4
+
+# Generate with options
+vibe ai kling "Dynamic city timelapse" -d 10 -r 16:9 -m pro -o city.mp4
+
+# Image-to-video (animate an image)
+vibe ai kling "Camera slowly panning" -i photo.jpg -o animated.mp4
+
+# With negative prompt
+vibe ai kling "Person walking" -n "blurry, low quality" -o walk.mp4
+
+# Start without waiting (get task ID)
+vibe ai kling "Flying through clouds" --no-wait
+
+# Check status (text2video)
+vibe ai kling-status <task-id>
+
+# Check status (image2video)
+vibe ai kling-status <task-id> --type image2video
+
+# Wait and download when complete
+vibe ai kling-status <task-id> -w -o output.mp4
+```
+
+---
+
+### Runway Gen-3 Video Generation
+- Added `vibe ai video` command for AI video generation
+  - Text-to-video with Gen-3 Alpha Turbo model
+  - Image-to-video with reference image support
+  - Duration options: 5 or 10 seconds
+  - Aspect ratio: 16:9 or 9:16
+  - Seed for reproducibility
+- Added `vibe ai video-status` command to check generation status
+  - Progress tracking with polling
+  - Video download when complete
+- Added `vibe ai video-cancel` command to cancel in-progress generation
+- Updated RunwayProvider with full API implementation:
+  - `generateVideo()` - Text/image to video
+  - `generateFromImage()` - Image-to-video helper
+  - `getGenerationStatus()` - Task status polling
+  - `cancelGeneration()` - Cancel task
+  - `waitForCompletion()` - Async polling with progress callback
+- Uses Runway Gen-3 Alpha Turbo API with proper versioning
+
+**Files modified:**
+- `packages/ai-providers/src/runway/RunwayProvider.ts` - Full API implementation
+- `packages/cli/src/commands/ai.ts` - Added video commands
+
+**Usage:**
+```bash
+# Generate video from text
+vibe ai video "A serene ocean sunset" -o sunset.mp4
+
+# Generate with options
+vibe ai video "Dynamic city timelapse" -d 10 -r 16:9 -o city.mp4
+
+# Image-to-video (animate an image)
+vibe ai video "Camera slowly zooming in" -i photo.jpg -o animated.mp4
+
+# Start without waiting (get task ID)
+vibe ai video "Flying through clouds" --no-wait
+
+# Check status
+vibe ai video-status <task-id>
+
+# Wait and download when complete
+vibe ai video-status <task-id> -w -o output.mp4
+
+# Cancel generation
+vibe ai video-cancel <task-id>
+```
+
+---
+
+### DALL-E Image Generation
+- Added `vibe ai image` command for general image generation
+- Added `vibe ai thumbnail` command for video thumbnails
+  - Platform style presets: YouTube, Instagram, TikTok, Twitter
+  - Automatic size optimization for each platform
+- Added `vibe ai background` command for video backgrounds
+  - Aspect ratio support: 16:9, 9:16, 1:1
+- DalleProvider with methods:
+  - `generateImage()` - General image generation
+  - `generateThumbnail()` - Platform-optimized thumbnails
+  - `generateBackground()` - Video backgrounds
+  - `createVariation()` - Image variations
+- Uses DALL-E 3 model with configurable size, quality, and style
+
+**Files created:**
+- `packages/ai-providers/src/dalle/DalleProvider.ts`
+- `packages/ai-providers/src/dalle/index.ts`
+
+**Usage:**
+```bash
+# Generate image
+vibe ai image "abstract gradient background" -o bg.png
+
+# With options
+vibe ai image "cat in space" -s 1792x1024 -q hd --style natural
+
+# Generate YouTube thumbnail
+vibe ai thumbnail "coding tutorial intro" -s youtube -o thumb.png
+
+# Generate TikTok thumbnail
+vibe ai thumbnail "day in the life" -s tiktok -o cover.png
+
+# Generate video background
+vibe ai background "soft blue gradient" -a 16:9 -o bg.png
+```
+
+---
+
 ### Subtitle Format Output (SRT/VTT)
 - Added subtitle format output to `vibe ai transcribe` command
 - Supported formats:

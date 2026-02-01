@@ -37,45 +37,56 @@ Unified interface for AI services.
 ### Audio
 - [x] **Whisper** - Speech-to-text, auto-subtitles (SRT/VTT export)
 - [x] **ElevenLabs** - Text-to-speech (`vibe ai tts`)
+- [x] **ElevenLabs** - Sound effects generation (`vibe ai sfx`)
+- [x] **ElevenLabs** - Audio isolation / vocal extraction (`vibe ai isolate`)
 - [x] Beat detection & silence detection (`vibe detect beats/silence`)
 
 ### Image
-- [ ] **DALL-E** - Thumbnail generation, image editing
-- [ ] **Stable Diffusion** - Local image generation
-- [ ] Background removal / replacement
+- [x] **DALL-E** - Thumbnail generation, image editing (`vibe ai image/thumbnail/background`)
+- [x] **Stability AI** - Stable Diffusion SD3.5 (`vibe ai sd/sd-upscale/sd-img2img`)
+- [x] Background removal (`vibe ai sd-remove-bg`)
+- [x] Search & replace (`vibe ai sd-replace`) - AI-powered object replacement
+- [x] Outpainting (`vibe ai sd-outpaint`) - Extend image canvas
 
 ### Video
 - [x] Scene detection & auto-cutting (`vibe detect scenes`)
-- [ ] **Runway Gen-3** - Video generation, inpainting
-- [ ] **Kling** - Video generation
+- [x] **Runway Gen-3** - Video generation (`vibe ai video`)
+- [x] **Kling** - Video generation (`vibe ai kling`)
 - [ ] **Pika** - Video-to-video transformation
 - [ ] **HeyGen** - AI avatars, lip sync
 
 ---
 
-## Phase 3: MCP Integration 📋
+## Phase 3: MCP Integration ✅
 
 Model Context Protocol for extensible AI workflows.
 
 ### Prerequisites
-- [ ] Project state schema for MCP Resource serialization
-- [ ] Zustand → JSON-serializable state mapping
+- [x] Project state schema for MCP Resource serialization
+- [x] JSON-serializable state via Project class
 
 ### Implementation
-- [ ] MCP server implementation for VibeEdit
-- [ ] Tool definitions (timeline manipulation, export, effects)
-- [ ] Resource providers (project state, media assets)
-- [ ] Prompt templates for common editing tasks
-- [ ] Claude Desktop / Cursor integration
+- [x] MCP server implementation (`packages/mcp-server/`)
+- [x] Tool definitions (12 tools for timeline, project, effects)
+- [x] Resource providers (project state, clips, sources, tracks, settings)
+- [x] Prompt templates (7 prompts for common editing tasks)
+- [x] Claude Desktop / Cursor configuration
 
-**Example MCP interface:**
+**MCP interface:**
 ```
-vibe://resources/project/{id}/state    # Full project state
-vibe://resources/project/{id}/clips    # Clip list
-vibe://tools/timeline/add-clip
-vibe://tools/timeline/split
-vibe://tools/export
-vibe://prompts/suggest-edits
+vibe://project/current    # Full project state
+vibe://project/clips      # Clip list
+vibe://project/sources    # Media sources
+vibe://project/tracks     # Track list
+vibe://project/settings   # Project settings
+
+Tools: project_create, project_info, timeline_add_source,
+       timeline_add_clip, timeline_split_clip, timeline_trim_clip,
+       timeline_move_clip, timeline_delete_clip, timeline_duplicate_clip,
+       timeline_add_effect, timeline_add_track, timeline_list
+
+Prompts: edit_video, create_montage, add_transitions, color_grade,
+         generate_subtitles, create_shorts, sync_to_music
 ```
 
 ---
@@ -165,8 +176,11 @@ vibe batch      import | concat | apply-effect | remove-clips | info
 vibe media      info | duration
 vibe export     <project> -o <output> -p <preset>
 vibe detect     scenes | silence | beats
-vibe ai         providers | transcribe | suggest | edit | tts | voices
-                motion | storyboard
+vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | isolate
+                motion | storyboard | image | thumbnail | background
+                video | video-status | video-cancel
+                kling | kling-status
+                sd | sd-upscale | sd-remove-bg | sd-img2img | sd-replace | sd-outpaint
 ```
 
 ---

@@ -5,6 +5,38 @@ import type {
 } from "../interface/types";
 
 /**
+ * Sound effect generation options
+ */
+export interface SoundEffectOptions {
+  /** Duration in seconds (0.5-22, default: auto) */
+  duration?: number;
+  /** Prompt influence (0-1, default: 0.3) */
+  promptInfluence?: number;
+}
+
+/**
+ * Sound effect generation result
+ */
+export interface SoundEffectResult {
+  success: boolean;
+  /** Audio data as Buffer */
+  audioBuffer?: Buffer;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Audio isolation result
+ */
+export interface AudioIsolationResult {
+  success: boolean;
+  /** Isolated vocals as Buffer */
+  audioBuffer?: Buffer;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
  * Voice info from ElevenLabs API
  */
 export interface Voice {
@@ -52,7 +84,7 @@ export class ElevenLabsProvider implements AIProvider {
   id = "elevenlabs";
   name = "ElevenLabs";
   description = "AI text-to-speech with natural voices and voice cloning";
-  capabilities: AICapability[] = ["text-to-speech"];
+  capabilities: AICapability[] = ["text-to-speech", "sound-generation", "audio-isolation"];
   iconUrl = "/icons/elevenlabs.svg";
   isAvailable = true;
 
@@ -191,6 +223,118 @@ export class ElevenLabsProvider implements AIProvider {
       };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Generate sound effect from text prompt
+   */
+  async generateSoundEffect(
+    prompt: string,
+    options: SoundEffectOptions = {}
+  ): Promise<SoundEffectResult> {
+    if (!this.apiKey) {
+      return {
+        success: false,
+        error: "ElevenLabs API key not configured",
+      };
+    }
+
+    try {
+      const body: Record<string, unknown> = {
+        text: prompt,
+        prompt_influence: options.promptInfluence ?? 0.3,
+      };
+
+      // Duration is optional; API auto-determines if not provided
+      if (options.duration !== undefined) {
+        // Clamp to valid range (0.5-22 seconds)
+        const duration = Math.max(0.5, Math.min(22, options.duration));
+        body.duration_seconds = duration;
+      }
+
+      const response = await fetch(`${this.baseUrl}/sound-generation`, {
+        method: "POST",
+        headers: {
+          "xi-api-key": this.apiKey,
+          "Content-Type": "application/json",
+          Accept: "audio/mpeg",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        return {
+          success: false,
+          error: `Sound generation failed: ${error}`,
+        };
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      return {
+        success: true,
+        audioBuffer,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Isolate vocals from audio
+   * Separates the vocal track from the background music/noise
+   */
+  async isolateVocals(audioData: Buffer | Blob): Promise<AudioIsolationResult> {
+    if (!this.apiKey) {
+      return {
+        success: false,
+        error: "ElevenLabs API key not configured",
+      };
+    }
+
+    try {
+      const formData = new FormData();
+
+      const audioBlob = Buffer.isBuffer(audioData)
+        ? new Blob([new Uint8Array(audioData)])
+        : audioData;
+      formData.append("audio", audioBlob, "audio.mp3");
+
+      const response = await fetch(`${this.baseUrl}/audio-isolation`, {
+        method: "POST",
+        headers: {
+          "xi-api-key": this.apiKey,
+          Accept: "audio/mpeg",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        return {
+          success: false,
+          error: `Audio isolation failed: ${error}`,
+        };
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      return {
+        success: true,
+        audioBuffer,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   }
 }
