@@ -6,6 +6,20 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### CLI Integration Tests
+- Added integration tests for CLI commands (project, timeline, ai)
+- 30 additional test cases for CLI commands:
+  - `project create/info/set` (8 tests)
+  - `timeline add-source/add-clip/add-track/add-effect/trim/list` (18 tests)
+  - `ai providers` (2 tests) + API key validation (2 tests)
+
+**Files created:**
+- `packages/cli/src/commands/project.test.ts`
+- `packages/cli/src/commands/timeline.test.ts`
+- `packages/cli/src/commands/ai.test.ts`
+
+---
+
 ### CLI Unit Tests
 - Added comprehensive unit tests for `Project` engine class
 - 43 test cases covering:
