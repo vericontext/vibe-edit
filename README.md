@@ -46,7 +46,7 @@ We use friendlier terms instead of traditional video editing jargon:
 ## Project Structure
 
 ```
-videocontext/
+vibe-edit/
 ├── apps/
 │   └── web/                    # Next.js web app
 ├── packages/
@@ -54,6 +54,7 @@ videocontext/
 │   │   ├── timeline/           # Timeline data structures
 │   │   ├── effects/            # Effect system
 │   │   └── export/             # Export pipeline
+│   ├── cli/                    # Command-line interface
 │   ├── ai-providers/           # AI plugins
 │   │   ├── interface/          # Common interface
 │   │   ├── whisper/            # OpenAI Whisper
@@ -93,6 +94,18 @@ pnpm build        # Build for production
 pnpm test         # Run tests
 pnpm lint         # Run linting
 pnpm format       # Format code with Prettier
+```
+
+### CLI Usage
+
+VibeEdit includes a CLI for headless video editing operations:
+
+```bash
+pnpm vibe project create "My Video"     # Create a new project
+pnpm vibe timeline add-source proj.vibe.json video.mp4
+pnpm vibe timeline add-clip proj.vibe.json <source-id>
+pnpm vibe timeline list proj.vibe.json  # View timeline contents
+pnpm vibe ai providers                  # List AI providers
 ```
 
 ## Contributing

@@ -35,4 +35,7 @@ pnpm-debug.log*
 .cache
 .eslintcache
 
+# Internal documentation (not for public)
+CLAUDE.md
+
 samples/
