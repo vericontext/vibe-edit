@@ -6,6 +6,40 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### MCP Documentation Enhancement
+- Completely rewrote `packages/mcp-server/README.md` with comprehensive documentation
+- Created `docs/mcp-guide.md` - Detailed MCP integration guide
+
+**README.md improvements:**
+- Quick start guide with step-by-step setup
+- Configuration options for Claude Desktop (macOS/Windows/Linux) and Cursor
+- Complete tool reference with all parameters and descriptions
+- Resource reference with example responses
+- Prompt reference with argument documentation
+- Usage examples (basic workflow, complex edit, prompts)
+- Troubleshooting section with common issues
+- Architecture diagram
+- Development commands
+
+**docs/mcp-guide.md includes:**
+- Detailed setup instructions for all platforms
+- Core concepts (project files, ID system, time units, media types)
+- 5 complete workflow examples:
+  1. Create a Simple Video
+  2. Multi-Clip Montage
+  3. Split and Rearrange
+  4. Color Grading
+  5. Short-Form Content
+- Tool, Resource, and Prompt reference tables
+- Advanced usage (combining with CLI, batch operations, AI pipelines)
+- Comprehensive troubleshooting guide
+
+**Files modified:**
+- `packages/mcp-server/README.md` - Complete rewrite (~500 lines)
+- `docs/mcp-guide.md` - New comprehensive guide (~600 lines)
+
+---
+
 ### Phase 4: Viral Optimizer Implementation
 - Added `vibe ai viral` command for platform-specific video optimization
 - Full AI pipeline orchestration:
