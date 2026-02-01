@@ -6,6 +6,85 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-01
 
+### Phase 4: Script-to-Video Implementation
+- Added `vibe ai script-to-video` command for end-to-end video generation from text
+- Full AI pipeline orchestration:
+  1. **Claude** - Analyzes script and generates storyboard segments
+  2. **ElevenLabs** - Generates voiceover narration from script
+  3. **DALL-E** - Creates visual assets for each scene
+  4. **Runway/Kling** - Generates video clips from images (image-to-video)
+  5. **Project Engine** - Assembles all assets into .vibe.json project
+
+**Features:**
+- Automatic storyboard generation with timing
+- Multi-scene visual generation with DALL-E
+- Optional voiceover with ElevenLabs TTS
+- Video generation with Runway Gen-3 or Kling AI
+- Aspect ratio support: 16:9, 9:16, 1:1
+- Images-only mode for faster iteration
+- Output directory for all generated assets
+
+**Files modified:**
+- `packages/cli/src/commands/ai.ts` - Added script-to-video command (~300 lines)
+- `docs/roadmap.md` - Updated Phase 4 with new GenAI features
+- `CLAUDE.md` - Added CLI documentation
+
+**Usage:**
+```bash
+# Simple text input
+vibe ai script-to-video "A day in the life of a developer..." -o project.vibe.json
+
+# From script file
+vibe ai script-to-video script.txt -f -o project.vibe.json
+
+# With options
+vibe ai script-to-video "..." -d 60 -v <voice-id> -a 9:16 -g kling
+
+# Images only (faster, no video generation)
+vibe ai script-to-video "..." --images-only -o test.vibe.json
+
+# Skip voiceover
+vibe ai script-to-video "..." --no-voiceover -o silent.vibe.json
+
+# Custom output directory
+vibe ai script-to-video "..." --output-dir ./my-assets -o project.vibe.json
+```
+
+**CLI Output Example:**
+```
+🎬 Script-to-Video Pipeline
+────────────────────────────────────────────────────────────
+
+✓ Generated 5 scenes (total: 45s)
+  → Saved: script-video-output/storyboard.json
+
+✓ Voiceover generated (342 chars)
+  → Saved: script-video-output/voiceover.mp3
+
+✓ Generated 5/5 images
+
+✓ Generated 5/5 videos
+
+✓ Project assembled
+
+✅ Script-to-Video complete!
+────────────────────────────────────────────────────────────
+
+  📄 Project: script-video.vibe.json
+  🎬 Scenes: 5
+  ⏱️  Duration: 45s
+  📁 Assets: script-video-output/
+  🎙️  Voiceover: voiceover.mp3
+  🖼️  Images: 5 scene-*.png
+  🎥 Videos: 5 scene-*.mp4
+
+Next steps:
+  vibe project info script-video.vibe.json
+  vibe export script-video.vibe.json -o final.mp4
+```
+
+---
+
 ### Phase 2 AI Provider Extensions
 - Added ElevenLabs Sound Effects generation (`vibe ai sfx`)
   - Text-to-sound effect using ElevenLabs API

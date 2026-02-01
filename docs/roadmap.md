@@ -91,18 +91,39 @@ Prompts: edit_video, create_montage, add_transitions, color_grade,
 
 ---
 
-## Phase 4: AI-Native Editing 📋
+## Phase 4: AI-Native Editing 🚧
 
 Intelligence built into every interaction.
 
+### Content-Aware Automation
+- [x] **Script-to-Video** - Generate complete videos from text scripts
+  - Claude storyboard analysis → ElevenLabs TTS → DALL-E visuals → Runway/Kling video
+  - Full pipeline: `vibe ai script-to-video <script> -o project.vibe.json`
+- [ ] Auto Highlights - Extract highlights from long-form content
+- [ ] B-Roll Matcher - Auto-match B-roll to narration
+- [ ] Viral Optimizer - Platform-specific optimization (YouTube, TikTok, Instagram)
+
+### Video Understanding & Generation
+- [ ] Video Extend - AI-powered clip extension
+- [ ] Video Inpainting - Remove objects from video
+- [ ] Video Upscale - Low-res → 4K AI upscaling
+- [ ] Frame Interpolation - AI slow motion
+
+### Voice & Audio
+- [ ] Voice Clone - Custom AI voice from samples
+- [ ] AI Dubbing - Automatic multilingual dubbing with lip-sync
+- [ ] Music Generation - Generate background music from prompts
+- [ ] Audio Restoration - Noise removal, quality enhancement
+
+### Smart Editing
+- [ ] Video-to-Video - Style transfer for videos
+- [ ] Object Tracking - Automatic object tracking
+- [ ] Auto Reframe - Smart 16:9 → 9:16 conversion
 - [ ] Natural language timeline control ("trim last 3 seconds")
-- [ ] Auto-reframe for different aspect ratios
-- [ ] Smart scene detection & chapter markers
 - [ ] AI color grading suggestions
-- [ ] Automatic B-roll suggestions
 - [ ] Content-aware speed ramping
 - [ ] AI-powered audio ducking
-- [ ] Auto-generate shorts from long-form content
+- [ ] Auto-generate shorts from long-form
 
 ---
 
@@ -181,6 +202,7 @@ vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | i
                 video | video-status | video-cancel
                 kling | kling-status
                 sd | sd-upscale | sd-remove-bg | sd-img2img | sd-replace | sd-outpaint
+                script-to-video
 ```
 
 ---

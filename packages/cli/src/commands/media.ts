@@ -63,8 +63,8 @@ mediaCommand
           // Video-specific info (if available)
           if (metadata.format.trackInfo && metadata.format.trackInfo.length > 0) {
             const videoTrack = metadata.format.trackInfo.find(
-              (t: any) => t.type === "video"
-            );
+              (t) => (t as Record<string, unknown>).type === "video"
+            ) as Record<string, unknown> | undefined;
             if (videoTrack) {
               console.log();
               console.log(chalk.bold.cyan("Video"));

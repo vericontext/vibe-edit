@@ -322,12 +322,10 @@ export async function handleToolCall(
       case "project_create": {
         const projectName = args.name as string;
         const outputPath = (args.outputPath as string) || `${projectName}.vibe.json`;
-        const project = new Project({
-          name: projectName,
-          width: (args.width as number) || 1920,
-          height: (args.height as number) || 1080,
-          fps: (args.fps as number) || 30,
-        });
+        const project = new Project(projectName);
+        if (args.fps) {
+          project.setFrameRate(args.fps as number);
+        }
         await saveProject(outputPath, project);
         result = `Created project "${projectName}" at ${outputPath}`;
         break;
@@ -335,9 +333,12 @@ export async function handleToolCall(
 
       case "project_info": {
         const project = await loadProject(args.projectPath as string);
+        const meta = project.getMeta();
         const info = {
-          name: project.getName(),
-          settings: project.getSettings(),
+          name: meta.name,
+          aspectRatio: meta.aspectRatio,
+          frameRate: meta.frameRate,
+          duration: meta.duration,
           sources: project.getSources().length,
           tracks: project.getTracks().length,
           clips: project.getClips().length,
@@ -358,7 +359,7 @@ export async function handleToolCall(
         const source = project.addSource({
           name: (args.name as string) || mediaPath.split("/").pop() || "media",
           type: mediaTypes[ext] || "video",
-          path: mediaPath,
+          url: mediaPath,
           duration: 10, // Default, should be detected
         });
         await saveProject(args.projectPath as string, project);
@@ -376,12 +377,16 @@ export async function handleToolCall(
           throw new Error("No tracks available. Add a track first.");
         }
 
+        const source = project.getSource(sourceId);
+        const duration = (args.duration as number) || source?.duration || 10;
+
         const clip = project.addClip({
           sourceId,
           trackId,
           startTime: (args.startTime as number) || 0,
-          duration: args.duration as number | undefined,
-          sourceStartTime: 0,
+          duration,
+          sourceStartOffset: 0,
+          sourceEndOffset: duration,
         });
         await saveProject(args.projectPath as string, project);
         result = `Added clip: ${clip.id}`;
@@ -390,9 +395,9 @@ export async function handleToolCall(
 
       case "timeline_split_clip": {
         const project = await loadProject(args.projectPath as string);
-        const newClip = project.splitClip(args.clipId as string, args.splitTime as number);
+        const splitResult = project.splitClip(args.clipId as string, args.splitTime as number);
         await saveProject(args.projectPath as string, project);
-        result = newClip ? `Split clip. New clip ID: ${newClip.id}` : "Failed to split clip";
+        result = splitResult ? `Split clip. New clip ID: ${splitResult[1].id}` : "Failed to split clip";
         break;
       }
 

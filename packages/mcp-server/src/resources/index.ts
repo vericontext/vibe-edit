@@ -109,7 +109,7 @@ export async function readResource(
           trackId: clip.trackId,
           startTime: clip.startTime,
           duration: clip.duration,
-          sourceStartTime: clip.sourceStartTime,
+          sourceStartOffset: clip.sourceStartOffset,
           effects: clip.effects,
         }));
         break;
@@ -119,7 +119,7 @@ export async function readResource(
           id: source.id,
           name: source.name,
           type: source.type,
-          path: source.path,
+          url: source.url,
           duration: source.duration,
           width: source.width,
           height: source.height,
@@ -138,12 +138,16 @@ export async function readResource(
         }));
         break;
 
-      case "settings":
+      case "settings": {
+        const meta = project.getMeta();
         data = {
-          name: project.getName(),
-          ...project.getSettings(),
+          name: meta.name,
+          aspectRatio: meta.aspectRatio,
+          frameRate: meta.frameRate,
+          duration: meta.duration,
         };
         break;
+      }
 
       default:
         throw new Error(`Unknown resource type: ${resourceType}`);

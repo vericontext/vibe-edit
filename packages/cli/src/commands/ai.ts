@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { resolve, dirname, basename, extname } from "node:path";
+import { existsSync } from "node:fs";
 import chalk from "chalk";
 import ora from "ora";
 import {
@@ -1547,6 +1548,466 @@ aiCommand
       }
     } catch (error) {
       console.error(chalk.red("Outpainting failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Script-to-Video command
+aiCommand
+  .command("script-to-video")
+  .description("Generate complete video from text script using AI pipeline")
+  .argument("<script>", "Script text or file path (use -f for file)")
+  .option("-f, --file", "Treat script argument as file path")
+  .option("-o, --output <path>", "Output project file path", "script-video.vibe.json")
+  .option("-d, --duration <seconds>", "Target total duration in seconds")
+  .option("-v, --voice <id>", "ElevenLabs voice ID for narration")
+  .option("-g, --generator <engine>", "Video generator: runway | kling", "runway")
+  .option("-a, --aspect-ratio <ratio>", "Aspect ratio: 16:9 | 9:16 | 1:1", "16:9")
+  .option("--images-only", "Generate images only, skip video generation")
+  .option("--no-voiceover", "Skip voiceover generation")
+  .option("--output-dir <dir>", "Directory for generated assets", "script-video-output")
+  .action(async (script: string, options) => {
+    try {
+      // Get all required API keys upfront
+      const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+      if (!claudeApiKey) {
+        console.error(chalk.red("Anthropic API key required for storyboard generation"));
+        process.exit(1);
+      }
+
+      const openaiApiKey = await getApiKey("OPENAI_API_KEY", "OpenAI");
+      if (!openaiApiKey) {
+        console.error(chalk.red("OpenAI API key required for image generation"));
+        process.exit(1);
+      }
+
+      let elevenlabsApiKey: string | undefined;
+      if (options.voiceover !== false) {
+        const key = await getApiKey("ELEVENLABS_API_KEY", "ElevenLabs");
+        if (!key) {
+          console.error(chalk.red("ElevenLabs API key required for voiceover (or use --no-voiceover)"));
+          process.exit(1);
+        }
+        elevenlabsApiKey = key;
+      }
+
+      let videoApiKey: string | undefined;
+      if (!options.imagesOnly) {
+        if (options.generator === "kling") {
+          const key = await getApiKey("KLING_API_KEY", "Kling");
+          if (!key) {
+            console.error(chalk.red("Kling API key required (or use --images-only)"));
+            process.exit(1);
+          }
+          videoApiKey = key;
+        } else {
+          const key = await getApiKey("RUNWAY_API_SECRET", "Runway");
+          if (!key) {
+            console.error(chalk.red("Runway API key required (or use --images-only)"));
+            process.exit(1);
+          }
+          videoApiKey = key;
+        }
+      }
+
+      // Read script content
+      let scriptContent = script;
+      if (options.file) {
+        const filePath = resolve(process.cwd(), script);
+        scriptContent = await readFile(filePath, "utf-8");
+      }
+
+      // Create output directory
+      const outputDir = resolve(process.cwd(), options.outputDir);
+      if (!existsSync(outputDir)) {
+        await mkdir(outputDir, { recursive: true });
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("🎬 Script-to-Video Pipeline"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log();
+
+      // Step 1: Generate storyboard with Claude
+      const storyboardSpinner = ora("📝 Analyzing script with Claude...").start();
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: claudeApiKey });
+
+      const segments = await claude.analyzeContent(
+        scriptContent,
+        options.duration ? parseFloat(options.duration) : undefined
+      );
+
+      if (segments.length === 0) {
+        storyboardSpinner.fail(chalk.red("Failed to generate storyboard"));
+        process.exit(1);
+      }
+
+      const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+      storyboardSpinner.succeed(chalk.green(`Generated ${segments.length} scenes (total: ${totalDuration}s)`));
+
+      // Save storyboard
+      const storyboardPath = resolve(outputDir, "storyboard.json");
+      await writeFile(storyboardPath, JSON.stringify(segments, null, 2), "utf-8");
+      console.log(chalk.dim(`  → Saved: ${storyboardPath}`));
+      console.log();
+
+      // Step 2: Generate voiceover with ElevenLabs
+      let voiceoverPath: string | undefined;
+      let voiceoverDuration = totalDuration;
+
+      if (options.voiceover !== false && elevenlabsApiKey) {
+        const ttsSpinner = ora("🎙️ Generating voiceover with ElevenLabs...").start();
+
+        const elevenlabs = new ElevenLabsProvider();
+        await elevenlabs.initialize({ apiKey: elevenlabsApiKey });
+
+        // Combine segment audio descriptions or use the script
+        const voiceoverText = segments
+          .map((seg) => seg.audio || seg.description)
+          .join(" ");
+
+        const ttsResult = await elevenlabs.textToSpeech(voiceoverText, {
+          voiceId: options.voice,
+        });
+
+        if (!ttsResult.success || !ttsResult.audioBuffer) {
+          ttsSpinner.warn(chalk.yellow(`Voiceover failed: ${ttsResult.error || "Unknown error"}`));
+        } else {
+          voiceoverPath = resolve(outputDir, "voiceover.mp3");
+          await writeFile(voiceoverPath, ttsResult.audioBuffer);
+          ttsSpinner.succeed(chalk.green(`Voiceover generated (${ttsResult.characterCount} chars)`));
+          console.log(chalk.dim(`  → Saved: ${voiceoverPath}`));
+        }
+        console.log();
+      }
+
+      // Step 3: Generate images with DALL-E
+      const imageSpinner = ora("🎨 Generating visuals with DALL-E...").start();
+
+      const dalle = new DalleProvider();
+      await dalle.initialize({ apiKey: openaiApiKey });
+
+      // Determine image size based on aspect ratio
+      const imageSizes: Record<string, "1792x1024" | "1024x1792" | "1024x1024"> = {
+        "16:9": "1792x1024",
+        "9:16": "1024x1792",
+        "1:1": "1024x1024",
+      };
+      const imageSize = imageSizes[options.aspectRatio] || "1792x1024";
+
+      const imagePaths: string[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        imageSpinner.text = `🎨 Generating image ${i + 1}/${segments.length}: ${segment.description.slice(0, 30)}...`;
+
+        try {
+          const imageResult = await dalle.generateImage(segment.visuals, {
+            size: imageSize,
+            quality: "standard",
+          });
+
+          if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
+            const imageUrl = imageResult.images[0].url;
+            const imagePath = resolve(outputDir, `scene-${i + 1}.png`);
+
+            // Download image
+            const response = await fetch(imageUrl);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            await writeFile(imagePath, buffer);
+            imagePaths.push(imagePath);
+          } else {
+            console.log(chalk.yellow(`\n  ⚠ Failed to generate image for scene ${i + 1}`));
+            imagePaths.push(""); // Placeholder for failed image
+          }
+        } catch (err) {
+          console.log(chalk.yellow(`\n  ⚠ Error generating image for scene ${i + 1}: ${err}`));
+          imagePaths.push("");
+        }
+
+        // Small delay to avoid rate limiting
+        if (i < segments.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+
+      const successfulImages = imagePaths.filter((p) => p !== "").length;
+      imageSpinner.succeed(chalk.green(`Generated ${successfulImages}/${segments.length} images`));
+      console.log();
+
+      // Step 4: Generate videos (if not images-only)
+      const videoPaths: string[] = [];
+
+      if (!options.imagesOnly && videoApiKey) {
+        const videoSpinner = ora(`🎬 Generating videos with ${options.generator === "kling" ? "Kling" : "Runway"}...`).start();
+
+        if (options.generator === "kling") {
+          const kling = new KlingProvider();
+          await kling.initialize({ apiKey: videoApiKey });
+
+          if (!kling.isConfigured()) {
+            videoSpinner.fail(chalk.red("Invalid Kling API key format. Use ACCESS_KEY:SECRET_KEY"));
+            process.exit(1);
+          }
+
+          // Submit all video generation tasks
+          const tasks: Array<{ taskId: string; index: number; imagePath: string }> = [];
+
+          for (let i = 0; i < segments.length; i++) {
+            if (!imagePaths[i]) {
+              videoPaths.push("");
+              continue;
+            }
+
+            const segment = segments[i];
+            videoSpinner.text = `🎬 Submitting video task ${i + 1}/${segments.length}...`;
+
+            try {
+              const imageBuffer = await readFile(imagePaths[i]);
+              const ext = extname(imagePaths[i]).toLowerCase().slice(1);
+              const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+              const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+              const result = await kling.generateVideo(segment.visuals, {
+                prompt: segment.visuals,
+                referenceImage,
+                duration: Math.min(segment.duration, 10) as 5 | 10,
+                aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
+              });
+
+              if (result.status !== "failed" && result.id) {
+                tasks.push({ taskId: result.id, index: i, imagePath: imagePaths[i] });
+              } else {
+                console.log(chalk.yellow(`\n  ⚠ Failed to start video generation for scene ${i + 1}`));
+                videoPaths[i] = "";
+              }
+            } catch (err) {
+              console.log(chalk.yellow(`\n  ⚠ Error starting video for scene ${i + 1}: ${err}`));
+              videoPaths[i] = "";
+            }
+          }
+
+          // Wait for all tasks to complete
+          videoSpinner.text = `🎬 Waiting for ${tasks.length} video(s) to complete...`;
+
+          for (const task of tasks) {
+            try {
+              const result = await kling.waitForCompletion(
+                task.taskId,
+                "image2video",
+                (status) => {
+                  videoSpinner.text = `🎬 Scene ${task.index + 1}: ${status.status}...`;
+                },
+                600000 // 10 minute timeout per video
+              );
+
+              if (result.status === "completed" && result.videoUrl) {
+                const videoPath = resolve(outputDir, `scene-${task.index + 1}.mp4`);
+                const response = await fetch(result.videoUrl);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await writeFile(videoPath, buffer);
+                videoPaths[task.index] = videoPath;
+              } else {
+                videoPaths[task.index] = "";
+              }
+            } catch (err) {
+              console.log(chalk.yellow(`\n  ⚠ Error completing video for scene ${task.index + 1}: ${err}`));
+              videoPaths[task.index] = "";
+            }
+          }
+        } else {
+          // Runway
+          const runway = new RunwayProvider();
+          await runway.initialize({ apiKey: videoApiKey });
+
+          // Submit all video generation tasks
+          const tasks: Array<{ taskId: string; index: number; imagePath: string }> = [];
+
+          for (let i = 0; i < segments.length; i++) {
+            if (!imagePaths[i]) {
+              videoPaths.push("");
+              continue;
+            }
+
+            const segment = segments[i];
+            videoSpinner.text = `🎬 Submitting video task ${i + 1}/${segments.length}...`;
+
+            try {
+              const imageBuffer = await readFile(imagePaths[i]);
+              const ext = extname(imagePaths[i]).toLowerCase().slice(1);
+              const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+              const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+              const result = await runway.generateVideo(segment.visuals, {
+                prompt: segment.visuals,
+                referenceImage,
+                duration: Math.min(segment.duration, 10) as 5 | 10,
+                aspectRatio: options.aspectRatio === "1:1" ? "16:9" : (options.aspectRatio as "16:9" | "9:16"),
+              });
+
+              if (result.status !== "failed" && result.id) {
+                tasks.push({ taskId: result.id, index: i, imagePath: imagePaths[i] });
+              } else {
+                console.log(chalk.yellow(`\n  ⚠ Failed to start video generation for scene ${i + 1}`));
+                videoPaths[i] = "";
+              }
+            } catch (err) {
+              console.log(chalk.yellow(`\n  ⚠ Error starting video for scene ${i + 1}: ${err}`));
+              videoPaths[i] = "";
+            }
+          }
+
+          // Wait for all tasks to complete
+          videoSpinner.text = `🎬 Waiting for ${tasks.length} video(s) to complete...`;
+
+          for (const task of tasks) {
+            try {
+              const result = await runway.waitForCompletion(
+                task.taskId,
+                (status) => {
+                  const progress = status.progress !== undefined ? `${status.progress}%` : status.status;
+                  videoSpinner.text = `🎬 Scene ${task.index + 1}: ${progress}...`;
+                },
+                300000 // 5 minute timeout per video
+              );
+
+              if (result.status === "completed" && result.videoUrl) {
+                const videoPath = resolve(outputDir, `scene-${task.index + 1}.mp4`);
+                const response = await fetch(result.videoUrl);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await writeFile(videoPath, buffer);
+                videoPaths[task.index] = videoPath;
+              } else {
+                videoPaths[task.index] = "";
+              }
+            } catch (err) {
+              console.log(chalk.yellow(`\n  ⚠ Error completing video for scene ${task.index + 1}: ${err}`));
+              videoPaths[task.index] = "";
+            }
+          }
+        }
+
+        const successfulVideos = videoPaths.filter((p) => p && p !== "").length;
+        videoSpinner.succeed(chalk.green(`Generated ${successfulVideos}/${segments.length} videos`));
+        console.log();
+      }
+
+      // Step 5: Assemble project
+      const assembleSpinner = ora("📦 Assembling project...").start();
+
+      const project = new Project("Script-to-Video Output");
+      project.setAspectRatio(options.aspectRatio as "16:9" | "9:16" | "1:1");
+
+      // Clear default tracks and create new ones
+      const defaultTracks = project.getTracks();
+      for (const track of defaultTracks) {
+        project.removeTrack(track.id);
+      }
+
+      const videoTrack = project.addTrack({
+        name: "Video",
+        type: "video",
+        order: 1,
+        isMuted: false,
+        isLocked: false,
+        isVisible: true,
+      });
+
+      const audioTrack = project.addTrack({
+        name: "Audio",
+        type: "audio",
+        order: 0,
+        isMuted: false,
+        isLocked: false,
+        isVisible: true,
+      });
+
+      // Add voiceover source and clip
+      if (voiceoverPath) {
+        const voiceoverSource = project.addSource({
+          name: "Voiceover",
+          url: voiceoverPath,
+          type: "audio",
+          duration: voiceoverDuration,
+        });
+
+        project.addClip({
+          sourceId: voiceoverSource.id,
+          trackId: audioTrack.id,
+          startTime: 0,
+          duration: voiceoverDuration,
+          sourceStartOffset: 0,
+          sourceEndOffset: voiceoverDuration,
+        });
+      }
+
+      // Add video/image sources and clips
+      let currentTime = 0;
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const hasVideo = videoPaths[i] && videoPaths[i] !== "";
+        const hasImage = imagePaths[i] && imagePaths[i] !== "";
+
+        if (!hasVideo && !hasImage) {
+          // Skip if no visual asset
+          currentTime += segment.duration;
+          continue;
+        }
+
+        const assetPath = hasVideo ? videoPaths[i] : imagePaths[i];
+        const mediaType = hasVideo ? "video" : "image";
+
+        const source = project.addSource({
+          name: `Scene ${i + 1}`,
+          url: assetPath,
+          type: mediaType as "video" | "image",
+          duration: segment.duration,
+        });
+
+        project.addClip({
+          sourceId: source.id,
+          trackId: videoTrack.id,
+          startTime: currentTime,
+          duration: segment.duration,
+          sourceStartOffset: 0,
+          sourceEndOffset: segment.duration,
+        });
+
+        currentTime += segment.duration;
+      }
+
+      // Save project file
+      const outputPath = resolve(process.cwd(), options.output);
+      await writeFile(outputPath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
+
+      assembleSpinner.succeed(chalk.green("Project assembled"));
+
+      // Final summary
+      console.log();
+      console.log(chalk.bold.green("✅ Script-to-Video complete!"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log();
+      console.log(`  📄 Project: ${chalk.cyan(outputPath)}`);
+      console.log(`  🎬 Scenes: ${segments.length}`);
+      console.log(`  ⏱️  Duration: ${totalDuration}s`);
+      console.log(`  📁 Assets: ${options.outputDir}/`);
+      if (voiceoverPath) {
+        console.log(`  🎙️  Voiceover: voiceover.mp3`);
+      }
+      console.log(`  🖼️  Images: ${successfulImages} scene-*.png`);
+      if (!options.imagesOnly) {
+        const videoCount = videoPaths.filter((p) => p && p !== "").length;
+        console.log(`  🎥 Videos: ${videoCount} scene-*.mp4`);
+      }
+      console.log();
+      console.log(chalk.dim("Next steps:"));
+      console.log(chalk.dim(`  vibe project info ${options.output}`));
+      console.log(chalk.dim(`  vibe export ${options.output} -o final.mp4`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Script-to-Video failed"));
       console.error(error);
       process.exit(1);
     }

@@ -106,12 +106,12 @@ detectCommand
         const project = Project.fromJSON(data);
 
         // Add video as source if not exists
-        let source = project.getSources().find((s) => s.path === absPath);
+        let source = project.getSources().find((s) => s.url === absPath);
         if (!source) {
           source = project.addSource({
             name: basename(absPath),
             type: "video",
-            path: absPath,
+            url: absPath,
             duration: totalDuration,
           });
         }
@@ -127,9 +127,8 @@ detectCommand
             trackId: project.getTracks().find((t) => t.type === "video")?.id || "",
             startTime: start,
             duration,
-            sourceStartTime: start,
-            sourceDuration: duration,
-            effects: [],
+            sourceStartOffset: start,
+            sourceEndOffset: end,
           });
         }
 
