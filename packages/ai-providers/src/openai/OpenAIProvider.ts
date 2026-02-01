@@ -70,6 +70,10 @@ Available actions:
 - add-transition: Add transition between clips (params: transitionType, duration)
 - add-track: Add new track (params: trackType: video|audio)
 - export: Export project (params: format, quality)
+- speed-change: Change clip playback speed (params: speed - e.g., 2 for 2x, 0.5 for half speed)
+- reverse: Reverse clip playback (no params needed)
+- crop: Crop/resize video (params: aspectRatio OR x, y, width, height)
+- position: Move clips to beginning/end/middle (params: position - "beginning", "end", "middle")
 
 Available effect types: fadeIn, fadeOut, blur, brightness, contrast, saturation, grayscale, sepia
 Available transition types: crossfade, wipe, slide, fade
@@ -84,6 +88,9 @@ Rules:
 3. Time can be specified as "3s", "3 seconds", "00:03", etc.
 4. If command is ambiguous, set clarification field
 5. Multiple commands can be returned for complex instructions
+6. For "speed up" use speed > 1, for "slow down" use speed < 1
+7. For crop to portrait, use aspectRatio: "9:16", for square use "1:1"
+8. "reverse" flips the clip playback backwards
 
 Respond with JSON only:
 {
@@ -229,11 +236,105 @@ Or if clarification needed:
       });
     }
 
+    // Speed commands
+    if (lower.includes("speed up") || lower.includes("faster")) {
+      const speedMatch = lower.match(/(\d+(?:\.\d+)?)\s*x/);
+      const speed = speedMatch ? parseFloat(speedMatch[1]) : 2.0;
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "speed-change",
+        clipIds: targetClips,
+        params: { speed },
+        description: `Speed up to ${speed}x`,
+      });
+    }
+
+    if (lower.includes("slow") || lower.includes("slower")) {
+      const speedMatch = lower.match(/(\d+(?:\.\d+)?)\s*x/);
+      const speed = speedMatch ? parseFloat(speedMatch[1]) : 0.5;
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "speed-change",
+        clipIds: targetClips,
+        params: { speed: speed > 1 ? 1 / speed : speed },
+        description: `Slow down to ${speed > 1 ? (1 / speed).toFixed(2) : speed}x`,
+      });
+    }
+
+    // Reverse commands
+    if (lower.includes("reverse") || lower.includes("backwards")) {
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "reverse",
+        clipIds: targetClips,
+        params: {},
+        description: "Reverse clip playback",
+      });
+    }
+
+    // Crop commands
+    if (lower.includes("crop") || lower.includes("portrait") || lower.includes("vertical") || lower.includes("square")) {
+      let aspectRatio = "16:9";
+      if (lower.includes("portrait") || lower.includes("vertical") || lower.includes("9:16")) {
+        aspectRatio = "9:16";
+      } else if (lower.includes("square") || lower.includes("1:1")) {
+        aspectRatio = "1:1";
+      } else if (lower.includes("4:5")) {
+        aspectRatio = "4:5";
+      }
+
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "crop",
+        clipIds: targetClips,
+        params: { aspectRatio },
+        description: `Crop to ${aspectRatio} aspect ratio`,
+      });
+    }
+
+    // Position commands
+    if (lower.includes("beginning") || lower.includes("start")) {
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "position",
+        clipIds: targetClips,
+        params: { position: "beginning" },
+        description: "Move clip to beginning",
+      });
+    }
+
+    if (lower.includes("end") && (lower.includes("move") || lower.includes("put"))) {
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "position",
+        clipIds: targetClips,
+        params: { position: "end" },
+        description: "Move clip to end",
+      });
+    }
+
+    if (lower.includes("middle") || lower.includes("center")) {
+      const targetClips = lower.includes("all") ? allClipIds : allClipIds.slice(0, 1);
+
+      commands.push({
+        action: "position",
+        clipIds: targetClips,
+        params: { position: "middle" },
+        description: "Move clip to middle",
+      });
+    }
+
     if (commands.length === 0) {
       return {
         success: false,
         commands: [],
-        error: "Could not understand command. Try: trim, fade in/out, split, delete, duplicate",
+        error: "Could not understand command. Try: trim, fade, split, delete, duplicate, speed up, slow down, reverse, crop, move to beginning/end",
       };
     }
 

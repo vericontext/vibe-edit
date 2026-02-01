@@ -1141,6 +1141,459 @@ Respond with JSON array only:
       return [];
     }
   }
+
+  /**
+   * Analyze a style prompt and generate FFmpeg color grading filters
+   */
+  async analyzeColorGrade(
+    style: string,
+    preset?: string
+  ): Promise<{
+    ffmpegFilter: string;
+    description: string;
+  }> {
+    // Built-in presets
+    const presets: Record<string, { ffmpegFilter: string; description: string }> = {
+      "film-noir": {
+        ffmpegFilter: "colorbalance=rs=0.1:gs=-0.1:bs=-0.1:rm=-0.05:gm=-0.1:bm=0.1,eq=contrast=1.3:brightness=-0.05:saturation=0.3",
+        description: "Classic film noir look with high contrast, desaturated colors and slight blue shadows",
+      },
+      "vintage": {
+        ffmpegFilter: "colorbalance=rs=0.15:gs=0.05:bs=-0.15:rh=0.1:gh=0:bh=-0.1,eq=saturation=0.8:contrast=1.1,curves=vintage",
+        description: "Warm vintage film look with faded blacks and orange/teal split toning",
+      },
+      "cinematic-warm": {
+        ffmpegFilter: "colorbalance=rs=0.1:gs=0.05:bs=-0.1:rm=0.05:gm=0.02:bm=-0.05,eq=contrast=1.15:saturation=0.9,curves=r='0/0 0.25/0.22 0.5/0.5 0.75/0.78 1/1':g='0/0 0.5/0.5 1/1':b='0/0.02 0.5/0.48 1/0.98'",
+        description: "Warm cinematic color grade with lifted blacks and orange highlights",
+      },
+      "cool-tones": {
+        ffmpegFilter: "colorbalance=rs=-0.1:gs=0:bs=0.15:rm=-0.05:gm=0:bm=0.1,eq=saturation=0.85:contrast=1.1",
+        description: "Cool blue-tinted look with desaturated colors for a modern feel",
+      },
+      "high-contrast": {
+        ffmpegFilter: "eq=contrast=1.4:brightness=0.02:saturation=1.1,curves=all='0/0 0.15/0.05 0.5/0.5 0.85/0.95 1/1'",
+        description: "High contrast punchy look with deep blacks and bright whites",
+      },
+      "pastel": {
+        ffmpegFilter: "eq=saturation=0.6:brightness=0.1:contrast=0.9,colorbalance=rs=0.05:gs=0.05:bs=0.1",
+        description: "Soft pastel look with lifted shadows and reduced saturation",
+      },
+      "cyberpunk": {
+        ffmpegFilter: "colorbalance=rs=-0.15:gs=0.1:bs=0.2:rm=0.2:gm=-0.1:bm=0.1,eq=contrast=1.3:saturation=1.4,hue=h=10",
+        description: "Neon cyberpunk style with magenta/cyan split toning and high saturation",
+      },
+      "horror": {
+        ffmpegFilter: "colorbalance=rs=-0.1:gs=-0.15:bs=0.05,eq=contrast=1.35:brightness=-0.1:saturation=0.5,curves=all='0/0 0.25/0.15 0.5/0.45 0.75/0.8 1/1'",
+        description: "Dark horror atmosphere with crushed blacks, desaturation and cold tones",
+      },
+    };
+
+    // If preset is specified, return it directly
+    if (preset && presets[preset]) {
+      return presets[preset];
+    }
+
+    // If no API key, try to match style to preset
+    if (!this.apiKey) {
+      const styleLower = style.toLowerCase();
+      for (const [key, value] of Object.entries(presets)) {
+        if (styleLower.includes(key.replace("-", " ")) || styleLower.includes(key)) {
+          return value;
+        }
+      }
+      return {
+        ffmpegFilter: "eq=contrast=1.1:saturation=0.95",
+        description: "Default slight contrast boost (API key required for custom styles)",
+      };
+    }
+
+    const systemPrompt = `You are an expert colorist who translates visual style descriptions into FFmpeg filter chains.
+
+Available FFmpeg filters you can use:
+- eq: brightness (-1 to 1), contrast (0 to 2), saturation (0 to 3), gamma (0.1 to 10)
+- colorbalance: rs/gs/bs (shadows), rm/gm/bm (midtones), rh/gh/bh (highlights) all -1 to 1
+- hue: h (hue shift 0-360), s (saturation multiplier)
+- curves: per-channel curves r/g/b/all with control points
+- lut3d: apply LUT file (but we'll avoid this for simplicity)
+- colortemperature: temperature (1000-40000K), mix (0-1)
+
+Rules:
+1. Combine multiple filters with commas
+2. Keep values subtle and realistic (avoid extreme values)
+3. Consider color harmony (complementary/split-complementary toning)
+4. Focus on: shadows, midtones, highlights, overall saturation and contrast
+
+Respond with JSON only:
+{
+  "ffmpegFilter": "eq=contrast=1.1:saturation=0.9,colorbalance=rs=0.1:bs=-0.1",
+  "description": "Brief description of the look"
+}`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: `Create an FFmpeg color grading filter for this style: "${style}"`,
+            },
+          ],
+          system: systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Claude API error:", await response.text());
+        return {
+          ffmpegFilter: "eq=contrast=1.1",
+          description: "Default grade (API error)",
+        };
+      }
+
+      const data = (await response.json()) as {
+        content: Array<{ type: string; text?: string }>;
+      };
+
+      const text = data.content.find((c) => c.type === "text")?.text;
+      if (!text) {
+        return { ffmpegFilter: "eq=contrast=1.1", description: "Default grade" };
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return { ffmpegFilter: "eq=contrast=1.1", description: "Default grade" };
+      }
+
+      return JSON.parse(jsonMatch[0]) as {
+        ffmpegFilter: string;
+        description: string;
+      };
+    } catch (error) {
+      console.error("Error analyzing color grade:", error);
+      return { ffmpegFilter: "eq=contrast=1.1", description: "Default grade (error)" };
+    }
+  }
+
+  /**
+   * Analyze transcript for speed ramping - identify emotional peaks and emphasis points
+   */
+  async analyzeForSpeedRamp(
+    segments: TranscriptSegment[],
+    options: {
+      style?: "dramatic" | "smooth" | "action";
+      minSpeed?: number;
+      maxSpeed?: number;
+    } = {}
+  ): Promise<{
+    keyframes: Array<{ time: number; speed: number; reason: string }>;
+  }> {
+    if (!this.apiKey) {
+      return { keyframes: [] };
+    }
+
+    const style = options.style || "dramatic";
+    const minSpeed = options.minSpeed || 0.25;
+    const maxSpeed = options.maxSpeed || 4.0;
+
+    const transcriptWithTimestamps = segments
+      .map((seg) => `[${seg.startTime.toFixed(1)}s - ${seg.endTime.toFixed(1)}s] ${seg.text}`)
+      .join("\n");
+
+    const styleDescriptions = {
+      dramatic: "Slow down for emotional moments, speed through transitions and filler",
+      smooth: "Gentle speed variations, maintain flow and readability",
+      action: "Quick cuts, speed up calm moments, slow for impact",
+    };
+
+    const systemPrompt = `You are a video editor creating dynamic speed ramps based on content analysis.
+
+Style: ${style}
+${styleDescriptions[style]}
+
+Speed range: ${minSpeed}x to ${maxSpeed}x (1.0 = normal speed)
+
+Analyze the transcript and identify moments where speed should change:
+1. **Slow motion (${minSpeed}x-0.5x)**: Emotional reveals, important statements, dramatic pauses, key visual moments
+2. **Normal speed (0.8x-1.2x)**: Standard dialogue, normal pacing
+3. **Fast forward (2x-${maxSpeed}x)**: Transitions, filler content, repetitive sections, "um/uh" moments
+
+Guidelines:
+- Create smooth transitions between speeds (don't jump abruptly)
+- Group similar content together
+- Minimum segment duration at each speed: 0.5 seconds real-time
+- Space keyframes naturally based on content rhythm
+
+Respond with JSON only:
+{
+  "keyframes": [
+    {"time": 0, "speed": 1.0, "reason": "Start at normal speed"},
+    {"time": 5.2, "speed": 0.5, "reason": "Slow for emotional reveal"},
+    {"time": 8.1, "speed": 1.0, "reason": "Return to normal"},
+    {"time": 12.5, "speed": 2.0, "reason": "Speed through transition"}
+  ]
+}`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: `Analyze this transcript and create speed ramp keyframes:\n\n${transcriptWithTimestamps}`,
+            },
+          ],
+          system: systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Claude API error:", await response.text());
+        return { keyframes: [] };
+      }
+
+      const data = (await response.json()) as {
+        content: Array<{ type: string; text?: string }>;
+      };
+
+      const text = data.content.find((c) => c.type === "text")?.text;
+      if (!text) {
+        return { keyframes: [] };
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return { keyframes: [] };
+      }
+
+      return JSON.parse(jsonMatch[0]) as {
+        keyframes: Array<{ time: number; speed: number; reason: string }>;
+      };
+    } catch (error) {
+      console.error("Error analyzing for speed ramp:", error);
+      return { keyframes: [] };
+    }
+  }
+
+  /**
+   * Analyze a video frame for auto-reframe - identify subject position for smart cropping
+   */
+  async analyzeFrameForReframe(
+    frameBase64: string,
+    targetAspect: string,
+    options: {
+      focusMode?: "auto" | "face" | "center" | "action";
+      sourceWidth: number;
+      sourceHeight: number;
+      mimeType?: string;
+    }
+  ): Promise<{
+    cropX: number;
+    cropY: number;
+    cropWidth: number;
+    cropHeight: number;
+    confidence: number;
+    subjectDescription: string;
+  }> {
+    const { sourceWidth, sourceHeight, focusMode = "auto", mimeType = "image/jpeg" } = options;
+
+    // Calculate target dimensions
+    const [targetW, targetH] = targetAspect.split(":").map(Number);
+    const targetRatio = targetW / targetH;
+    const sourceRatio = sourceWidth / sourceHeight;
+
+    let cropWidth: number;
+    let cropHeight: number;
+
+    if (sourceRatio > targetRatio) {
+      // Source is wider, crop horizontally
+      cropHeight = sourceHeight;
+      cropWidth = Math.round(sourceHeight * targetRatio);
+    } else {
+      // Source is taller, crop vertically
+      cropWidth = sourceWidth;
+      cropHeight = Math.round(sourceWidth / targetRatio);
+    }
+
+    // Default center crop
+    const defaultCropX = Math.round((sourceWidth - cropWidth) / 2);
+    const defaultCropY = Math.round((sourceHeight - cropHeight) / 2);
+
+    // If center mode, just return center crop
+    if (focusMode === "center") {
+      return {
+        cropX: defaultCropX,
+        cropY: defaultCropY,
+        cropWidth,
+        cropHeight,
+        confidence: 1.0,
+        subjectDescription: "Center-focused crop",
+      };
+    }
+
+    // Use Claude Vision to analyze subject position
+    if (!this.apiKey) {
+      return {
+        cropX: defaultCropX,
+        cropY: defaultCropY,
+        cropWidth,
+        cropHeight,
+        confidence: 0.5,
+        subjectDescription: "Default center crop (API key required for smart reframe)",
+      };
+    }
+
+    const focusModePrompts = {
+      auto: "Identify the main subject or point of interest in the frame",
+      face: "Focus on human faces, prioritize face visibility",
+      action: "Focus on motion and action, follow moving subjects",
+    };
+
+    const systemPrompt = `You are analyzing a video frame to determine optimal crop position for ${targetAspect} aspect ratio.
+
+Source dimensions: ${sourceWidth}x${sourceHeight}
+Target crop dimensions: ${cropWidth}x${cropHeight}
+Focus mode: ${focusMode} - ${focusModePrompts[focusMode as keyof typeof focusModePrompts] || focusModePrompts.auto}
+
+Analyze the frame and determine:
+1. Where is the main subject/point of interest?
+2. What crop position (cropX, cropY) would best frame the subject?
+
+Constraints:
+- cropX must be between 0 and ${sourceWidth - cropWidth}
+- cropY must be between 0 and ${sourceHeight - cropHeight}
+- Keep the subject within the crop bounds
+- For faces, keep them in upper third
+- For action, anticipate movement direction
+
+Respond with JSON only:
+{
+  "cropX": 100,
+  "cropY": 50,
+  "confidence": 0.85,
+  "subjectDescription": "Person speaking on left side of frame"
+}`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: mimeType,
+                    data: frameBase64,
+                  },
+                },
+                {
+                  type: "text",
+                  text: `Analyze this frame for ${targetAspect} reframe. Where should we crop to best capture the subject?`,
+                },
+              ],
+            },
+          ],
+          system: systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Claude Vision API error:", await response.text());
+        return {
+          cropX: defaultCropX,
+          cropY: defaultCropY,
+          cropWidth,
+          cropHeight,
+          confidence: 0.5,
+          subjectDescription: "Default crop (API error)",
+        };
+      }
+
+      const data = (await response.json()) as {
+        content: Array<{ type: string; text?: string }>;
+      };
+
+      const text = data.content.find((c) => c.type === "text")?.text;
+      if (!text) {
+        return {
+          cropX: defaultCropX,
+          cropY: defaultCropY,
+          cropWidth,
+          cropHeight,
+          confidence: 0.5,
+          subjectDescription: "Default crop",
+        };
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return {
+          cropX: defaultCropX,
+          cropY: defaultCropY,
+          cropWidth,
+          cropHeight,
+          confidence: 0.5,
+          subjectDescription: "Default crop",
+        };
+      }
+
+      const result = JSON.parse(jsonMatch[0]) as {
+        cropX: number;
+        cropY: number;
+        confidence: number;
+        subjectDescription: string;
+      };
+
+      // Validate and clamp values
+      const clampedCropX = Math.max(0, Math.min(result.cropX, sourceWidth - cropWidth));
+      const clampedCropY = Math.max(0, Math.min(result.cropY, sourceHeight - cropHeight));
+
+      return {
+        cropX: clampedCropX,
+        cropY: clampedCropY,
+        cropWidth,
+        cropHeight,
+        confidence: result.confidence,
+        subjectDescription: result.subjectDescription,
+      };
+    } catch (error) {
+      console.error("Error analyzing frame for reframe:", error);
+      return {
+        cropX: defaultCropX,
+        cropY: defaultCropY,
+        cropWidth,
+        cropHeight,
+        confidence: 0.5,
+        subjectDescription: "Default crop (error)",
+      };
+    }
+  }
 }
 
 export const claudeProvider = new ClaudeProvider();

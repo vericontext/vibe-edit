@@ -4,6 +4,92 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
+## 2026-02-02
+
+### Smart Editing Features
+Added 8 new AI-powered smart editing commands for Phase 4.
+
+**New Commands:**
+- `vibe ai duck` - Auto-duck background music when voice is present (FFmpeg sidechain compress)
+- `vibe ai grade` - AI color grading with style prompts or presets (Claude + FFmpeg)
+- `vibe ai speed-ramp` - Content-aware speed ramping (Whisper + Claude + FFmpeg)
+- `vibe ai reframe` - Auto-reframe to different aspect ratios (Claude Vision + FFmpeg)
+- `vibe ai auto-shorts` - Generate shorts from long-form video (highlights + reframe + captions)
+- `vibe ai style-transfer` - Apply artistic style transfer to video (Replicate)
+- `vibe ai track-object` - Track objects in video using SAM-2 or co-tracker (Replicate)
+
+**Enhanced Natural Language Timeline Control:**
+- Extended `vibe ai edit` with 4 new actions: speed-change, reverse, crop, position
+- Examples: "speed up the middle part by 2x", "reverse the second clip", "crop to 9:16 portrait"
+
+**ClaudeProvider Enhancements:**
+- Added `analyzeColorGrade()` method - generates FFmpeg filters from style descriptions
+- Added `analyzeForSpeedRamp()` method - identifies emotional peaks for speed keyframes
+- Added `analyzeFrameForReframe()` method - Claude Vision for subject tracking
+
+**ReplicateProvider Enhancements:**
+- Added `styleTransferVideo()` method for video style transfer
+- Added `trackObject()` method for point/box/prompt-based tracking
+- Added `getTrackingResult()` method for tracking result retrieval
+
+**OpenAIProvider Enhancements:**
+- Extended parseCommand with speed-change, reverse, crop, position actions
+- Enhanced fallback parser for offline capability
+
+**New Types:**
+- Added 6 new AICapability types: `color-grading`, `speed-ramping`, `auto-reframe`, `auto-shorts`, `object-tracking`, `audio-ducking`
+- Extended TimelineCommand.action with: `speed-change`, `reverse`, `crop`, `position`
+
+**Built-in Color Grade Presets:**
+- film-noir, vintage, cinematic-warm, cool-tones
+- high-contrast, pastel, cyberpunk, horror
+
+**Files modified:**
+- `packages/ai-providers/src/interface/types.ts` - Added 6 capabilities, 4 timeline actions
+- `packages/ai-providers/src/claude/ClaudeProvider.ts` - Added 3 analysis methods (~350 lines)
+- `packages/ai-providers/src/replicate/ReplicateProvider.ts` - Added style/tracking methods (~180 lines)
+- `packages/ai-providers/src/openai/OpenAIProvider.ts` - Extended command parsing (~100 lines)
+- `packages/cli/src/commands/ai.ts` - Added 8 new commands (~800 lines)
+- `CLAUDE.md` - Added CLI documentation
+
+**Usage:**
+```bash
+# Audio Ducking (FFmpeg, free)
+pnpm vibe ai duck bgm.mp3 --voice narration.mp3 -o ducked.mp3
+pnpm vibe ai duck bgm.mp3 --voice vo.mp3 --threshold -25 --ratio 4
+
+# Color Grading (Claude + FFmpeg)
+pnpm vibe ai grade video.mp4 --style "sunset warm glow" -o graded.mp4
+pnpm vibe ai grade video.mp4 --preset cyberpunk -o styled.mp4
+pnpm vibe ai grade video.mp4 --preset film-noir --analyze-only  # Preview only
+
+# Speed Ramping (Whisper + Claude + FFmpeg)
+pnpm vibe ai speed-ramp video.mp4 -o ramped.mp4
+pnpm vibe ai speed-ramp video.mp4 --style dramatic --analyze-only
+pnpm vibe ai speed-ramp video.mp4 --min-speed 0.25 --max-speed 4
+
+# Auto Reframe (Claude Vision + FFmpeg)
+pnpm vibe ai reframe video.mp4 --aspect 9:16 -o portrait.mp4
+pnpm vibe ai reframe video.mp4 --focus face --keyframes crop.json
+
+# Auto Shorts
+pnpm vibe ai auto-shorts video.mp4 -d 60 -o short.mp4
+pnpm vibe ai auto-shorts video.mp4 --count 3 --output-dir ./shorts
+
+# Style Transfer (Replicate)
+pnpm vibe ai style-transfer https://example.com/video.mp4 --style "anime style"
+
+# Object Tracking (Replicate SAM-2)
+pnpm vibe ai track-object https://example.com/video.mp4 --point 500,300
+
+# Enhanced NL Timeline
+pnpm vibe ai edit project.json "speed up by 2x"
+pnpm vibe ai edit project.json "reverse the clip"
+pnpm vibe ai edit project.json "crop to portrait"
+```
+
+---
+
 ## 2026-02-01
 
 ### Voice & Audio Features

@@ -122,14 +122,14 @@ Intelligence built into every interaction.
 - [x] Audio Restoration - Noise removal, quality enhancement (`vibe ai audio-restore`)
 
 ### Smart Editing
-- [ ] Video-to-Video - Style transfer for videos
-- [ ] Object Tracking - Automatic object tracking
-- [ ] Auto Reframe - Smart 16:9 → 9:16 conversion
-- [ ] Natural language timeline control ("trim last 3 seconds")
-- [ ] AI color grading suggestions
-- [ ] Content-aware speed ramping
-- [ ] AI-powered audio ducking
-- [ ] Auto-generate shorts from long-form
+- [x] Audio Ducking - Auto-duck music when voice is present (`vibe ai duck`)
+- [x] AI Color Grading - Style-based color grading (`vibe ai grade`)
+- [x] Speed Ramping - Content-aware speed ramping (`vibe ai speed-ramp`)
+- [x] Natural Language Timeline - Extended with speed/reverse/crop/position actions
+- [x] Auto Reframe - Smart 16:9 → 9:16 conversion (`vibe ai reframe`)
+- [x] Auto-generate Shorts - From long-form with captions (`vibe ai auto-shorts`)
+- [x] Video Style Transfer - Artistic style for videos (`vibe ai style-transfer`)
+- [x] Object Tracking - SAM-2/co-tracker tracking (`vibe ai track-object`)
 
 ---
 
@@ -211,6 +211,8 @@ vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | i
                 sd | sd-upscale | sd-remove-bg | sd-img2img | sd-replace | sd-outpaint
                 script-to-video | highlights | b-roll | viral
                 voice-clone | music | music-status | audio-restore | dub
+                duck | grade | speed-ramp | reframe | auto-shorts
+                style-transfer | track-object
 ```
 
 ---

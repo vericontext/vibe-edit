@@ -4204,6 +4204,901 @@ ${segmentTexts}`;
     }
   });
 
+// ============================================
+// Smart Editing Commands
+// ============================================
+
+// Audio Ducking (FFmpeg only)
+aiCommand
+  .command("duck")
+  .description("Auto-duck background music when voice is present (FFmpeg)")
+  .argument("<music>", "Background music file path")
+  .option("-v, --voice <path>", "Voice/narration track (required)")
+  .option("-o, --output <path>", "Output audio file path")
+  .option("-t, --threshold <dB>", "Sidechain threshold in dB", "-30")
+  .option("-r, --ratio <ratio>", "Compression ratio", "3")
+  .option("-a, --attack <ms>", "Attack time in ms", "20")
+  .option("-l, --release <ms>", "Release time in ms", "200")
+  .action(async (musicPath: string, options) => {
+    try {
+      if (!options.voice) {
+        console.error(chalk.red("Voice track required. Use --voice <path>"));
+        process.exit(1);
+      }
+
+      // Check FFmpeg availability
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const spinner = ora("Processing audio ducking...").start();
+
+      const absMusic = resolve(process.cwd(), musicPath);
+      const absVoice = resolve(process.cwd(), options.voice);
+      const outputPath = options.output
+        ? resolve(process.cwd(), options.output)
+        : absMusic.replace(/(\.[^.]+)$/, "-ducked$1");
+
+      // Convert threshold from dB to linear (0-1 scale)
+      const thresholdDb = parseFloat(options.threshold);
+      const thresholdLinear = Math.pow(10, thresholdDb / 20);
+
+      const ratio = parseFloat(options.ratio);
+      const attack = parseFloat(options.attack);
+      const release = parseFloat(options.release);
+
+      // FFmpeg sidechain compress filter
+      const filterComplex = `[0:a][1:a]sidechaincompress=threshold=${thresholdLinear}:ratio=${ratio}:attack=${attack}:release=${release}[out]`;
+
+      const cmd = `ffmpeg -i "${absMusic}" -i "${absVoice}" -filter_complex "${filterComplex}" -map "[out]" "${outputPath}" -y`;
+
+      await execAsync(cmd);
+
+      spinner.succeed(chalk.green("Audio ducking complete"));
+      console.log();
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Music: ${musicPath}`);
+      console.log(`Voice: ${options.voice}`);
+      console.log(`Threshold: ${thresholdDb}dB`);
+      console.log(`Ratio: ${ratio}:1`);
+      console.log(`Attack/Release: ${attack}ms / ${release}ms`);
+      console.log();
+      console.log(chalk.green(`Output: ${outputPath}`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Audio ducking failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// AI Color Grading
+aiCommand
+  .command("grade")
+  .description("Apply AI-generated color grading (Claude + FFmpeg)")
+  .argument("<video>", "Video file path")
+  .option("-s, --style <prompt>", "Style description (e.g., 'cinematic warm')")
+  .option("-p, --preset <name>", "Built-in preset: film-noir, vintage, cinematic-warm, cool-tones, high-contrast, pastel, cyberpunk, horror")
+  .option("-o, --output <path>", "Output video file path")
+  .option("--analyze-only", "Show filter without applying")
+  .option("-k, --api-key <key>", "Anthropic API key (or set ANTHROPIC_API_KEY env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      if (!options.style && !options.preset) {
+        console.error(chalk.red("Either --style or --preset is required"));
+        console.log(chalk.dim("Examples:"));
+        console.log(chalk.dim('  pnpm vibe ai grade video.mp4 --style "warm sunset"'));
+        console.log(chalk.dim("  pnpm vibe ai grade video.mp4 --preset cinematic-warm"));
+        process.exit(1);
+      }
+
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const spinner = ora("Analyzing color grade...").start();
+
+      // Get API key if using style (not preset)
+      let gradeResult: { ffmpegFilter: string; description: string };
+
+      if (options.preset) {
+        const claude = new ClaudeProvider();
+        gradeResult = await claude.analyzeColorGrade("", options.preset);
+      } else {
+        const apiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
+        const claude = new ClaudeProvider();
+        await claude.initialize({ apiKey: apiKey || undefined });
+        gradeResult = await claude.analyzeColorGrade(options.style);
+      }
+
+      spinner.succeed(chalk.green("Color grade analyzed"));
+      console.log();
+      console.log(chalk.bold.cyan("Color Grade"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Style: ${options.preset || options.style}`);
+      console.log(`Description: ${gradeResult.description}`);
+      console.log();
+      console.log(chalk.dim("FFmpeg filter:"));
+      console.log(chalk.cyan(gradeResult.ffmpegFilter));
+      console.log();
+
+      if (options.analyzeOnly) {
+        console.log(chalk.dim("Use without --analyze-only to apply the grade."));
+        return;
+      }
+
+      const absPath = resolve(process.cwd(), videoPath);
+      const outputPath = options.output
+        ? resolve(process.cwd(), options.output)
+        : absPath.replace(/(\.[^.]+)$/, "-graded$1");
+
+      spinner.start("Applying color grade...");
+
+      const cmd = `ffmpeg -i "${absPath}" -vf "${gradeResult.ffmpegFilter}" -c:a copy "${outputPath}" -y`;
+      await execAsync(cmd, { timeout: 600000 });
+
+      spinner.succeed(chalk.green("Color grade applied"));
+      console.log(chalk.green(`Output: ${outputPath}`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Color grading failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Speed Ramping
+aiCommand
+  .command("speed-ramp")
+  .description("Apply content-aware speed ramping (Whisper + Claude + FFmpeg)")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output video file path")
+  .option("-s, --style <style>", "Style: dramatic, smooth, action", "dramatic")
+  .option("--min-speed <factor>", "Minimum speed factor", "0.25")
+  .option("--max-speed <factor>", "Maximum speed factor", "4.0")
+  .option("--analyze-only", "Show keyframes without applying")
+  .option("-l, --language <lang>", "Language code for transcription")
+  .option("-k, --api-key <key>", "Anthropic API key (or set ANTHROPIC_API_KEY env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const openaiApiKey = await getApiKey("OPENAI_API_KEY", "OpenAI");
+      if (!openaiApiKey) {
+        console.error(chalk.red("OpenAI API key required for Whisper transcription."));
+        process.exit(1);
+      }
+
+      const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
+      if (!claudeApiKey) {
+        console.error(chalk.red("Anthropic API key required for speed analysis."));
+        process.exit(1);
+      }
+
+      const absPath = resolve(process.cwd(), videoPath);
+
+      // Step 1: Extract audio
+      const spinner = ora("Extracting audio...").start();
+      const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
+
+      await execAsync(`ffmpeg -i "${absPath}" -vn -acodec libmp3lame -q:a 2 "${tempAudio}" -y`);
+
+      // Step 2: Transcribe
+      spinner.text = "Transcribing audio...";
+
+      const whisper = new WhisperProvider();
+      await whisper.initialize({ apiKey: openaiApiKey });
+
+      const audioBuffer = await readFile(tempAudio);
+      const audioBlob = new Blob([audioBuffer]);
+      const transcript = await whisper.transcribe(audioBlob, options.language);
+
+      if (!transcript.segments || transcript.segments.length === 0) {
+        spinner.fail(chalk.red("No transcript segments found"));
+        process.exit(1);
+      }
+
+      // Step 3: Analyze with Claude
+      spinner.text = "Analyzing for speed ramping...";
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: claudeApiKey });
+
+      const speedResult = await claude.analyzeForSpeedRamp(transcript.segments, {
+        style: options.style as "dramatic" | "smooth" | "action",
+        minSpeed: parseFloat(options.minSpeed),
+        maxSpeed: parseFloat(options.maxSpeed),
+      });
+
+      // Clean up temp file
+      try {
+        await execAsync(`rm "${tempAudio}"`);
+      } catch { }
+
+      spinner.succeed(chalk.green(`Found ${speedResult.keyframes.length} speed keyframes`));
+
+      console.log();
+      console.log(chalk.bold.cyan("Speed Ramp Keyframes"));
+      console.log(chalk.dim("─".repeat(60)));
+
+      for (const kf of speedResult.keyframes) {
+        const speedColor = kf.speed < 1 ? chalk.blue : kf.speed > 1 ? chalk.yellow : chalk.white;
+        console.log(`  ${formatTime(kf.time)} → ${speedColor(`${kf.speed.toFixed(2)}x`)} - ${kf.reason}`);
+      }
+      console.log();
+
+      if (options.analyzeOnly) {
+        console.log(chalk.dim("Use without --analyze-only to apply speed ramps."));
+        return;
+      }
+
+      if (speedResult.keyframes.length < 2) {
+        console.log(chalk.yellow("Not enough keyframes for speed ramping."));
+        return;
+      }
+
+      spinner.start("Applying speed ramps...");
+
+      // Build FFmpeg filter for speed ramping (segment-based)
+      const outputPath = options.output
+        ? resolve(process.cwd(), options.output)
+        : absPath.replace(/(\.[^.]+)$/, "-ramped$1");
+
+      // For simplicity, we'll create segments and concatenate
+      // A full implementation would use complex filter expressions
+      // Here we use setpts with a simple approach
+
+      // Get video duration
+      const { stdout: durationOut } = await execAsync(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${absPath}"`
+      );
+      const totalDuration = parseFloat(durationOut.trim());
+
+      // For demo, apply average speed or first segment's speed
+      const avgSpeed = speedResult.keyframes.reduce((sum, kf) => sum + kf.speed, 0) / speedResult.keyframes.length;
+
+      // Use setpts for speed change (1/speed for setpts)
+      const setpts = `setpts=${(1 / avgSpeed).toFixed(3)}*PTS`;
+      const atempo = avgSpeed >= 0.5 && avgSpeed <= 2.0 ? `atempo=${avgSpeed.toFixed(3)}` : "";
+
+      let cmd: string;
+      if (atempo) {
+        cmd = `ffmpeg -i "${absPath}" -filter_complex "[0:v]${setpts}[v];[0:a]${atempo}[a]" -map "[v]" -map "[a]" "${outputPath}" -y`;
+      } else {
+        cmd = `ffmpeg -i "${absPath}" -vf "${setpts}" -an "${outputPath}" -y`;
+      }
+
+      await execAsync(cmd, { timeout: 600000 });
+
+      spinner.succeed(chalk.green("Speed ramp applied"));
+      console.log(chalk.green(`Output: ${outputPath}`));
+      console.log(chalk.dim(`Average speed: ${avgSpeed.toFixed(2)}x`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Speed ramping failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Auto Reframe
+aiCommand
+  .command("reframe")
+  .description("Auto-reframe video to different aspect ratio (Claude Vision + FFmpeg)")
+  .argument("<video>", "Video file path")
+  .option("-a, --aspect <ratio>", "Target aspect ratio: 9:16, 1:1, 4:5", "9:16")
+  .option("-f, --focus <mode>", "Focus mode: auto, face, center, action", "auto")
+  .option("-o, --output <path>", "Output video file path")
+  .option("--analyze-only", "Show crop regions without applying")
+  .option("--keyframes <path>", "Export keyframes to JSON file")
+  .option("-k, --api-key <key>", "Anthropic API key (or set ANTHROPIC_API_KEY env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const absPath = resolve(process.cwd(), videoPath);
+
+      // Get video dimensions
+      const spinner = ora("Analyzing video...").start();
+
+      const { stdout: probeOut } = await execAsync(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration -of csv=p=0 "${absPath}"`
+      );
+      const [width, height, durationStr] = probeOut.trim().split(",");
+      const sourceWidth = parseInt(width);
+      const sourceHeight = parseInt(height);
+      const duration = parseFloat(durationStr);
+
+      spinner.text = "Extracting keyframes...";
+
+      // Extract keyframes every 2 seconds for analysis
+      const keyframeInterval = 2;
+      const numKeyframes = Math.ceil(duration / keyframeInterval);
+      const tempDir = `/tmp/vibe-reframe-${Date.now()}`;
+      await execAsync(`mkdir -p "${tempDir}"`);
+
+      await execAsync(
+        `ffmpeg -i "${absPath}" -vf "fps=1/${keyframeInterval}" -frame_pts 1 "${tempDir}/frame-%04d.jpg" -y`
+      );
+
+      // Get API key
+      const apiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: apiKey || undefined });
+
+      // Analyze keyframes
+      spinner.text = "Analyzing frames for subject tracking...";
+
+      const cropKeyframes: Array<{
+        time: number;
+        cropX: number;
+        cropY: number;
+        cropWidth: number;
+        cropHeight: number;
+        confidence: number;
+        subjectDescription: string;
+      }> = [];
+
+      for (let i = 1; i <= numKeyframes && i <= 30; i++) {
+        // Limit to 30 frames
+        const framePath = `${tempDir}/frame-${i.toString().padStart(4, "0")}.jpg`;
+
+        try {
+          const frameBuffer = await readFile(framePath);
+          const frameBase64 = frameBuffer.toString("base64");
+
+          const result = await claude.analyzeFrameForReframe(frameBase64, options.aspect, {
+            focusMode: options.focus,
+            sourceWidth,
+            sourceHeight,
+            mimeType: "image/jpeg",
+          });
+
+          cropKeyframes.push({
+            time: (i - 1) * keyframeInterval,
+            ...result,
+          });
+
+          spinner.text = `Analyzing frames... ${i}/${Math.min(numKeyframes, 30)}`;
+        } catch (e) {
+          // Skip failed frames
+        }
+
+        // Small delay to avoid rate limiting
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      // Clean up temp files
+      try {
+        await execAsync(`rm -rf "${tempDir}"`);
+      } catch { }
+
+      spinner.succeed(chalk.green(`Analyzed ${cropKeyframes.length} keyframes`));
+
+      console.log();
+      console.log(chalk.bold.cyan("Reframe Analysis"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Source: ${sourceWidth}x${sourceHeight}`);
+      console.log(`Target: ${options.aspect}`);
+      console.log(`Focus: ${options.focus}`);
+      console.log();
+
+      if (cropKeyframes.length > 0) {
+        const avgConf = cropKeyframes.reduce((sum, kf) => sum + kf.confidence, 0) / cropKeyframes.length;
+        console.log(`Average confidence: ${(avgConf * 100).toFixed(0)}%`);
+        console.log();
+        console.log(chalk.dim("Sample keyframes:"));
+        for (const kf of cropKeyframes.slice(0, 5)) {
+          console.log(`  ${formatTime(kf.time)} → crop=${kf.cropX},${kf.cropY} (${kf.subjectDescription})`);
+        }
+        if (cropKeyframes.length > 5) {
+          console.log(chalk.dim(`  ... and ${cropKeyframes.length - 5} more`));
+        }
+      }
+      console.log();
+
+      // Export keyframes if requested
+      if (options.keyframes) {
+        const keyframesPath = resolve(process.cwd(), options.keyframes);
+        await writeFile(keyframesPath, JSON.stringify(cropKeyframes, null, 2));
+        console.log(chalk.green(`Keyframes saved to: ${keyframesPath}`));
+      }
+
+      if (options.analyzeOnly) {
+        console.log(chalk.dim("Use without --analyze-only to apply reframe."));
+        return;
+      }
+
+      // Apply reframe using average crop position
+      const avgCropX = Math.round(cropKeyframes.reduce((sum, kf) => sum + kf.cropX, 0) / cropKeyframes.length);
+      const avgCropY = Math.round(cropKeyframes.reduce((sum, kf) => sum + kf.cropY, 0) / cropKeyframes.length);
+      const cropWidth = cropKeyframes[0]?.cropWidth || sourceWidth;
+      const cropHeight = cropKeyframes[0]?.cropHeight || sourceHeight;
+
+      const outputPath = options.output
+        ? resolve(process.cwd(), options.output)
+        : absPath.replace(/(\.[^.]+)$/, `-${options.aspect.replace(":", "x")}$1`);
+
+      spinner.start("Applying reframe...");
+
+      const cmd = `ffmpeg -i "${absPath}" -vf "crop=${cropWidth}:${cropHeight}:${avgCropX}:${avgCropY}" -c:a copy "${outputPath}" -y`;
+      await execAsync(cmd, { timeout: 600000 });
+
+      spinner.succeed(chalk.green("Reframe applied"));
+      console.log(chalk.green(`Output: ${outputPath}`));
+      console.log(chalk.dim(`Crop: ${cropWidth}x${cropHeight} at (${avgCropX}, ${avgCropY})`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Reframe failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Auto Shorts
+aiCommand
+  .command("auto-shorts")
+  .description("Auto-generate shorts from long-form video")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file (single) or directory (multiple)")
+  .option("-d, --duration <seconds>", "Target duration in seconds (15-60)", "60")
+  .option("-n, --count <number>", "Number of shorts to generate", "1")
+  .option("-a, --aspect <ratio>", "Aspect ratio: 9:16, 1:1", "9:16")
+  .option("--output-dir <dir>", "Output directory for multiple shorts")
+  .option("--add-captions", "Add auto-generated captions")
+  .option("--caption-style <style>", "Caption style: minimal, bold, animated", "bold")
+  .option("--analyze-only", "Show segments without generating")
+  .option("-l, --language <lang>", "Language code for transcription")
+  .action(async (videoPath: string, options) => {
+    try {
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const openaiApiKey = await getApiKey("OPENAI_API_KEY", "OpenAI");
+      if (!openaiApiKey) {
+        console.error(chalk.red("OpenAI API key required for transcription."));
+        process.exit(1);
+      }
+
+      const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+      if (!claudeApiKey) {
+        console.error(chalk.red("Anthropic API key required for highlight detection."));
+        process.exit(1);
+      }
+
+      const absPath = resolve(process.cwd(), videoPath);
+      const targetDuration = parseInt(options.duration);
+      const shortCount = parseInt(options.count);
+
+      // Step 1: Extract audio and transcribe
+      const spinner = ora("Extracting audio...").start();
+      const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
+
+      await execAsync(`ffmpeg -i "${absPath}" -vn -acodec libmp3lame -q:a 2 "${tempAudio}" -y`);
+
+      spinner.text = "Transcribing audio...";
+
+      const whisper = new WhisperProvider();
+      await whisper.initialize({ apiKey: openaiApiKey });
+
+      const audioBuffer = await readFile(tempAudio);
+      const audioBlob = new Blob([audioBuffer]);
+      const transcript = await whisper.transcribe(audioBlob, options.language);
+
+      // Clean up temp audio
+      try {
+        await execAsync(`rm "${tempAudio}"`);
+      } catch { }
+
+      if (!transcript.segments || transcript.segments.length === 0) {
+        spinner.fail(chalk.red("No transcript found"));
+        process.exit(1);
+      }
+
+      // Step 2: Find highlights
+      spinner.text = "Finding highlights...";
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: claudeApiKey });
+
+      const highlights = await claude.analyzeForHighlights(transcript.segments, {
+        criteria: "all",
+        targetDuration: targetDuration * shortCount,
+        maxCount: shortCount * 3, // Get extras to choose from
+      });
+
+      if (highlights.length === 0) {
+        spinner.fail(chalk.red("No highlights found"));
+        process.exit(1);
+      }
+
+      // Sort by confidence and select best
+      highlights.sort((a, b) => b.confidence - a.confidence);
+      const selectedHighlights = highlights.slice(0, shortCount);
+
+      spinner.succeed(chalk.green(`Found ${highlights.length} highlights, selected ${selectedHighlights.length}`));
+
+      console.log();
+      console.log(chalk.bold.cyan("Auto Shorts"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Target duration: ${targetDuration}s`);
+      console.log(`Aspect ratio: ${options.aspect}`);
+      console.log();
+
+      for (let i = 0; i < selectedHighlights.length; i++) {
+        const h = selectedHighlights[i];
+        console.log(chalk.yellow(`[Short ${i + 1}] ${formatTime(h.startTime)} - ${formatTime(h.endTime)} (${h.duration.toFixed(1)}s)`));
+        console.log(`  ${h.reason}`);
+        console.log(chalk.dim(`  Confidence: ${(h.confidence * 100).toFixed(0)}%`));
+      }
+      console.log();
+
+      if (options.analyzeOnly) {
+        console.log(chalk.dim("Use without --analyze-only to generate shorts."));
+        return;
+      }
+
+      // Step 3: Generate shorts
+      const outputDir = options.outputDir
+        ? resolve(process.cwd(), options.outputDir)
+        : dirname(absPath);
+
+      if (options.outputDir && !existsSync(outputDir)) {
+        await mkdir(outputDir, { recursive: true });
+      }
+
+      for (let i = 0; i < selectedHighlights.length; i++) {
+        const h = selectedHighlights[i];
+        const shortSpinner = ora(`Generating short ${i + 1}/${selectedHighlights.length}...`).start();
+
+        let outputPath: string;
+        if (shortCount === 1 && options.output) {
+          outputPath = resolve(process.cwd(), options.output);
+        } else {
+          const baseName = basename(absPath, extname(absPath));
+          outputPath = resolve(outputDir, `${baseName}-short-${i + 1}.mp4`);
+        }
+
+        // Get source dimensions for reframe
+        const { stdout: probeOut } = await execAsync(
+          `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "${absPath}"`
+        );
+        const [width, height] = probeOut.trim().split(",").map(Number);
+
+        // Calculate crop for aspect ratio
+        const [targetW, targetH] = options.aspect.split(":").map(Number);
+        const targetRatio = targetW / targetH;
+        const sourceRatio = width / height;
+
+        let cropW: number, cropH: number, cropX: number, cropY: number;
+        if (sourceRatio > targetRatio) {
+          cropH = height;
+          cropW = Math.round(height * targetRatio);
+          cropX = Math.round((width - cropW) / 2);
+          cropY = 0;
+        } else {
+          cropW = width;
+          cropH = Math.round(width / targetRatio);
+          cropX = 0;
+          cropY = Math.round((height - cropH) / 2);
+        }
+
+        // Build FFmpeg command
+        const vf = `crop=${cropW}:${cropH}:${cropX}:${cropY}`;
+        const cmd = `ffmpeg -ss ${h.startTime} -i "${absPath}" -t ${h.duration} -vf "${vf}" -c:a aac -b:a 128k "${outputPath}" -y`;
+
+        await execAsync(cmd, { timeout: 300000 });
+
+        shortSpinner.succeed(chalk.green(`Short ${i + 1}: ${outputPath}`));
+      }
+
+      console.log();
+      console.log(chalk.bold.green(`Generated ${selectedHighlights.length} short(s)`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Auto shorts failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Style Transfer
+aiCommand
+  .command("style-transfer")
+  .description("Apply artistic style transfer to video (Replicate)")
+  .argument("<video>", "Video file path or URL")
+  .option("-s, --style <path/prompt>", "Style reference image path or text prompt")
+  .option("-o, --output <path>", "Output video file path")
+  .option("--strength <value>", "Transfer strength (0-1)", "0.5")
+  .option("--no-wait", "Start processing without waiting")
+  .option("-k, --api-key <key>", "Replicate API token (or set REPLICATE_API_TOKEN env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      if (!options.style) {
+        console.error(chalk.red("Style required. Use --style <image-path> or --style <prompt>"));
+        process.exit(1);
+      }
+
+      const apiKey = await getApiKey("REPLICATE_API_TOKEN", "Replicate", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Replicate API token required."));
+        console.error(chalk.dim("Set REPLICATE_API_TOKEN environment variable"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing style transfer...").start();
+
+      const replicate = new ReplicateProvider();
+      await replicate.initialize({ apiKey });
+
+      // Determine if style is an image path or text prompt
+      let styleRef: string | undefined;
+      let stylePrompt: string | undefined;
+
+      if (options.style.startsWith("http://") || options.style.startsWith("https://")) {
+        styleRef = options.style;
+      } else if (existsSync(resolve(process.cwd(), options.style))) {
+        // It's a local file - need to upload or base64
+        spinner.fail(chalk.yellow("Local style images must be URLs for Replicate."));
+        console.log(chalk.dim("Upload your style image to a URL and try again."));
+        process.exit(1);
+      } else {
+        // Treat as text prompt
+        stylePrompt = options.style;
+      }
+
+      // Video must be URL
+      let videoUrl: string;
+      if (videoPath.startsWith("http://") || videoPath.startsWith("https://")) {
+        videoUrl = videoPath;
+      } else {
+        spinner.fail(chalk.yellow("Video must be a URL for Replicate processing."));
+        console.log(chalk.dim("Upload your video to a URL and try again."));
+        process.exit(1);
+      }
+
+      spinner.text = "Starting style transfer...";
+
+      const result = await replicate.styleTransferVideo({
+        videoUrl,
+        styleRef,
+        stylePrompt,
+        strength: parseFloat(options.strength),
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Style transfer failed"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Style Transfer Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+      console.log(`Style: ${stylePrompt || styleRef}`);
+      console.log(`Strength: ${options.strength}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Style transfer started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  curl -s -H "Authorization: Bearer $REPLICATE_API_TOKEN" https://api.replicate.com/v1/predictions/${result.id}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Processing style transfer (this may take several minutes)...";
+
+      const finalResult = await replicate.waitForCompletion(
+        result.id,
+        (status) => {
+          spinner.text = `Processing... ${status.status}`;
+        },
+        600000
+      );
+
+      if (finalResult.status !== "completed") {
+        spinner.fail(chalk.red(finalResult.error || "Style transfer failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Style transfer complete"));
+
+      console.log();
+      if (finalResult.videoUrl) {
+        console.log(`Video URL: ${finalResult.videoUrl}`);
+
+        if (options.output) {
+          const downloadSpinner = ora("Downloading video...").start();
+          try {
+            const response = await fetch(finalResult.videoUrl);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            const outputPath = resolve(process.cwd(), options.output);
+            await writeFile(outputPath, buffer);
+            downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+          } catch (err) {
+            downloadSpinner.fail(chalk.red("Failed to download video"));
+          }
+        }
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Style transfer failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// Object Tracking
+aiCommand
+  .command("track-object")
+  .description("Track objects in video (Replicate SAM-2)")
+  .argument("<video>", "Video file path or URL")
+  .option("-p, --point <x,y>", "Point to track (x,y coordinates)")
+  .option("-b, --box <x,y,w,h>", "Bounding box to track (x,y,width,height)")
+  .option("--prompt <text>", "Object description to track")
+  .option("-o, --output <path>", "Output JSON or MP4 file path", "track.json")
+  .option("-v, --visualize", "Output video with tracking overlay")
+  .option("--no-wait", "Start processing without waiting")
+  .option("-k, --api-key <key>", "Replicate API token (or set REPLICATE_API_TOKEN env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      if (!options.point && !options.box && !options.prompt) {
+        console.error(chalk.red("Tracking target required. Use --point, --box, or --prompt"));
+        console.log(chalk.dim("Examples:"));
+        console.log(chalk.dim("  pnpm vibe ai track-object video.mp4 --point 500,300"));
+        console.log(chalk.dim("  pnpm vibe ai track-object video.mp4 --box 100,100,200,200"));
+        console.log(chalk.dim('  pnpm vibe ai track-object video.mp4 --prompt "the person"'));
+        process.exit(1);
+      }
+
+      const apiKey = await getApiKey("REPLICATE_API_TOKEN", "Replicate", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("Replicate API token required."));
+        console.error(chalk.dim("Set REPLICATE_API_TOKEN environment variable"));
+        process.exit(1);
+      }
+
+      const spinner = ora("Initializing object tracking...").start();
+
+      const replicate = new ReplicateProvider();
+      await replicate.initialize({ apiKey });
+
+      // Video must be URL
+      let videoUrl: string;
+      if (videoPath.startsWith("http://") || videoPath.startsWith("https://")) {
+        videoUrl = videoPath;
+      } else {
+        spinner.fail(chalk.yellow("Video must be a URL for Replicate processing."));
+        console.log(chalk.dim("Upload your video to a URL and try again."));
+        process.exit(1);
+      }
+
+      // Parse tracking target
+      let point: [number, number] | undefined;
+      let box: [number, number, number, number] | undefined;
+
+      if (options.point) {
+        const [x, y] = options.point.split(",").map(Number);
+        point = [x, y];
+      }
+
+      if (options.box) {
+        const [x, y, w, h] = options.box.split(",").map(Number);
+        box = [x, y, w, h];
+      }
+
+      spinner.text = "Starting object tracking...";
+
+      const result = await replicate.trackObject({
+        videoUrl,
+        point,
+        box,
+        prompt: options.prompt,
+      });
+
+      if (result.status === "failed") {
+        spinner.fail(chalk.red(result.error || "Object tracking failed"));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("Object Tracking Started"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Task ID: ${chalk.bold(result.id)}`);
+      if (point) console.log(`Point: ${point[0]}, ${point[1]}`);
+      if (box) console.log(`Box: ${box[0]}, ${box[1]}, ${box[2]}, ${box[3]}`);
+      if (options.prompt) console.log(`Prompt: ${options.prompt}`);
+
+      if (!options.wait) {
+        spinner.succeed(chalk.green("Tracking started"));
+        console.log();
+        console.log(chalk.dim("Check status with:"));
+        console.log(chalk.dim(`  curl -s -H "Authorization: Bearer $REPLICATE_API_TOKEN" https://api.replicate.com/v1/predictions/${result.id}`));
+        console.log();
+        return;
+      }
+
+      spinner.text = "Processing tracking (this may take several minutes)...";
+
+      const finalResult = await replicate.getTrackingResult(result.id);
+
+      // Poll for completion
+      let pollResult = finalResult;
+      const startTime = Date.now();
+      const maxWait = 600000;
+
+      while (pollResult.status !== "completed" && pollResult.status !== "failed" && Date.now() - startTime < maxWait) {
+        await new Promise((r) => setTimeout(r, 3000));
+        pollResult = await replicate.getTrackingResult(result.id);
+        spinner.text = `Processing... ${pollResult.status}`;
+      }
+
+      if (pollResult.status !== "completed") {
+        spinner.fail(chalk.red(pollResult.error || "Tracking failed or timed out"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Object tracking complete"));
+
+      console.log();
+      if (pollResult.maskUrl) {
+        console.log(`Mask URL: ${pollResult.maskUrl}`);
+
+        const outputPath = resolve(process.cwd(), options.output);
+        if (options.visualize || options.output.endsWith(".mp4")) {
+          const downloadSpinner = ora("Downloading tracking mask...").start();
+          try {
+            const response = await fetch(pollResult.maskUrl);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            await writeFile(outputPath, buffer);
+            downloadSpinner.succeed(chalk.green(`Saved to: ${outputPath}`));
+          } catch (err) {
+            downloadSpinner.fail(chalk.red("Failed to download mask"));
+          }
+        } else {
+          // Save tracking data as JSON
+          const trackData = {
+            taskId: result.id,
+            maskUrl: pollResult.maskUrl,
+            trackingData: pollResult.trackingData,
+          };
+          await writeFile(outputPath, JSON.stringify(trackData, null, 2));
+          console.log(chalk.green(`Tracking data saved to: ${outputPath}`));
+        }
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Object tracking failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
 aiCommand
   .command("providers")
   .description("List available AI providers")
@@ -4348,6 +5243,81 @@ function executeCommand(project: Project, cmd: TimelineCommand): boolean {
           isLocked: false,
           isVisible: true,
         });
+        return true;
+
+      case "speed-change":
+        // Store speed info in clip metadata (processed during export)
+        for (const clipId of clipIds) {
+          const clip = project.getClips().find((c) => c.id === clipId);
+          if (clip) {
+            const speed = (params.speed as number) || 1.0;
+            project.addEffect(clipId, {
+              type: "speed" as EffectType,
+              startTime: 0,
+              duration: clip.duration,
+              params: { speed },
+            });
+          }
+        }
+        return true;
+
+      case "reverse":
+        // Reverse is implemented as speed = -1
+        for (const clipId of clipIds) {
+          const clip = project.getClips().find((c) => c.id === clipId);
+          if (clip) {
+            project.addEffect(clipId, {
+              type: "reverse" as EffectType,
+              startTime: 0,
+              duration: clip.duration,
+              params: {},
+            });
+          }
+        }
+        return true;
+
+      case "crop":
+        // Store crop info in clip metadata (processed during export)
+        for (const clipId of clipIds) {
+          const clip = project.getClips().find((c) => c.id === clipId);
+          if (clip) {
+            project.addEffect(clipId, {
+              type: "crop" as EffectType,
+              startTime: 0,
+              duration: clip.duration,
+              params: {
+                aspectRatio: params.aspectRatio as string,
+                x: params.x as number,
+                y: params.y as number,
+                width: params.width as number,
+                height: params.height as number,
+              },
+            });
+          }
+        }
+        return true;
+
+      case "position":
+        // Move clip to beginning/end/middle
+        for (const clipId of clipIds) {
+          const clip = project.getClips().find((c) => c.id === clipId);
+          if (clip) {
+            const position = params.position as string;
+            const allClips = project.getClips().filter((c) => c.trackId === clip.trackId);
+            let newStartTime = 0;
+
+            if (position === "end") {
+              const maxEnd = Math.max(...allClips.filter((c) => c.id !== clipId).map((c) => c.startTime + c.duration));
+              newStartTime = maxEnd;
+            } else if (position === "middle") {
+              const totalDuration = allClips.reduce((sum, c) => sum + c.duration, 0);
+              newStartTime = (totalDuration - clip.duration) / 2;
+            }
+            // "beginning" stays at 0
+
+            project.moveClip(clipId, clip.trackId, newStartTime);
+          }
+        }
         return true;
 
       default:

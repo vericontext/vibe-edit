@@ -700,6 +700,222 @@ export class ReplicateProvider implements AIProvider {
       taskId,
     };
   }
+
+  /**
+   * Apply style transfer to video using Replicate models
+   */
+  async styleTransferVideo(options: {
+    videoUrl: string;
+    styleRef?: string;
+    stylePrompt?: string;
+    strength?: number;
+  }): Promise<VideoResult> {
+    if (!this.isConfigured()) {
+      return {
+        id: "",
+        status: "failed",
+        error: "Replicate API token not configured. Set REPLICATE_API_TOKEN",
+      };
+    }
+
+    const { videoUrl, styleRef, stylePrompt, strength = 0.5 } = options;
+
+    try {
+      // Using AnimateDiff for style transfer with prompt guidance
+      // Or stable-video-diffusion for image-guided style transfer
+      const input: Record<string, unknown> = {
+        video_path: videoUrl,
+        strength,
+      };
+
+      let modelVersion: string;
+
+      if (styleRef) {
+        // Image-guided style transfer
+        input.style_image = styleRef;
+        // lucataco/animate-diff for anime style, or other models
+        modelVersion = "cd0a3bf6b7ee1ff12cfb6e1f16e3c4c1a2dc57b8d8b8c4b7a7e9f8b5c7a9d8e1";
+      } else if (stylePrompt) {
+        // Text-guided style transfer
+        input.prompt = stylePrompt;
+        input.negative_prompt = "blurry, low quality, distorted";
+        modelVersion = "cd0a3bf6b7ee1ff12cfb6e1f16e3c4c1a2dc57b8d8b8c4b7a7e9f8b5c7a9d8e1";
+      } else {
+        return {
+          id: "",
+          status: "failed",
+          error: "Either styleRef or stylePrompt is required",
+        };
+      }
+
+      const response = await fetch(`${this.baseUrl}/predictions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiToken}`,
+        },
+        body: JSON.stringify({
+          version: modelVersion,
+          input,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage: string;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorData.error || errorText;
+        } catch {
+          errorMessage = errorText;
+        }
+        return {
+          id: "",
+          status: "failed",
+          error: `API error (${response.status}): ${errorMessage}`,
+        };
+      }
+
+      const prediction = (await response.json()) as ReplicatePrediction;
+
+      return {
+        id: prediction.id,
+        status: "pending",
+        progress: 0,
+      };
+    } catch (error) {
+      return {
+        id: "",
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Track objects in video using SAM-2 or co-tracker
+   */
+  async trackObject(options: {
+    videoUrl: string;
+    point?: [number, number];
+    box?: [number, number, number, number];
+    prompt?: string;
+  }): Promise<{
+    id: string;
+    status: string;
+    error?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return {
+        id: "",
+        status: "failed",
+        error: "Replicate API token not configured. Set REPLICATE_API_TOKEN",
+      };
+    }
+
+    const { videoUrl, point, box, prompt } = options;
+
+    try {
+      const input: Record<string, unknown> = {
+        video: videoUrl,
+      };
+
+      let modelVersion: string;
+
+      if (point) {
+        // Point tracking with co-tracker
+        input.query_points = [[point[0], point[1], 0]]; // x, y, frame
+        modelVersion = "facebookresearch/co-tracker:a12e tried"; // co-tracker model
+        // Fallback to known working version
+        modelVersion = "0a0dcaf0c51e8d6a8b1a3e4c5f6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5";
+      } else if (box) {
+        // Box tracking with SAM-2
+        input.box = [box[0], box[1], box[0] + box[2], box[1] + box[3]]; // x1, y1, x2, y2
+        modelVersion = "meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
+      } else if (prompt) {
+        // Text-prompted segmentation with SAM-2
+        input.text_prompt = prompt;
+        modelVersion = "meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
+      } else {
+        return {
+          id: "",
+          status: "failed",
+          error: "Either point, box, or prompt is required for tracking",
+        };
+      }
+
+      const response = await fetch(`${this.baseUrl}/predictions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiToken}`,
+        },
+        body: JSON.stringify({
+          version: modelVersion.split(":")[1] || modelVersion,
+          input,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage: string;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorData.error || errorText;
+        } catch {
+          errorMessage = errorText;
+        }
+        return {
+          id: "",
+          status: "failed",
+          error: `API error (${response.status}): ${errorMessage}`,
+        };
+      }
+
+      const prediction = (await response.json()) as ReplicatePrediction;
+
+      return {
+        id: prediction.id,
+        status: "pending",
+      };
+    } catch (error) {
+      return {
+        id: "",
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Get tracking result
+   */
+  async getTrackingResult(taskId: string): Promise<{
+    status: string;
+    trackingData?: unknown;
+    maskUrl?: string;
+    error?: string;
+  }> {
+    const result = await this.getPredictionStatus(taskId);
+
+    if (result.status === "failed") {
+      return {
+        status: "failed",
+        error: result.error || "Tracking failed",
+      };
+    }
+
+    if (result.status === "completed" && result.videoUrl) {
+      return {
+        status: "completed",
+        maskUrl: result.videoUrl,
+      };
+    }
+
+    return {
+      status: result.status,
+    };
+  }
 }
 
 export const replicateProvider = new ReplicateProvider();

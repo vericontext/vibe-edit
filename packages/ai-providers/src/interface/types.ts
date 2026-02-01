@@ -33,7 +33,13 @@ export type AICapability =
   | "voice-clone"
   | "dubbing"
   | "music-generation"
-  | "audio-restoration";
+  | "audio-restoration"
+  | "color-grading"
+  | "speed-ramping"
+  | "auto-reframe"
+  | "auto-shorts"
+  | "object-tracking"
+  | "audio-ducking";
 
 /**
  * Generation status
@@ -165,7 +171,11 @@ export interface TimelineCommand {
     | "set-volume"
     | "add-transition"
     | "add-track"
-    | "export";
+    | "export"
+    | "speed-change"
+    | "reverse"
+    | "crop"
+    | "position";
   /** Target clip IDs (empty for global commands) */
   clipIds: string[];
   /** Command parameters */
