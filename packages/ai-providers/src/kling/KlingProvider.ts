@@ -72,7 +72,7 @@ export class KlingProvider implements AIProvider {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as { task_id: string };
 
       return {
         id: data.task_id,
@@ -112,7 +112,16 @@ export class KlingProvider implements AIProvider {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        task_id: string;
+        status: string;
+        video_url?: string;
+        thumbnail_url?: string;
+        duration?: number;
+        width?: number;
+        height?: number;
+        progress?: number;
+      };
 
       const statusMap: Record<string, VideoResult["status"]> = {
         queued: "queued",

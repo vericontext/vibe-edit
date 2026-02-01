@@ -1,5 +1,6 @@
 // Interface and registry
 export * from "./interface";
+export { providerRegistry, getBestProviderForCapability } from "./interface/registry";
 
 // Individual providers
 export { WhisperProvider, whisperProvider } from "./whisper";

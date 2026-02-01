@@ -1,0 +1,34 @@
+{
+  "name": "@vibe-edit/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vibe": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "tsx src/index.ts",
+    "lint": "eslint src/",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@vibe-edit/core": "workspace:*",
+    "@vibe-edit/ai-providers": "workspace:*",
+    "commander": "^12.0.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

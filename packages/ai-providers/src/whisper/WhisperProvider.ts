@@ -67,7 +67,11 @@ export class WhisperProvider implements AIProvider {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        text: string;
+        language?: string;
+        segments?: Array<{ id: number; start: number; end: number; text: string }>;
+      };
 
       return {
         id: crypto.randomUUID(),

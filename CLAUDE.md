@@ -24,21 +24,52 @@ pnpm --filter @vibe-edit/ai-providers test
 pnpm --filter @vibe-edit/core build
 ```
 
+## CLI Commands
+
+```bash
+pnpm vibe --help                    # Show all commands
+
+# Project management
+pnpm vibe project create <name>     # Create new project file
+pnpm vibe project info <file>       # Show project info
+pnpm vibe project set <file>        # Update project settings
+
+# Timeline editing
+pnpm vibe timeline add-source <project> <media>   # Add media source
+pnpm vibe timeline add-clip <project> <source-id> # Add clip to timeline
+pnpm vibe timeline add-track <project> <type>     # Add video/audio track
+pnpm vibe timeline add-effect <project> <clip-id> <type>  # Add effect
+pnpm vibe timeline trim <project> <clip-id>       # Trim clip
+pnpm vibe timeline list <project>                 # List contents
+
+# AI providers
+pnpm vibe ai providers              # List available AI providers
+pnpm vibe ai transcribe <audio>     # Transcribe audio with Whisper
+pnpm vibe ai suggest <project> <instruction>  # Get AI edit suggestions
+```
+
 ## Architecture
 
 ### Monorepo Structure (Turborepo + pnpm workspaces)
 
 - **apps/web**: Next.js 14 application (App Router) - the main editor UI
 - **packages/core**: Core video editing logic and state management
+- **packages/cli**: Command-line interface for headless operations
 - **packages/ui**: Shared Radix UI components with Tailwind CSS
 - **packages/ai-providers**: Pluggable AI provider system
 
 ### State Management
 
-Central Zustand store with Immer in `packages/core/src/timeline/store.ts`:
+**Web (Zustand)**: Central store in `packages/core/src/timeline/store.ts`
 - `useTimelineStore` - main store with all actions
-- Selector hooks for performance: `usePlaybackState()`, `useTracks()`, `useClips()`, `useSources()`, `useZoom()`
-- ID generation: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+- Selector hooks: `usePlaybackState()`, `useTracks()`, `useClips()`, `useSources()`, `useZoom()`
+
+**CLI (Headless)**: `Project` class in `packages/cli/src/engine/project.ts`
+- Pure TypeScript, no React/Zustand dependency
+- Same operations as Zustand store but for headless use
+- Serializes to `.vibe.json` project files
+
+ID generation: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 
 ### AI Provider Plugin System
 

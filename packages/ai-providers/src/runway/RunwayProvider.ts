@@ -76,7 +76,7 @@ export class RunwayProvider implements AIProvider {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as { id: string };
 
       return {
         id: data.id,
@@ -116,7 +116,14 @@ export class RunwayProvider implements AIProvider {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        id: string;
+        status: "pending" | "queued" | "processing" | "completed" | "failed" | "cancelled";
+        output_url?: string;
+        thumbnail_url?: string;
+        duration?: number;
+        progress?: number;
+      };
 
       return {
         id: data.id,
@@ -154,7 +161,7 @@ export class RunwayProvider implements AIProvider {
     }
   }
 
-  async applyStyle(video: Blob, style: string): Promise<VideoResult> {
+  async applyStyle(_video: Blob, _style: string): Promise<VideoResult> {
     // TODO: Implement style transfer using Runway
     return {
       id: "",
