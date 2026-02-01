@@ -3,12 +3,12 @@
  * Interactive shell for VibeFrame
  */
 
-import { createInterface, Interface } from "node:readline";
 import chalk from "chalk";
 import { Session } from "./session.js";
 import { executeReplCommand } from "./executor.js";
 import { getWelcomeMessage, getPrompt } from "./prompts.js";
 import { isConfigured } from "../config/index.js";
+import { createTTYInterface, hasTTY, closeTTYStream } from "../utils/tty.js";
 
 // Re-export for external use
 export { Session } from "./session.js";
@@ -18,6 +18,17 @@ export { executeReplCommand, type CommandResult } from "./executor.js";
  * Start the interactive REPL
  */
 export async function startRepl(): Promise<void> {
+  // Check if TTY is available
+  if (!hasTTY()) {
+    console.error(chalk.red("Error: Interactive mode requires a terminal."));
+    console.log(chalk.dim("Run 'vibe' directly from your terminal, not from a pipe."));
+    console.log();
+    console.log("For non-interactive use, try:");
+    console.log(chalk.cyan("  vibe --help"));
+    console.log(chalk.cyan("  vibe project create myproject"));
+    process.exit(1);
+  }
+
   // Create session and initialize
   const session = new Session();
   await session.initialize();
@@ -28,13 +39,10 @@ export async function startRepl(): Promise<void> {
   // Print welcome message
   console.log(getWelcomeMessage(configured));
 
-  // Create readline interface
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-    historySize: 100,
+  // Create readline interface with TTY support
+  const rl = createTTYInterface({
     prompt: getPrompt(),
+    historySize: 100,
   });
 
   // Handle SIGINT (Ctrl+C)
@@ -71,6 +79,7 @@ export async function startRepl(): Promise<void> {
       if (result.message) {
         console.log(result.message);
       }
+      closeTTYStream();
       rl.close();
       process.exit(0);
       return;
@@ -98,6 +107,7 @@ export async function startRepl(): Promise<void> {
   rl.on("close", () => {
     console.log();
     console.log(chalk.dim("Goodbye!"));
+    closeTTYStream();
     process.exit(0);
   });
 
