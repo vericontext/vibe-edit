@@ -193,7 +193,7 @@ Local-first with optional real-time sync.
 
 ## CLI Status
 
-**125 tests passing** (75 unit + 50 integration)
+**157 tests passing**
 
 ```
 vibe project    create | info | set
