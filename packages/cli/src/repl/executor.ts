@@ -4,8 +4,12 @@
  */
 
 import { extname } from "node:path";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import chalk from "chalk";
 import ora from "ora";
+
+const execAsync = promisify(exec);
 import { Session } from "./session.js";
 import { success, error, warn, info, getHelpText, formatProjectInfo } from "./prompts.js";
 import { getApiKeyFromConfig, loadConfig, type LLMProvider } from "../config/index.js";
@@ -24,6 +28,88 @@ export interface CommandResult {
   shouldExit?: boolean;
   showHelp?: boolean;
   showSetup?: boolean;
+}
+
+/**
+ * Try to execute AI generation commands (image, tts, sfx)
+ * These don't require a project
+ */
+async function tryExecuteAICommand(
+  input: string,
+  lowerInput: string
+): Promise<CommandResult | null> {
+  // Image generation patterns
+  const imageMatch = lowerInput.match(
+    /(?:generate|create|make|draw)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\s+(?:of\s+)?(.+?)(?:\s+(?:and\s+)?(?:save|output|export)\s+(?:as|to|it\s+as)\s+(\S+))?$/i
+  );
+  if (imageMatch) {
+    const prompt = imageMatch[1].trim();
+    const outputFile = imageMatch[2] || `${prompt.split(/\s+/).slice(0, 3).join("-").toLowerCase()}.png`;
+    return await runVibeCommand("ai image", `"${prompt}" -o "${outputFile}"`);
+  }
+
+  // TTS / audio generation patterns
+  const ttsMatch = lowerInput.match(
+    /(?:generate|create|make)\s+(?:an?\s+)?(?:audio|voice|speech|tts|narration|voiceover)\s+(?:message\s+)?(?:saying\s+|of\s+|for\s+)?["']?(.+?)["']?(?:\s+(?:and\s+)?(?:save|output|export)\s+(?:as|to|it\s+as)\s+(\S+))?$/i
+  );
+  if (ttsMatch) {
+    const text = ttsMatch[1].trim();
+    const outputFile = ttsMatch[2] || "output.mp3";
+    return await runVibeCommand("ai tts", `"${text}" -o "${outputFile}"`);
+  }
+
+  // Sound effect patterns
+  const sfxMatch = lowerInput.match(
+    /(?:generate|create|make)\s+(?:an?\s+)?(?:sound\s*effect|sfx|sound)\s+(?:of\s+)?(.+?)(?:\s+(?:and\s+)?(?:save|output|export)\s+(?:as|to|it\s+as)\s+(\S+))?$/i
+  );
+  if (sfxMatch) {
+    const prompt = sfxMatch[1].trim();
+    const outputFile = sfxMatch[2] || "sound-effect.mp3";
+    return await runVibeCommand("ai sfx", `"${prompt}" -o "${outputFile}"`);
+  }
+
+  // Direct "image of X" pattern
+  const simpleImageMatch = lowerInput.match(
+    /^(?:an?\s+)?(?:image|picture|photo)\s+(?:of\s+)?(.+)$/i
+  );
+  if (simpleImageMatch) {
+    const prompt = simpleImageMatch[1].trim();
+    const outputFile = `${prompt.split(/\s+/).slice(0, 3).join("-").toLowerCase()}.png`;
+    return await runVibeCommand("ai image", `"${prompt}" -o "${outputFile}"`);
+  }
+
+  return null;
+}
+
+/**
+ * Run a vibe CLI command and return the result
+ */
+async function runVibeCommand(
+  command: string,
+  args: string
+): Promise<CommandResult> {
+  const spinner = ora({ text: `Running: vibe ${command}...`, spinner: "dots" }).start();
+
+  try {
+    const { stdout, stderr } = await execAsync(`vibe ${command} ${args}`, {
+      timeout: 120000, // 2 minute timeout
+    });
+
+    spinner.succeed();
+
+    const output = stdout || stderr;
+    return {
+      success: true,
+      message: success(output.trim() || `Completed: vibe ${command}`),
+    };
+  } catch (e: unknown) {
+    spinner.fail();
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return {
+      success: false,
+      message: error(`Command failed: ${errorMessage}`),
+    };
+  }
 }
 
 /** Parse a built-in command into parts */
@@ -241,6 +327,14 @@ async function executeNaturalLanguageCommand(
   input: string,
   session: Session
 ): Promise<CommandResult> {
+  const lowerInput = input.toLowerCase();
+
+  // Check for AI generation commands (these don't require a project)
+  const aiCommandResult = await tryExecuteAICommand(input, lowerInput);
+  if (aiCommandResult) {
+    return aiCommandResult;
+  }
+
   // Check if project exists
   if (!session.hasProject()) {
     // Special case: user might be trying to create a project with natural language
