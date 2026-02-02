@@ -126,16 +126,33 @@ async function runSetupWizard(fullSetup = false): Promise<void> {
   // Step 3: Optional providers (only in full setup mode)
   if (fullSetup) {
     console.log(chalk.bold("3. Additional Providers (optional)"));
-    console.log(chalk.dim("   Video generation, TTS, images, etc."));
+    console.log(chalk.dim("   Natural language, video generation, TTS, images, etc."));
     console.log();
 
-    const optionalProviders = [
+    // Build list of optional providers, excluding the one already configured as primary LLM
+    const allOptionalProviders = [
+      { key: "openai", name: "OpenAI", desc: "NL Commands, DALL-E, Whisper" },
+      { key: "anthropic", name: "Anthropic", desc: "Claude, NL Commands" },
+      { key: "google", name: "Google", desc: "Gemini" },
       { key: "elevenlabs", name: "ElevenLabs", desc: "TTS & Voice" },
       { key: "runway", name: "Runway", desc: "Video Gen" },
       { key: "kling", name: "Kling", desc: "Video Gen" },
       { key: "stability", name: "Stability AI", desc: "Images" },
       { key: "replicate", name: "Replicate", desc: "Various" },
     ];
+
+    // Get the key of the primary LLM provider to skip it
+    const primaryProviderKey =
+      selectedProvider === "gemini"
+        ? "google"
+        : selectedProvider === "claude"
+        ? "anthropic"
+        : selectedProvider;
+
+    // Filter out the primary provider
+    const optionalProviders = allOptionalProviders.filter(
+      (p) => p.key !== primaryProviderKey
+    );
 
     for (const provider of optionalProviders) {
       const existing = config.providers[provider.key as keyof typeof config.providers];

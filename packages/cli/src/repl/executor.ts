@@ -259,12 +259,15 @@ async function executeNaturalLanguageCommand(
   }
 
   // Get OpenAI API key (used for command parsing)
-  // Note: Claude/Gemini support can be added when their providers implement parseCommand
+  // Note: Natural language commands currently require OpenAI for parsing
   const apiKey = await getApiKeyFromConfig("openai");
   if (!apiKey) {
     return {
       success: false,
-      message: error("OpenAI API key not configured. Run 'setup' to configure."),
+      message: error(
+        "Natural language commands require OpenAI API key.\n" +
+        "   Run 'vibe setup --full' and configure OpenAI under Additional Providers."
+      ),
     };
   }
 
