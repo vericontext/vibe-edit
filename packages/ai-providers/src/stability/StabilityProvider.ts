@@ -128,6 +128,20 @@ export class StabilityProvider implements AIProvider {
   }
 
   /**
+   * Model mapping: model name -> [endpoint, model_param]
+   * Some endpoints (core, ultra) don't need a model param
+   */
+  private modelMapping: Record<string, [string, string | null]> = {
+    "sd3.5-large": ["sd3", "sd3.5-large"],
+    "sd3.5-large-turbo": ["sd3", "sd3.5-large-turbo"],
+    "sd3.5-medium": ["sd3", "sd3.5-medium"],
+    "sd3-large": ["sd3", "sd3-large"],
+    "sd3-medium": ["sd3", "sd3-medium"],
+    "stable-image-core": ["core", null],
+    "stable-image-ultra": ["ultra", null],
+  };
+
+  /**
    * Generate images from text prompt using SD3.5 or newer models
    */
   async generateImage(
@@ -143,10 +157,19 @@ export class StabilityProvider implements AIProvider {
 
     try {
       const model = options.model || "sd3.5-large";
+
+      // Get endpoint and model param from mapping
+      const [endpoint, modelParam] = this.modelMapping[model] || ["sd3", model];
+
       const formData = new FormData();
 
       formData.append("prompt", prompt);
       formData.append("output_format", options.outputFormat || "png");
+
+      // Add model param if needed
+      if (modelParam) {
+        formData.append("model", modelParam);
+      }
 
       if (options.negativePrompt) {
         formData.append("negative_prompt", options.negativePrompt);
@@ -161,7 +184,7 @@ export class StabilityProvider implements AIProvider {
         formData.append("style_preset", options.stylePreset);
       }
 
-      const response = await fetch(`${this.baseUrl}/v2beta/stable-image/generate/${model}`, {
+      const response = await fetch(`${this.baseUrl}/v2beta/stable-image/generate/${endpoint}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
