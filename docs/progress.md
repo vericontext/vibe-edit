@@ -6,6 +6,50 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: "export the video" Natural Language Routing
+Fixed "export the video" being incorrectly routed to timeline command instead of export handler.
+
+**Problem:**
+- `vibe [my-video]> export the video` → "Unknown action: export"
+- The builtin export pattern `/^export(?:\s+[\w./-]+)?$/i` only matched simple filenames (no spaces)
+- "export the video" triggered natural language routing, but LLM classified it as "timeline"
+- Timeline handler had no "export" action, causing the error
+
+**Solution:**
+- Added "export" type to `CommandIntent` interface
+- Updated LLM system prompt with export classification (type 8)
+- Added fallback patterns for export commands:
+  - `export/render/output the video/project/mp4`
+  - `save/export as/to mp4/video`
+  - `export/render to output.mp4`
+- Extracted `runExport()` function for programmatic usage
+- Added export case in `executeNaturalLanguageCommand()`
+
+**Now works:**
+```
+vibe [my-video]> export the video       ✓ → export handler
+vibe [my-video]> render the project     ✓ → export handler
+vibe [my-video]> save as mp4            ✓ → export handler
+vibe [my-video]> export to output.mp4   ✓ → export handler (with filename)
+
+# Still works as builtin:
+vibe [my-video]> export output.mp4      ✓ → builtin export
+```
+
+**Files Modified:**
+- `packages/cli/src/repl/executor.ts`:
+  - Added "export" to `CommandIntent` type union
+  - Updated `classifyCommand()` system prompt with export examples
+  - Added export patterns to `fallbackClassify()`
+  - Added export case in `executeNaturalLanguageCommand()`
+  - Added `runExport` import
+- `packages/cli/src/commands/export.ts`:
+  - Added `ExportResult` and `ExportOptions` interfaces
+  - Extracted `runExport()` function for reuse
+  - Renamed internal `runFFmpeg` to `runFFmpegProcess`
+
+---
+
 ### Fix: Comprehensive Natural Language Routing for REPL
 Fixed greedy builtin command detection that was incorrectly routing natural language commands.
 
