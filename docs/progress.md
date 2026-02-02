@@ -6,6 +6,56 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-02
 
+### Feature: Ollama Provider for Local LLM Support
+Added OllamaProvider to enable local LLM support for natural language timeline commands without requiring external API keys.
+
+**Features:**
+- Uses Ollama's `/api/chat` endpoint (default: `http://localhost:11434`)
+- Default model: `mistral` (4GB), also supports `phi` (1.6GB) and `tinyllama` (0.6GB)
+- No API key required - runs completely locally
+- Full `parseCommand` implementation with same capabilities as OpenAI/Claude providers
+- Fallback pattern matching when Ollama server is unavailable
+
+**MCP Type Safety Improvements:**
+- Fixed `as any` type cast to proper `EffectType` import in MCP tools
+- Added `duration` parameter to `timeline_add_source` tool schema
+- Removed unused `setCurrentProject()` function from resources
+
+**Files Created:**
+- `packages/ai-providers/src/ollama/OllamaProvider.ts` - Ollama provider implementation
+- `packages/ai-providers/src/ollama/index.ts` - Export file
+
+**Files Modified:**
+- `packages/ai-providers/src/index.ts` - Added OllamaProvider export
+- `packages/cli/src/repl/executor.ts` - Added Ollama to provider selection
+- `packages/mcp-server/src/tools/index.ts` - Fixed EffectType, added duration param
+- `packages/mcp-server/src/resources/index.ts` - Removed unused function
+
+**Usage:**
+```bash
+# Install and run Ollama
+ollama serve
+ollama pull mistral  # or phi (smaller)
+
+# Configure VibeFrame to use Ollama
+vibe setup --full  # Select "Ollama" as LLM provider
+
+# Use natural language commands locally
+vibe
+vibe> new test
+vibe> add video.mp4
+vibe> trim the clip to 5 seconds  # Uses local Ollama!
+```
+
+**Recommended Ollama Models:**
+| Model | Size | Notes |
+|-------|------|-------|
+| phi | 1.6GB | Lightweight, fast |
+| tinyllama | 0.6GB | Smallest |
+| mistral | 4.1GB | Best quality |
+
+---
+
 ### Feature: Use Configured LLM Provider for Natural Language Commands
 Fixed architecture issue where natural language commands only worked with OpenAI.
 
