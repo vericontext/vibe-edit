@@ -116,6 +116,63 @@ vibe> "Move clip-2 to the beginning"
 vibe> "Add a crossfade between clip-1 and clip-2"
 ```
 
+### CLI Commands (Non-Interactive)
+
+For scripting and automation, use CLI commands directly:
+
+**Project Management**
+```bash
+vibe project create <name> -o <output.vibe.json>
+vibe project info <project.vibe.json>
+vibe project set <project> --name "New Name"
+```
+
+**Timeline Operations**
+```bash
+vibe timeline add-source <project> <media> -d <duration>
+vibe timeline add-clip <project> <source-id> -s <start> -d <duration>
+vibe timeline add-effect <project> <clip-id> fadeIn -d 1
+vibe timeline list <project>
+vibe timeline trim <project> <clip-id> -d <duration>
+vibe timeline split <project> <clip-id> -t <time>
+vibe timeline delete <project> <clip-id>
+```
+
+**Batch Operations**
+```bash
+vibe batch import <project> <directory> --filter ".mp4"
+vibe batch concat <project> --all
+vibe batch apply-effect <project> fadeIn --all
+vibe batch info <project>
+```
+
+**AI Commands**
+```bash
+# Natural language editing (uses configured LLM)
+vibe ai edit <project> "trim all clips to 10 seconds"
+
+# Text-to-speech
+vibe ai tts "Your text here" -o output.mp3
+
+# Image generation
+vibe ai image "description" -o output.png
+
+# Storyboard generation
+vibe ai storyboard "content" -d 30 -o storyboard.json
+
+# Sound effects
+vibe ai sfx "whoosh sound" -o effect.mp3
+
+# Transcription
+vibe ai transcribe audio.mp3 -o subtitles.srt
+```
+
+**Export**
+```bash
+vibe export <project> -o output.mp4 -p standard -y
+# Presets: draft (360p), standard (720p), high (1080p), ultra (4K)
+```
+
 ---
 
 ## API Requirements by Feature
@@ -197,6 +254,99 @@ vibe> "Add voiceover: Welcome to our channel"         # Requires ElevenLabs
 vibe> "Generate background music"
 vibe> export ai-generated.mp4
 ```
+
+### Example 5: Multi-Provider Promo Video (Advanced)
+
+Create a professional promotional video using multiple AI providers together.
+
+**What you'll use:**
+- **Claude** - Storyboard generation
+- **ElevenLabs** - TTS narration + sound effects
+- **DALL-E** - Visual assets (logo, UI mockups)
+- **OpenAI GPT** - Natural language editing
+
+**Step 1: Write script and generate storyboard (Claude)**
+
+```bash
+# Create script file
+cat > promo/script.txt << 'EOF'
+VibeFrame: Edit Videos with Your Voice.
+Tired of complex video editing software?
+Just type what you want. That's it.
+No timelines. No buttons. Your words become edits.
+Open source. Free forever.
+EOF
+
+# Generate storyboard with Claude
+vibe ai storyboard promo/script.txt -f -d 30 -o promo/storyboard.json
+```
+
+**Step 2: Generate narration (ElevenLabs TTS)**
+
+```bash
+# List available voices
+vibe ai voices
+
+# Generate TTS narration
+vibe ai tts "Tired of complex video editing? Meet VibeFrame. \
+Just type what you want. Trim clips. Add effects. Export. \
+Your words become edits. Open source. Free forever." \
+  -v EXAVITQu4vr4xnSDxMaL -o promo/narration.mp3
+```
+
+**Step 3: Generate visual assets (DALL-E)**
+
+```bash
+# Generate logo
+vibe ai image "Futuristic minimalist logo for VibeFrame video editor, \
+purple and blue gradients, dark background" -o promo/logo.png
+
+# Generate UI mockup
+vibe ai image "Clean terminal interface showing video editing commands, \
+dark theme, purple accents" -o promo/terminal-ui.png
+```
+
+**Step 4: Generate sound effects (ElevenLabs SFX)**
+
+```bash
+vibe ai sfx "digital whoosh transition, modern tech" \
+  -o promo/whoosh.mp3 --duration 2
+```
+
+**Step 5: Create project and edit with natural language (OpenAI GPT)**
+
+```bash
+# Create project with B-roll videos
+vibe project create "promo" -o promo/promo.vibe.json
+vibe timeline add-source promo/promo.vibe.json footage1.mp4 -d 40
+vibe timeline add-source promo/promo.vibe.json footage2.mp4 -d 40
+vibe batch concat promo/promo.vibe.json --all
+
+# Edit with natural language
+vibe ai edit promo/promo.vibe.json "trim first clip to 15 seconds, \
+trim second clip to 15 seconds, add fade in to first clip, \
+add fade out to second clip"
+
+# Export video
+vibe export promo/promo.vibe.json -o promo/video.mp4 -p standard
+```
+
+**Step 6: Mix audio with FFmpeg**
+
+```bash
+# Combine video with narration
+ffmpeg -y -i promo/video.mp4 -i promo/narration.mp3 \
+  -filter_complex "[0:a]volume=0.3[bg];[1:a][bg]amix=inputs=2[aout]" \
+  -map 0:v -map "[aout]" -c:v copy -c:a aac \
+  promo/final.mp4
+```
+
+**Result:** A 24-second promo video with:
+- AI-generated storyboard structure
+- Professional TTS narration
+- Custom visual assets
+- Natural language edited B-roll
+- Mixed audio track
 
 ---
 
