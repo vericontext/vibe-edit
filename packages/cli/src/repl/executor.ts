@@ -12,6 +12,7 @@ import { Session } from "./session.js";
 import { success, error, warn, info, getHelpText, formatProjectInfo } from "./prompts.js";
 import { getApiKeyFromConfig, loadConfig, type LLMProvider } from "../config/index.js";
 import { executeCommand } from "../commands/ai.js";
+import { runExport } from "../commands/export.js";
 import { Project } from "../engine/index.js";
 import {
   OpenAIProvider,
@@ -32,7 +33,7 @@ export interface CommandResult {
 
 /** Unified command intent from LLM */
 interface CommandIntent {
-  type: "image" | "tts" | "sfx" | "video" | "timeline" | "project" | "add-media" | "unknown";
+  type: "image" | "tts" | "sfx" | "video" | "timeline" | "project" | "add-media" | "export" | "unknown";
   params: {
     prompt?: string;
     text?: string;
@@ -67,9 +68,11 @@ Analyze the user's natural language input and classify it into one of these type
    - Splitting: "split at 3s", "cut at this point"
 6. "project" - Project management (e.g., "create new project called X", "start a project named Y")
 7. "add-media" - Add existing media file to project (e.g., "add sunset.png to the project", "add video.mp4 to timeline", "include intro.mp3")
-8. "unknown" - Cannot understand the command
+8. "export" - Export project to video file (e.g., "export the video", "render the project", "save as mp4", "export to output.mp4", "render to file")
+9. "unknown" - Cannot understand the command
 
 IMPORTANT: If the input mentions "effect", "fade", "transition", "trim", "cut", "split", "speed", "reverse", "blur", or similar editing terms, classify as "timeline".
+IMPORTANT: If the input mentions "export", "render", "output" in the context of creating a final video file, classify as "export".
 
 Extract relevant parameters:
 - For image: prompt (the image description), outputFile (optional)
@@ -78,13 +81,14 @@ Extract relevant parameters:
 - For video: prompt (video description), outputFile (optional)
 - For project: projectName
 - For add-media: filename (the file to add, e.g., "sunset.png", "video.mp4")
+- For export: outputFile (optional, e.g., "output.mp4", "my-video.mp4")
 - For timeline: leave params empty (will be parsed separately)
 
 If the command is ambiguous, set clarification to ask for more details.
 
 Respond with JSON only:
 {
-  "type": "image|tts|sfx|video|timeline|project|add-media|unknown",
+  "type": "image|tts|sfx|video|timeline|project|add-media|export|unknown",
   "params": {
     "prompt": "extracted prompt if applicable",
     "text": "text to speak if tts",
@@ -102,7 +106,11 @@ Examples:
 - "trim to 5 seconds" → {"type": "timeline", "params": {}}
 - "create a welcome banner image" → {"type": "image", "params": {"prompt": "a welcome banner"}}
 - "add sunset.png to the project" → {"type": "add-media", "params": {"filename": "sunset.png"}}
-- "include intro.mp4 in timeline" → {"type": "add-media", "params": {"filename": "intro.mp4"}}`;
+- "include intro.mp4 in timeline" → {"type": "add-media", "params": {"filename": "intro.mp4"}}
+- "export the video" → {"type": "export", "params": {}}
+- "render the project" → {"type": "export", "params": {}}
+- "save as mp4" → {"type": "export", "params": {}}
+- "export to output.mp4" → {"type": "export", "params": {"outputFile": "output.mp4"}}`;
 
   try {
     let endpoint: string;
@@ -249,6 +257,23 @@ function fallbackClassify(input: string): CommandIntent {
     if (filenameMatch) {
       return { type: "add-media", params: { filename: filenameMatch[1] } };
     }
+  }
+
+  // Export patterns
+  if (lower.match(/(?:export|render|output)\s+(?:the\s+)?(?:video|project|mp4|movie|film)/)) {
+    const outputMatch = input.match(/(?:to|as)\s+["']?([^\s"']+\.(?:mp4|webm|mov))["']?/i);
+    return { type: "export", params: { outputFile: outputMatch?.[1] } };
+  }
+  if (lower.match(/(?:save|export)\s+(?:as|to)\s+(?:mp4|video|movie)/)) {
+    return { type: "export", params: {} };
+  }
+  if (lower.match(/^(?:render|export)\s+(?:it|this|everything)?$/)) {
+    return { type: "export", params: {} };
+  }
+  // "export to output.mp4" pattern
+  if (lower.match(/(?:export|render|save)\s+(?:to|as)\s+[\w./-]+\.(?:mp4|webm|mov)/)) {
+    const outputMatch = input.match(/(?:to|as)\s+["']?([^\s"']+\.(?:mp4|webm|mov))["']?/i);
+    return { type: "export", params: { outputFile: outputMatch?.[1] } };
   }
 
   // Generic timeline patterns (broader catch)
@@ -796,6 +821,50 @@ async function executeNaturalLanguageCommand(
         }
 
         return { success: true, message: success(`Added: ${source.name}`) };
+      }
+
+      case "export": {
+        if (!session.hasProject()) {
+          spinner.fail();
+          return {
+            success: false,
+            message: error("No project loaded. Use 'new <name>' to create one first."),
+          };
+        }
+
+        // Save project first if not saved
+        let projectPath = session.getProjectPath();
+        if (!projectPath) {
+          try {
+            projectPath = await session.saveProject();
+          } catch (e) {
+            spinner.fail();
+            return {
+              success: false,
+              message: error(`Failed to save project before export: ${e}`),
+            };
+          }
+        }
+
+        const outputFile = String(
+          intent.params.outputFile ||
+            `${session.getProjectName()?.replace(/\s+/g, "-").toLowerCase() || "output"}.mp4`
+        );
+
+        spinner.text = `Exporting to ${outputFile}...`;
+
+        const result = await runExport(projectPath, outputFile, {
+          preset: "standard",
+          overwrite: true,
+        });
+
+        if (result.success) {
+          spinner.succeed();
+          return { success: true, message: success(result.message) };
+        } else {
+          spinner.fail();
+          return { success: false, message: error(result.message) };
+        }
       }
 
       case "timeline": {

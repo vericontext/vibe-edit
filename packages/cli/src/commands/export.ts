@@ -6,6 +6,104 @@ import chalk from "chalk";
 import ora from "ora";
 import { Project, type ProjectFile } from "../engine/index.js";
 
+/**
+ * Export result for programmatic usage
+ */
+export interface ExportResult {
+  success: boolean;
+  message: string;
+  outputPath?: string;
+}
+
+/**
+ * Export options
+ */
+export interface ExportOptions {
+  preset?: "draft" | "standard" | "high" | "ultra";
+  format?: "mp4" | "webm" | "mov";
+  overwrite?: boolean;
+}
+
+/**
+ * Reusable export function for programmatic usage
+ */
+export async function runExport(
+  projectPath: string,
+  outputPath: string,
+  options: ExportOptions = {}
+): Promise<ExportResult> {
+  const { preset = "standard", format = "mp4", overwrite = false } = options;
+
+  try {
+    // Check if FFmpeg is installed
+    const ffmpegPath = await findFFmpeg();
+    if (!ffmpegPath) {
+      return {
+        success: false,
+        message: "FFmpeg not found. Install with: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)",
+      };
+    }
+
+    // Load project
+    const filePath = resolve(process.cwd(), projectPath);
+    const content = await readFile(filePath, "utf-8");
+    const data: ProjectFile = JSON.parse(content);
+    const project = Project.fromJSON(data);
+
+    const summary = project.getSummary();
+
+    if (summary.clipCount === 0) {
+      return {
+        success: false,
+        message: "Project has no clips to export",
+      };
+    }
+
+    // Determine output path
+    const finalOutputPath = resolve(process.cwd(), outputPath);
+
+    // Get preset settings
+    const presetSettings = getPresetSettings(preset, summary.aspectRatio);
+
+    // Get clips sorted by start time
+    const clips = project.getClips().sort((a, b) => a.startTime - b.startTime);
+    const sources = project.getSources();
+
+    // Verify source files exist
+    for (const clip of clips) {
+      const source = sources.find((s) => s.id === clip.sourceId);
+      if (source) {
+        try {
+          await access(source.url);
+        } catch {
+          return {
+            success: false,
+            message: `Source file not found: ${source.url}`,
+          };
+        }
+      }
+    }
+
+    // Build FFmpeg command
+    const ffmpegArgs = buildFFmpegArgs(clips, sources, presetSettings, finalOutputPath, { overwrite, format });
+
+    // Run FFmpeg
+    await runFFmpegProcess(ffmpegPath, ffmpegArgs, () => {});
+
+    return {
+      success: true,
+      message: `Exported: ${outputPath}`,
+      outputPath: finalOutputPath,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      message: `Export failed: ${errorMessage}`,
+    };
+  }
+}
+
 export const exportCommand = new Command("export")
   .description("Export project to video file")
   .argument("<project>", "Project file path")
@@ -89,7 +187,7 @@ export const exportCommand = new Command("export")
       // Run FFmpeg
       spinner.text = "Encoding...";
 
-      await runFFmpeg(ffmpegPath, ffmpegArgs, (progress) => {
+      await runFFmpegProcess(ffmpegPath, ffmpegArgs, (progress) => {
         spinner.text = `Encoding... ${progress}%`;
       });
 
@@ -251,7 +349,7 @@ function buildFFmpegArgs(
 /**
  * Run FFmpeg with progress reporting
  */
-function runFFmpeg(
+function runFFmpegProcess(
   ffmpegPath: string,
   args: string[],
   onProgress: (percent: number) => void
