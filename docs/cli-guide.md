@@ -123,6 +123,53 @@ vibe [my-video]> export the video
 - Generate media files first (images, audio) before adding them to the timeline
 - The LLM converts natural language → CLI commands internally
 
+### Supported REPL Patterns
+
+**AI Generation (no project required):**
+```
+vibe> generate an image of a sunset landscape
+vibe> create an image of a robot mascot
+vibe> make a picture of mountains
+
+vibe> create audio saying "Welcome to VibeFrame"
+vibe> generate voice message "Hello world"
+vibe> make narration for intro
+
+vibe> create a sound effect of whoosh
+vibe> generate sfx explosion
+vibe> make sound of rain
+```
+
+**Project Management:**
+```
+vibe> create a new project called my-video
+vibe> new my-video
+vibe> save
+vibe> save as project.vibe.json
+```
+
+**Timeline Operations (project required):**
+```
+vibe> add sunset.png
+vibe> add fade-in effect to clip-1
+vibe> trim clip to 5 seconds
+vibe> export output.mp4
+```
+
+**Built-in Commands:**
+| Command | Description |
+|---------|-------------|
+| `new <name>` | Create new project |
+| `open <file>` | Open project file |
+| `save [file]` | Save project |
+| `info` | Show project info |
+| `list` | Show timeline |
+| `add <file>` | Add media file |
+| `export [file]` | Export video |
+| `undo` | Undo last action |
+| `help` | Show help |
+| `exit` | Exit REPL |
+
 ---
 
 ## Core Concepts
