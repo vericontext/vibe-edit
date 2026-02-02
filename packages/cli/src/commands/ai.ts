@@ -2954,7 +2954,11 @@ aiCommand
       }
 
       // Save project file
-      const outputPath = resolve(process.cwd(), options.output);
+      let outputPath = resolve(process.cwd(), options.output);
+      // If output is a directory, save project file inside it
+      if (existsSync(outputPath) && (await stat(outputPath)).isDirectory()) {
+        outputPath = resolve(outputPath, "project.vibe.json");
+      }
       await writeFile(outputPath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
 
       assembleSpinner.succeed(chalk.green("Project assembled"));
