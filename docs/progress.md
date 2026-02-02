@@ -6,6 +6,34 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-02
 
+### Feature: Use Configured LLM Provider for Natural Language Commands
+Fixed architecture issue where natural language commands only worked with OpenAI.
+
+**Problem:**
+- User selects Claude in `vibe setup`
+- But natural language commands ("trim clip to 5s") require OpenAI
+- This was an architectural inconsistency
+
+**Solution:**
+- Added `parseCommand` method to ClaudeProvider
+- Updated REPL executor to use the user's configured LLM provider
+- Now Claude users can use natural language commands without configuring OpenAI
+
+**Files Modified:**
+- `packages/ai-providers/src/claude/ClaudeProvider.ts` - Added parseCommand method
+- `packages/cli/src/repl/executor.ts` - Use configured LLM provider instead of hardcoded OpenAI
+
+**Verification:**
+```bash
+vibe setup    # Select Claude
+vibe
+vibe> new test
+vibe> add video.mp4
+vibe> trim the clip to 5 seconds  # Now uses Claude!
+```
+
+---
+
 ### Fix: Install Script Hanging After `vibe setup`
 Fixed the install script hanging after `vibe setup` completes.
 
