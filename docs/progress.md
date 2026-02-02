@@ -1794,10 +1794,10 @@ vibe ai transcribe interview.mp3 -l ko -o captions.vtt
 **Usage:**
 ```bash
 # Generate motion graphic
-vibe ai motion "로고가 바운스하면서 등장하는 인트로" -o intro.tsx
+vibe ai motion "bouncing logo intro animation" -o intro.tsx
 
 # With style preset
-vibe ai motion "타이틀 페이드인" -s cinematic -d 3
+vibe ai motion "title fade in" -s cinematic -d 3
 
 # Generate storyboard from text
 vibe ai storyboard "Product launch video script..." -o storyboard.json
