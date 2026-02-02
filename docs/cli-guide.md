@@ -102,18 +102,23 @@ In REPL mode, natural language input is automatically converted to commands by t
 vibe> create a new project
 # → vibe project create "new project"
 
-vibe> add intro.mp4 file
-# → vibe timeline add-source intro.mp4
+vibe> generate an image of a sunset landscape
+# → vibe ai image "sunset landscape" -o sunset.png
 
-vibe> trim the first clip to 5 seconds
-# → vibe timeline trim clip-1 -d 5
+vibe> create a welcome audio message
+# → vibe ai tts "Welcome to VibeFrame" -o welcome.mp3
 
-vibe> add fade-in effect to all clips
-# → vibe batch apply-effect fadeIn --all
+vibe> add sunset.png to the project
+# → vibe timeline add-source sunset.png
+
+vibe> add fade-in effect to the clip
+# → vibe timeline add-effect clip-1 fadeIn
 
 vibe> export the video
 # → vibe export output.mp4
 ```
+
+**Note:** Generate media files first (images, audio) before adding them to the timeline.
 
 ---
 
