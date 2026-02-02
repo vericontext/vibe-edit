@@ -6,6 +6,38 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: REPL Exits After AI Generation Commands
+Fixed the REPL exiting immediately after completing AI generation commands (image, tts, sfx).
+
+**Problem:**
+- After running commands like "generate an image of a sunset", the image would be created successfully
+- The REPL prompt would briefly appear but then exit to the shell
+- The `ora` spinner was interfering with readline by discarding stdin
+
+**Solution:**
+- Added `discardStdin: false` option to all `ora` spinner configurations in the executor
+- This prevents the spinner from interfering with readline's stdin handling
+
+**Files Modified:**
+- `packages/cli/src/repl/executor.ts` - Added `discardStdin: false` to all 4 spinner instances:
+  - `generateImage()` spinner
+  - `generateTTS()` spinner
+  - `generateSFX()` spinner
+  - `executeNaturalLanguageCommand()` spinner
+
+**Verification:**
+```bash
+pnpm build
+vibe
+vibe> generate an image of a sunset
+# Image generates, REPL stays open
+vibe> generate an image of a cat
+# Works for multiple commands in sequence
+vibe> exit
+```
+
+---
+
 ### Feature: Complete Skill Scripts Coverage
 Added 15 new Python helper scripts to match all CLI capabilities.
 

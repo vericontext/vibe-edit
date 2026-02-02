@@ -84,7 +84,7 @@ async function tryExecuteAICommand(
  * Generate image using Gemini
  */
 async function generateImage(prompt: string, outputFile: string): Promise<CommandResult> {
-  const spinner = ora({ text: `Generating image: "${prompt}"...`, spinner: "dots" }).start();
+  const spinner = ora({ text: `Generating image: "${prompt}"...`, spinner: "dots", discardStdin: false }).start();
 
   try {
     const apiKey = await getApiKeyFromConfig("google");
@@ -130,7 +130,7 @@ async function generateImage(prompt: string, outputFile: string): Promise<Comman
  * Generate TTS using ElevenLabs
  */
 async function generateTTS(text: string, outputFile: string): Promise<CommandResult> {
-  const spinner = ora({ text: `Generating audio: "${text.slice(0, 30)}..."`, spinner: "dots" }).start();
+  const spinner = ora({ text: `Generating audio: "${text.slice(0, 30)}..."`, spinner: "dots", discardStdin: false }).start();
 
   try {
     const apiKey = await getApiKeyFromConfig("elevenlabs");
@@ -177,7 +177,7 @@ async function generateTTS(text: string, outputFile: string): Promise<CommandRes
  * Generate sound effect using ElevenLabs
  */
 async function generateSFX(prompt: string, outputFile: string): Promise<CommandResult> {
-  const spinner = ora({ text: `Generating sound effect: "${prompt}"...`, spinner: "dots" }).start();
+  const spinner = ora({ text: `Generating sound effect: "${prompt}"...`, spinner: "dots", discardStdin: false }).start();
 
   try {
     const apiKey = await getApiKeyFromConfig("elevenlabs");
@@ -496,7 +496,7 @@ async function executeNaturalLanguageCommand(
 
   await llmProvider.initialize({ apiKey: apiKey || "" });
 
-  const spinner = ora({ text: "Processing...", spinner: "dots" }).start();
+  const spinner = ora({ text: "Processing...", spinner: "dots", discardStdin: false }).start();
 
   try {
     const project = session.getProject();

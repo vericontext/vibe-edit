@@ -122,6 +122,37 @@ vibe command example
 ```
 ```
 
+## Version Management
+
+All packages share the same version number. Update versions when making significant changes:
+
+**When to bump versions:**
+- `patch` (0.1.0 → 0.1.1): Bug fixes, minor improvements
+- `minor` (0.1.0 → 0.2.0): New features, new commands
+- `major` (0.1.0 → 1.0.0): Breaking changes, major milestones
+
+**How to update:**
+```bash
+# Update all package.json files at once
+pnpm -r exec -- npm version patch --no-git-tag-version
+# or: minor, major
+
+# Then commit with version tag
+git add -A && git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
+```
+
+**Files to update:**
+- `package.json` (root)
+- `packages/cli/package.json`
+- `packages/core/package.json`
+- `packages/ai-providers/package.json`
+- `packages/mcp-server/package.json`
+- `packages/ui/package.json`
+- `apps/web/package.json`
+
+**Current version:** Check with `cat package.json | grep version`
+
 ## Environment Variables
 
 Copy `.env.example` to `.env`. Each AI provider has its own API key:
