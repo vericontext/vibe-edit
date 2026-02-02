@@ -90,9 +90,18 @@ def generate_storyboard(
         if block.get("type") == "text":
             text_content += block.get("text", "")
 
-    # Parse JSON
+    # Parse JSON (strip markdown code blocks if present)
+    text_content = text_content.strip()
+    if text_content.startswith("```json"):
+        text_content = text_content[7:]
+    elif text_content.startswith("```"):
+        text_content = text_content[3:]
+    if text_content.endswith("```"):
+        text_content = text_content[:-3]
+    text_content = text_content.strip()
+
     try:
-        storyboard = json.loads(text_content.strip())
+        storyboard = json.loads(text_content)
     except json.JSONDecodeError as e:
         return {"success": False, "error": f"Invalid JSON: {e}", "raw": text_content}
 

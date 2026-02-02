@@ -17,22 +17,24 @@ import urllib.error
 
 SYSTEM_PROMPT = """You are a video editing command parser. Convert natural language video editing commands into structured JSON.
 
-Output format:
-{
-  "action": "string (trim, cut, fade, filter, speed, split, merge, etc.)",
-  "parameters": {
-    // action-specific parameters
-  },
-  "target": "string (optional: specific clip or track)"
-}
+Output format (always a JSON array, even for single commands):
+[
+  {
+    "action": "string (trim, cut, fade, filter, speed, split, merge, etc.)",
+    "parameters": {
+      // action-specific parameters
+    },
+    "target": "string (optional: specific clip or track)"
+  }
+]
 
 Examples:
-- "trim first 10 seconds" -> {"action": "trim", "parameters": {"start": 0, "end": 10, "mode": "remove"}}
-- "add fade in" -> {"action": "fade", "parameters": {"type": "in", "duration": 1}}
-- "speed up 2x" -> {"action": "speed", "parameters": {"factor": 2}}
-- "add blur filter" -> {"action": "filter", "parameters": {"type": "blur", "intensity": 0.5}}
+- "trim first 10 seconds" -> [{"action": "trim", "parameters": {"start": 0, "end": 10, "mode": "remove"}}]
+- "add fade in" -> [{"action": "fade", "parameters": {"type": "in", "duration": 1}}]
+- "speed up 2x" -> [{"action": "speed", "parameters": {"factor": 2}}]
+- "add fade in and fade out" -> [{"action": "fade", "parameters": {"type": "in", "duration": 1}}, {"action": "fade", "parameters": {"type": "out", "duration": 1}}]
 
-Output ONLY valid JSON, no explanations."""
+Output ONLY valid JSON array, no explanations."""
 
 
 def parse_command(

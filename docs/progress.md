@@ -6,6 +6,68 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-02
 
+### Fix: Skills and CLI Integration Testing & Bug Fixes
+Performed comprehensive integration testing of Claude Code skills and CLI commands. Fixed bugs discovered during testing.
+
+**Tests Performed:**
+
+| Category | Item | Status | Notes |
+|----------|------|--------|-------|
+| OpenAI API | chat.py | ✅ Pass | "Say hello" → "Hello!" |
+| OpenAI API | dalle.py | ✅ Pass | Generated 403KB image |
+| OpenAI API | whisper.py | ✅ Pass | Transcribed TTS audio correctly |
+| OpenAI API | tts.py | ✅ Pass | 19KB MP3 output |
+| Claude API | chat.py | ✅ Pass | "Say hello" → "Hello!" |
+| Claude API | parse.py | ✅ Pass | Fixed JSON array parsing |
+| Claude API | motion.py | ✅ Pass | Generated Remotion TSX |
+| Claude API | storyboard.py | ✅ Pass | Fixed markdown stripping |
+| Gemini Image | generate.py | ✅ Pass | 326KB PNG (1024x1024) - initial failure was transient |
+| ElevenLabs | tts.py | ✅ Pass | 25KB MP3 output |
+| ElevenLabs | sfx.py | ✅ Pass | 33KB MP3 output |
+| CLI | vibe ai image | ✅ Pass | DALL-E generated 1MB image |
+| CLI | vibe ai tts | ✅ Pass | ElevenLabs TTS working |
+| CLI | vibe ai sfx | ✅ Pass | ElevenLabs SFX working |
+| CLI | vibe ai transcribe | ✅ Pass | SRT output correct |
+| CLI | project create/info | ✅ Pass | Project CRUD working |
+
+**Bugs Fixed:**
+
+1. **parse.py - Multiple Commands JSON Parsing**
+   - Problem: When parsing commands like "trim first 10s and add fade in", Claude returned multiple JSON objects which caused `json.loads()` to fail with "Extra data" error
+   - Solution: Updated system prompt to always return JSON array, even for single commands
+   - File: `.claude/skills/claude-api/scripts/parse.py`
+
+2. **storyboard.py - Markdown Code Block in Response**
+   - Problem: Claude sometimes wrapped JSON in ```json code blocks, causing parse failure
+   - Solution: Added code to strip markdown code blocks before JSON parsing
+   - File: `.claude/skills/claude-api/scripts/storyboard.py`
+
+**API Key Status:**
+- ✅ OPENAI_API_KEY - Working (chat, dalle, whisper, tts)
+- ✅ ANTHROPIC_API_KEY - Working (chat, parse, motion, storyboard)
+- ✅ GOOGLE_API_KEY - Working (text, image generation)
+- ✅ ELEVENLABS_API_KEY - Working (tts, sfx)
+
+**Files Modified:**
+- `.claude/skills/claude-api/scripts/parse.py` - JSON array output format
+- `.claude/skills/claude-api/scripts/storyboard.py` - Markdown code block stripping
+
+**Verification Commands:**
+```bash
+# Test skills
+python .claude/skills/openai-api/scripts/chat.py "Hello"
+python .claude/skills/claude-api/scripts/parse.py "trim 10s and add fade"
+python .claude/skills/claude-api/scripts/storyboard.py "product demo" -d 30 -o /tmp/test.json
+python .claude/skills/gemini-image/scripts/generate.py "red circle" -o /tmp/gemini.png
+
+# Test CLI
+pnpm vibe ai image "test" -o /tmp/test.png
+pnpm vibe ai tts "Hello" -o /tmp/test.mp3
+pnpm vibe ai transcribe /tmp/test.mp3 -o /tmp/test.srt
+```
+
+---
+
 ### Feature: Claude Code Skills for AI Provider APIs
 Created 9 Claude Code skills for development-time API reference and helper scripts. These skills enable Claude Code to access vendor API documentation and use helper scripts during VibeFrame CLI development.
 
