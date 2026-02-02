@@ -64,6 +64,56 @@ vibe
 
 ---
 
+### Fix: Export Command Uses System FFmpeg
+Changed export command to use system FFmpeg instead of FFmpeg.wasm, which only works in browsers.
+
+**Problem:**
+- `vibe export` failed with `ffmpeg.wasm does not support nodejs`
+- FFmpeg.wasm is designed for browser environments only
+
+**Solution:**
+- Replaced `@ffmpeg/ffmpeg` with `child_process.spawn` to call system FFmpeg
+- Added FFmpeg installation check with helpful error messages
+- Properly builds filter_complex for clip concatenation and effects
+
+**Features:**
+- Checks if FFmpeg is installed, shows install instructions if missing
+- Reports encoding progress percentage
+- Supports fadeIn/fadeOut effects via FFmpeg fade filters
+- Quality presets: draft, standard, high, ultra
+
+**Files Modified:**
+- `packages/cli/src/commands/export.ts` - Complete rewrite using system FFmpeg
+- `packages/cli/package.json` - Removed @ffmpeg/ffmpeg, @ffmpeg/util dependencies
+
+**Usage:**
+```bash
+# Export project to video
+vibe export project.vibe.json -o output.mp4 -p standard -y
+
+# Output:
+# ✔ Exported: output.mp4
+#   Duration: 15.0s
+#   Clips: 3
+#   Format: mp4
+#   Preset: standard
+#   Resolution: 1280x720
+```
+
+**FFmpeg Installation:**
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu
+sudo apt install ffmpeg
+
+# Windows
+winget install ffmpeg
+```
+
+---
+
 ### Feature: Ollama Provider for Local LLM Support
 Added OllamaProvider to enable local LLM support for natural language timeline commands without requiring external API keys.
 
