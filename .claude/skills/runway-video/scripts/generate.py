@@ -67,9 +67,12 @@ def generate_video(
         "X-Runway-Version": "2024-11-06",
     }
 
+    # Use appropriate endpoint based on whether image is provided
+    endpoint = "image_to_video" if image_path else "text_to_video"
+
     try:
         data = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(f"{BASE_URL}/image_to_video", data=data, headers=headers, method="POST")
+        req = urllib.request.Request(f"{BASE_URL}/{endpoint}", data=data, headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=30) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as e:

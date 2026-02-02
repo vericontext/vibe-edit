@@ -32,8 +32,8 @@ Performed comprehensive integration testing of Claude Code skills and CLI comman
 | Stability Image | generate.py | ✅ Pass | 672KB PNG - fixed API endpoint |
 | Replicate AI | music.py | ✅ Pass | 60KB MP3 (5s) - fixed model version |
 | Replicate AI | upscale.py | ✅ --help | Requires input image |
-| Runway Video | generate.py | ✅ --help | Video gen skipped (cost/time) |
-| Kling Video | generate.py | ✅ --help | Video gen skipped (cost/time) |
+| Runway Video | generate.py | ⚠️ API 403 | Model access denied (gen3a_turbo) |
+| Kling Video | generate.py | ⚠️ API 429 | Account balance not enough |
 
 **Bugs Fixed:**
 
@@ -64,8 +64,8 @@ Performed comprehensive integration testing of Claude Code skills and CLI comman
 - ✅ ELEVENLABS_API_KEY - Working (tts, sfx)
 - ✅ STABILITY_API_KEY - Working (image generation)
 - ✅ REPLICATE_API_TOKEN - Working (music generation)
-- ✅ RUNWAY_API_SECRET - Configured (video gen not tested - cost)
-- ✅ KLING_API_KEY - Configured (video gen not tested - cost)
+- ⚠️ RUNWAY_API_SECRET - Model access denied (gen3a_turbo not available)
+- ⚠️ KLING_API_KEY - Account balance insufficient
 
 **Files Modified:**
 - `.claude/skills/claude-api/scripts/parse.py` - JSON array output format
