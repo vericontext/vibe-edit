@@ -3,13 +3,10 @@
  * Handles both built-in commands and natural language AI commands
  */
 
-import { extname } from "node:path";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
+import { extname, resolve } from "node:path";
+import { writeFile } from "node:fs/promises";
 import chalk from "chalk";
 import ora from "ora";
-
-const execAsync = promisify(exec);
 import { Session } from "./session.js";
 import { success, error, warn, info, getHelpText, formatProjectInfo } from "./prompts.js";
 import { getApiKeyFromConfig, loadConfig, type LLMProvider } from "../config/index.js";
@@ -19,6 +16,8 @@ import {
   OpenAIProvider,
   ClaudeProvider,
   OllamaProvider,
+  GeminiProvider,
+  ElevenLabsProvider,
 } from "@vibeframe/ai-providers";
 
 /** Built-in command result */
@@ -45,7 +44,7 @@ async function tryExecuteAICommand(
   if (imageMatch) {
     const prompt = imageMatch[1].trim();
     const outputFile = imageMatch[2] || `${prompt.split(/\s+/).slice(0, 3).join("-").toLowerCase()}.png`;
-    return await runVibeCommand("ai image", `"${prompt}" -o "${outputFile}"`);
+    return await generateImage(prompt, outputFile);
   }
 
   // TTS / audio generation patterns
@@ -55,7 +54,7 @@ async function tryExecuteAICommand(
   if (ttsMatch) {
     const text = ttsMatch[1].trim();
     const outputFile = ttsMatch[2] || "output.mp3";
-    return await runVibeCommand("ai tts", `"${text}" -o "${outputFile}"`);
+    return await generateTTS(text, outputFile);
   }
 
   // Sound effect patterns
@@ -65,7 +64,7 @@ async function tryExecuteAICommand(
   if (sfxMatch) {
     const prompt = sfxMatch[1].trim();
     const outputFile = sfxMatch[2] || "sound-effect.mp3";
-    return await runVibeCommand("ai sfx", `"${prompt}" -o "${outputFile}"`);
+    return await generateSFX(prompt, outputFile);
   }
 
   // Direct "image of X" pattern
@@ -75,39 +74,146 @@ async function tryExecuteAICommand(
   if (simpleImageMatch) {
     const prompt = simpleImageMatch[1].trim();
     const outputFile = `${prompt.split(/\s+/).slice(0, 3).join("-").toLowerCase()}.png`;
-    return await runVibeCommand("ai image", `"${prompt}" -o "${outputFile}"`);
+    return await generateImage(prompt, outputFile);
   }
 
   return null;
 }
 
 /**
- * Run a vibe CLI command and return the result
+ * Generate image using Gemini
  */
-async function runVibeCommand(
-  command: string,
-  args: string
-): Promise<CommandResult> {
-  const spinner = ora({ text: `Running: vibe ${command}...`, spinner: "dots" }).start();
+async function generateImage(prompt: string, outputFile: string): Promise<CommandResult> {
+  const spinner = ora({ text: `Generating image: "${prompt}"...`, spinner: "dots" }).start();
 
   try {
-    const { stdout, stderr } = await execAsync(`vibe ${command} ${args}`, {
-      timeout: 120000, // 2 minute timeout
-    });
+    const apiKey = await getApiKeyFromConfig("google");
+    if (!apiKey) {
+      spinner.fail();
+      return {
+        success: false,
+        message: error("Google API key not configured. Run 'vibe setup --full' or set GOOGLE_API_KEY."),
+      };
+    }
+
+    const provider = new GeminiProvider();
+    await provider.initialize({ apiKey });
+
+    const result = await provider.generateImage(prompt, { aspectRatio: "1:1" });
+
+    if (!result.images || result.images.length === 0) {
+      spinner.fail();
+      return { success: false, message: error("No image generated") };
+    }
+
+    // Save the image
+    const outputPath = resolve(process.cwd(), outputFile);
+    const imageData = result.images[0].base64;
+    await writeFile(outputPath, Buffer.from(imageData, "base64"));
 
     spinner.succeed();
-
-    const output = stdout || stderr;
     return {
       success: true,
-      message: success(output.trim() || `Completed: vibe ${command}`),
+      message: success(`Image saved: ${outputFile}`),
     };
   } catch (e: unknown) {
     spinner.fail();
     const errorMessage = e instanceof Error ? e.message : String(e);
     return {
       success: false,
-      message: error(`Command failed: ${errorMessage}`),
+      message: error(`Image generation failed: ${errorMessage}`),
+    };
+  }
+}
+
+/**
+ * Generate TTS using ElevenLabs
+ */
+async function generateTTS(text: string, outputFile: string): Promise<CommandResult> {
+  const spinner = ora({ text: `Generating audio: "${text.slice(0, 30)}..."`, spinner: "dots" }).start();
+
+  try {
+    const apiKey = await getApiKeyFromConfig("elevenlabs");
+    if (!apiKey) {
+      spinner.fail();
+      return {
+        success: false,
+        message: error("ElevenLabs API key not configured. Run 'vibe setup --full' or set ELEVENLABS_API_KEY."),
+      };
+    }
+
+    const provider = new ElevenLabsProvider();
+    await provider.initialize({ apiKey });
+
+    const result = await provider.textToSpeech(text, {
+      voiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel (default)
+    });
+
+    if (!result.success || !result.audioBuffer) {
+      spinner.fail();
+      return { success: false, message: error(result.error || "TTS generation failed") };
+    }
+
+    // Save the audio
+    const outputPath = resolve(process.cwd(), outputFile);
+    await writeFile(outputPath, result.audioBuffer);
+
+    spinner.succeed();
+    return {
+      success: true,
+      message: success(`Audio saved: ${outputFile}`),
+    };
+  } catch (e: unknown) {
+    spinner.fail();
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return {
+      success: false,
+      message: error(`TTS generation failed: ${errorMessage}`),
+    };
+  }
+}
+
+/**
+ * Generate sound effect using ElevenLabs
+ */
+async function generateSFX(prompt: string, outputFile: string): Promise<CommandResult> {
+  const spinner = ora({ text: `Generating sound effect: "${prompt}"...`, spinner: "dots" }).start();
+
+  try {
+    const apiKey = await getApiKeyFromConfig("elevenlabs");
+    if (!apiKey) {
+      spinner.fail();
+      return {
+        success: false,
+        message: error("ElevenLabs API key not configured. Run 'vibe setup --full' or set ELEVENLABS_API_KEY."),
+      };
+    }
+
+    const provider = new ElevenLabsProvider();
+    await provider.initialize({ apiKey });
+
+    const result = await provider.generateSoundEffect(prompt, {});
+
+    if (!result.success || !result.audioBuffer) {
+      spinner.fail();
+      return { success: false, message: error(result.error || "SFX generation failed") };
+    }
+
+    // Save the audio
+    const outputPath = resolve(process.cwd(), outputFile);
+    await writeFile(outputPath, result.audioBuffer);
+
+    spinner.succeed();
+    return {
+      success: true,
+      message: success(`Sound effect saved: ${outputFile}`),
+    };
+  } catch (e: unknown) {
+    spinner.fail();
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return {
+      success: false,
+      message: error(`SFX generation failed: ${errorMessage}`),
     };
   }
 }
