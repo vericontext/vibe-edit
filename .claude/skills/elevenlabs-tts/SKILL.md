@@ -116,7 +116,7 @@ curl -X POST "https://api.elevenlabs.io/v1/voices/add" \
   -F "files=@sample2.mp3"
 ```
 
-## Usage with Helper Script
+## Usage with Helper Scripts
 
 ```bash
 # Text-to-Speech
@@ -130,6 +130,15 @@ python .claude/skills/elevenlabs-tts/scripts/sfx.py "thunder crash" -o thunder.m
 
 # List Voices
 python .claude/skills/elevenlabs-tts/scripts/voices.py
+
+# Filter voices
+python .claude/skills/elevenlabs-tts/scripts/voices.py --filter "female"
+
+# Clone a voice from samples
+python .claude/skills/elevenlabs-tts/scripts/voice-clone.py "My Voice" sample1.mp3 sample2.mp3
+
+# Isolate vocals from audio
+python .claude/skills/elevenlabs-tts/scripts/isolate.py song.mp3 -o vocals.mp3
 ```
 
 ## Integration with VibeFrame

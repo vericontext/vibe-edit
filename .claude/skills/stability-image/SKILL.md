@@ -148,7 +148,7 @@ curl -X POST "https://api.stability.ai/v2beta/stable-image/edit/outpaint" \
 - `prompt`: Description for extended area
 - `creativity`: 0-1 (default: 0.5)
 
-## Usage with Helper Script
+## Usage with Helper Scripts
 
 ```bash
 # Text-to-image
@@ -157,11 +157,23 @@ python .claude/skills/stability-image/scripts/generate.py "mountain landscape" -
 # With style preset
 python .claude/skills/stability-image/scripts/generate.py "robot" -o robot.png --style anime
 
-# Remove background
-python .claude/skills/stability-image/scripts/edit.py remove-bg input.png -o output.png
+# Image-to-image transformation
+python .claude/skills/stability-image/scripts/img2img.py photo.png "watercolor painting" -o watercolor.png
 
-# Upscale
-python .claude/skills/stability-image/scripts/edit.py upscale input.png -o upscaled.png
+# Upscale (fast mode)
+python .claude/skills/stability-image/scripts/upscale.py input.png -o upscaled.png
+
+# Upscale (creative mode)
+python .claude/skills/stability-image/scripts/upscale.py input.png -o upscaled.png --mode creative --prompt "enhance details"
+
+# Remove background
+python .claude/skills/stability-image/scripts/remove-bg.py photo.png -o transparent.png
+
+# Search and replace objects
+python .claude/skills/stability-image/scripts/replace.py photo.png "red sports car" "blue car" -o replaced.png
+
+# Outpaint (extend image)
+python .claude/skills/stability-image/scripts/outpaint.py photo.png -o wider.png --left 200 --right 200
 ```
 
 ## Integration with VibeFrame

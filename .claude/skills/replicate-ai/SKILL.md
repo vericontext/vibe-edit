@@ -241,8 +241,11 @@ Instead of polling, use webhooks:
 ## Usage with Helper Scripts
 
 ```bash
-# Video upscaling
+# Image upscaling
 python .claude/skills/replicate-ai/scripts/upscale.py input.png -o upscaled.png -s 4
+
+# Video upscaling (requires URL)
+python .claude/skills/replicate-ai/scripts/video-upscale.py --url https://example.com/video.mp4 -o upscaled.mp4
 
 # Music generation
 python .claude/skills/replicate-ai/scripts/music.py "upbeat intro music" -o music.mp3 -d 10
@@ -250,8 +253,20 @@ python .claude/skills/replicate-ai/scripts/music.py "upbeat intro music" -o musi
 # Background removal
 python .claude/skills/replicate-ai/scripts/rembg.py photo.png -o no-bg.png
 
-# Audio separation
+# Audio separation (Demucs)
 python .claude/skills/replicate-ai/scripts/demucs.py song.mp3 -o vocals.mp3 --stem vocals
+
+# All audio stems
+python .claude/skills/replicate-ai/scripts/demucs.py song.mp3 -o stems/ --all
+
+# Frame interpolation (smoother video)
+python .claude/skills/replicate-ai/scripts/interpolate.py --url https://example.com/video.mp4 -o smooth.mp4 -m 2
+
+# Style transfer
+python .claude/skills/replicate-ai/scripts/style-transfer.py content.png style.png -o stylized.png
+
+# Generic model prediction
+python .claude/skills/replicate-ai/scripts/predict.py MODEL_VERSION '{"input": "param"}'
 ```
 
 ## Integration with VibeFrame

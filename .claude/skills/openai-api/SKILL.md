@@ -215,6 +215,12 @@ python .claude/skills/openai-api/scripts/chat.py "Parse: trim 5 seconds from sta
 # Generate image
 python .claude/skills/openai-api/scripts/dalle.py "thumbnail for tech video" -o thumb.png
 
+# Edit image (DALL-E 2 inpainting)
+python .claude/skills/openai-api/scripts/edit.py image.png mask.png "add a sunset sky" -o edited.png
+
+# Edit without mask
+python .claude/skills/openai-api/scripts/edit.py image.png "add a mountain background" -o edited.png
+
 # Transcribe audio
 python .claude/skills/openai-api/scripts/whisper.py audio.mp3 -o transcript.json
 

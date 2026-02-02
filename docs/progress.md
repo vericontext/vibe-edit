@@ -6,6 +6,64 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Feature: Complete Skill Scripts Coverage
+Added 15 new Python helper scripts to match all CLI capabilities.
+
+**Stability AI Scripts (5 new):**
+- `upscale.py` - Fast and creative upscaling modes
+- `remove-bg.py` - Background removal
+- `img2img.py` - Image-to-image transformation
+- `replace.py` - Search and replace objects
+- `outpaint.py` - Extend image boundaries
+
+**ElevenLabs Scripts (3 new):**
+- `voices.py` - List and filter available voices
+- `voice-clone.py` - Clone voice from audio samples
+- `isolate.py` - Separate vocals from background audio
+
+**Kling Video Scripts (2 new):**
+- `extend.py` - Extend existing videos
+- `status.py` - Check task status
+
+**Replicate AI Scripts (4 new):**
+- `video-upscale.py` - Video upscaling with Real-ESRGAN
+- `interpolate.py` - Frame interpolation with RIFE
+- `demucs.py` - Audio stem separation
+- `style-transfer.py` - Neural style transfer
+
+**OpenAI Scripts (1 new):**
+- `edit.py` - DALL-E 2 image inpainting/editing
+
+**SKILL.md Updates:**
+- Updated all skill documentation to reference new scripts
+- Added usage examples for each new script
+
+**Files Created:**
+- `.claude/skills/stability-image/scripts/upscale.py`
+- `.claude/skills/stability-image/scripts/remove-bg.py`
+- `.claude/skills/stability-image/scripts/img2img.py`
+- `.claude/skills/stability-image/scripts/replace.py`
+- `.claude/skills/stability-image/scripts/outpaint.py`
+- `.claude/skills/elevenlabs-tts/scripts/voices.py`
+- `.claude/skills/elevenlabs-tts/scripts/voice-clone.py`
+- `.claude/skills/elevenlabs-tts/scripts/isolate.py`
+- `.claude/skills/kling-video/scripts/extend.py`
+- `.claude/skills/kling-video/scripts/status.py`
+- `.claude/skills/replicate-ai/scripts/video-upscale.py`
+- `.claude/skills/replicate-ai/scripts/interpolate.py`
+- `.claude/skills/replicate-ai/scripts/demucs.py`
+- `.claude/skills/replicate-ai/scripts/style-transfer.py`
+- `.claude/skills/openai-api/scripts/edit.py`
+
+**Files Modified:**
+- `.claude/skills/stability-image/SKILL.md`
+- `.claude/skills/elevenlabs-tts/SKILL.md`
+- `.claude/skills/kling-video/SKILL.md`
+- `.claude/skills/replicate-ai/SKILL.md`
+- `.claude/skills/openai-api/SKILL.md`
+
+---
+
 ### Feature: Gemini Video Understanding
 Added video analysis capabilities using Google Gemini's multimodal API.
 

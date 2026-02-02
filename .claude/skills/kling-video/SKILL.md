@@ -187,7 +187,7 @@ curl "https://api.klingai.com/v1/videos/text2video/{task_id}" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-## Usage with Helper Script
+## Usage with Helper Scripts
 
 ```bash
 # Text-to-video
@@ -198,6 +198,18 @@ python .claude/skills/kling-video/scripts/generate.py "animate scene" -i photo.p
 
 # With options
 python .claude/skills/kling-video/scripts/generate.py "prompt" -o out.mp4 -d 10 -r 9:16 -m pro
+
+# Check task status
+python .claude/skills/kling-video/scripts/status.py TASK_ID
+
+# Check image-to-video task
+python .claude/skills/kling-video/scripts/status.py TASK_ID --type image2video
+
+# Extend a video
+python .claude/skills/kling-video/scripts/extend.py VIDEO_ID -o extended.mp4
+
+# Extend with prompt
+python .claude/skills/kling-video/scripts/extend.py VIDEO_ID -o extended.mp4 --prompt "continue the scene"
 ```
 
 ## Integration with VibeFrame
