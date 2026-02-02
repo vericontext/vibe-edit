@@ -62,6 +62,37 @@ export interface GeminiImageResult {
   error?: string;
 }
 
+/**
+ * Video analysis options for Gemini
+ */
+export interface GeminiVideoOptions {
+  /** Model to use for analysis */
+  model?: "gemini-3-flash-preview" | "gemini-2.5-flash" | "gemini-2.5-pro";
+  /** MIME type of the video (for inline data) */
+  mimeType?: string;
+  /** Frames per second to sample (default: 1) */
+  fps?: number;
+  /** Start offset in seconds for clipping */
+  startOffset?: number;
+  /** End offset in seconds for clipping */
+  endOffset?: number;
+  /** Use low resolution mode (fewer tokens) */
+  lowResolution?: boolean;
+}
+
+/**
+ * Video analysis result
+ */
+export interface GeminiVideoResult {
+  success: boolean;
+  response?: string;
+  model?: string;
+  promptTokens?: number;
+  responseTokens?: number;
+  totalTokens?: number;
+  error?: string;
+}
+
 const MODEL_MAP: Record<string, string> = {
   "flash": "gemini-2.5-flash-image",
   "pro": "gemini-3-pro-image-preview",
@@ -423,6 +454,151 @@ export class GeminiProvider implements AIProvider {
         images,
         description,
         model: modelId,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+/**
+   * Video analysis options
+   */
+  async analyzeVideo(
+    videoData: Buffer | string,
+    prompt: string,
+    options: GeminiVideoOptions = {}
+  ): Promise<GeminiVideoResult> {
+    if (!this.apiKey) {
+      return {
+        success: false,
+        error: "Google API key not configured",
+      };
+    }
+
+    const modelId = options.model || "gemini-3-flash-preview";
+
+    try {
+      // Build the video part
+      let videoPart: Record<string, unknown>;
+
+      if (typeof videoData === "string") {
+        // YouTube URL or file URI
+        if (videoData.includes("youtube.com") || videoData.includes("youtu.be")) {
+          videoPart = {
+            file_data: { file_uri: videoData },
+          };
+        } else {
+          // Assume it's a file URI from Files API
+          videoPart = {
+            file_data: { file_uri: videoData },
+          };
+        }
+      } else {
+        // Buffer - inline data
+        videoPart = {
+          inline_data: {
+            mime_type: options.mimeType || "video/mp4",
+            data: videoData.toString("base64"),
+          },
+        };
+      }
+
+      // Add video metadata if specified
+      const videoMetadata: Record<string, unknown> = {};
+      if (options.fps !== undefined) {
+        videoMetadata.fps = options.fps;
+      }
+      if (options.startOffset !== undefined) {
+        videoMetadata.start_offset = `${options.startOffset}s`;
+      }
+      if (options.endOffset !== undefined) {
+        videoMetadata.end_offset = `${options.endOffset}s`;
+      }
+
+      if (Object.keys(videoMetadata).length > 0) {
+        videoPart.video_metadata = videoMetadata;
+      }
+
+      // Build generation config
+      const generationConfig: Record<string, unknown> = {
+        temperature: 0.4,
+        maxOutputTokens: 8192,
+      };
+
+      if (options.lowResolution) {
+        generationConfig.mediaResolution = "low";
+      }
+
+      const payload = {
+        contents: [{
+          parts: [
+            videoPart,
+            { text: prompt },
+          ],
+        }],
+        generationConfig,
+      };
+
+      const response = await fetch(
+        `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage: string;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error?.message || errorText;
+        } catch {
+          errorMessage = errorText;
+        }
+        return {
+          success: false,
+          error: `API error (${response.status}): ${errorMessage}`,
+        };
+      }
+
+      const data = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string }>;
+          };
+        }>;
+        usageMetadata?: {
+          promptTokenCount?: number;
+          candidatesTokenCount?: number;
+          totalTokenCount?: number;
+        };
+      };
+
+      const parts = data.candidates?.[0]?.content?.parts;
+      if (!parts || parts.length === 0) {
+        return {
+          success: false,
+          error: "No response from model",
+        };
+      }
+
+      const textParts = parts.filter((p) => p.text).map((p) => p.text);
+      const responseText = textParts.join("\n");
+
+      return {
+        success: true,
+        response: responseText,
+        model: modelId,
+        promptTokens: data.usageMetadata?.promptTokenCount,
+        responseTokens: data.usageMetadata?.candidatesTokenCount,
+        totalTokens: data.usageMetadata?.totalTokenCount,
       };
     } catch (error) {
       return {
