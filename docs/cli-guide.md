@@ -99,26 +99,29 @@ vibe
 In REPL mode, natural language input is automatically converted to commands by the LLM:
 
 ```
-vibe> create a new project
-# → vibe project create "new project"
+vibe> create a new project called my-video
+✓ Created project: my-video
 
-vibe> generate an image of a sunset landscape
-# → vibe ai image "sunset landscape" -o sunset.png
+vibe [my-video]> generate an image of a sunset landscape
+✓ Image saved: sunset.png
 
-vibe> create a welcome audio message
-# → vibe ai tts "Welcome to VibeFrame" -o welcome.mp3
+vibe [my-video]> create a welcome audio message
+✓ Audio saved: welcome.mp3
 
-vibe> add sunset.png to the project
-# → vibe timeline add-source sunset.png
+vibe [my-video]> add sunset.png to the project
+✓ Added source: sunset.png (source-1)
 
-vibe> add fade-in effect to the clip
-# → vibe timeline add-effect clip-1 fadeIn
+vibe [my-video]> add fade-in effect to the clip
+✓ Added fadeIn effect to clip-1
 
-vibe> export the video
-# → vibe export output.mp4
+vibe [my-video]> export the video
+✓ Exported: output.mp4
 ```
 
-**Note:** Generate media files first (images, audio) before adding them to the timeline.
+**Note:**
+- `vibe [my-video]>` shows you're editing a project named "my-video"
+- Generate media files first (images, audio) before adding them to the timeline
+- The LLM converts natural language → CLI commands internally
 
 ---
 
