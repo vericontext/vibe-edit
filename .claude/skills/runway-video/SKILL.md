@@ -1,20 +1,20 @@
 ---
 name: runway-video
-description: Generate videos using Runway Gen-3 API. Use for text-to-video and image-to-video generation.
+description: Generate videos and images using Runway API. Use for text-to-image, image-to-video generation.
 allowed-tools: Bash(curl *), Bash(python *), Read, Write
 ---
 
-# Runway Video Generation
+# Runway Media Generation
 
-Generate high-quality videos using Runway Gen-3 Alpha Turbo.
+Generate high-quality videos and images using Runway Gen-4 models.
 
 ## Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| Text-to-Video | Generate video from text description |
-| Image-to-Video | Animate a reference image |
-| Gen-3 Alpha Turbo | Fast, high-quality generation |
+| Feature | Model | Description |
+|---------|-------|-------------|
+| Image-to-Video | gen4_turbo | Animate an image with motion |
+| Text-to-Image | gen4_image | High-quality image generation |
+| Text-to-Image | gen4_image_turbo | Fast image generation (2 credits) |
 
 ## Authentication
 
@@ -22,158 +22,135 @@ Generate high-quality videos using Runway Gen-3 Alpha Turbo.
 export RUNWAY_API_SECRET="your-api-key"
 ```
 
-Header: `Authorization: Bearer $RUNWAY_API_SECRET`
+## Pricing
 
-Required Header: `X-Runway-Version: 2024-11-06`
+### Video Generation
+| Model | Pricing |
+|-------|---------|
+| gen4_turbo | Per generation (5s/10s) |
 
-## API Endpoints
+### Image Generation
+| Model | Pricing |
+|-------|---------|
+| gen4_image | 5 credits/720p, 8 credits/1080p |
+| gen4_image_turbo | 2 credits/any resolution |
 
-### Image-to-Video / Text-to-Video
-```
-POST https://api.dev.runwayml.com/v1/image_to_video
-```
+## Python SDK Usage
 
-### Get Task Status
-```
-GET https://api.dev.runwayml.com/v1/tasks/{task_id}
-```
-
-### Cancel Task
-```
-POST https://api.dev.runwayml.com/v1/tasks/{task_id}/cancel
-```
-
-## Request Format
-
-### Text-to-Video
-```json
-{
-  "promptText": "A serene mountain landscape with clouds",
-  "model": "gen3a_turbo",
-  "duration": 5,
-  "ratio": "16:9",
-  "watermark": false
-}
-```
+Install: `pip install runwayml`
 
 ### Image-to-Video
-```json
-{
-  "promptImage": "data:image/png;base64,...",
-  "promptText": "Camera slowly zooms in",
-  "model": "gen3a_turbo",
-  "duration": 5,
-  "ratio": "16:9"
-}
+```python
+from runwayml import RunwayML
+
+client = RunwayML()
+
+task = client.image_to_video.create(
+    model='gen4_turbo',
+    prompt_image='https://example.com/image.jpg',  # or base64 data URI
+    prompt_text='A timelapse with clouds flying by',
+    ratio='1280:720',
+    duration=5,
+).wait_for_task_output()
+
+print(task.output[0])  # Video URL
+```
+
+### Text-to-Image
+```python
+from runwayml import RunwayML
+
+client = RunwayML()
+
+task = client.text_to_image.create(
+    model='gen4_image_turbo',
+    prompt_text='A sunset over mountains',
+    ratio='1920:1080',
+).wait_for_task_output()
+
+print(task.output[0])  # Image URL
+```
+
+### Base64 Image Input
+```python
+import base64
+
+with open('image.png', 'rb') as f:
+    image_data = base64.b64encode(f.read()).decode('utf-8')
+
+data_uri = f"data:image/png;base64,{image_data}"
+
+task = client.image_to_video.create(
+    model='gen4_turbo',
+    prompt_image=data_uri,
+    prompt_text='Camera slowly panning',
+    ratio='1280:720',
+    duration=5,
+).wait_for_task_output()
 ```
 
 ## Parameters
 
+### Video Parameters
 | Parameter | Type | Values | Description |
 |-----------|------|--------|-------------|
-| `promptText` | string | - | Text description of the video |
-| `promptImage` | string | URL or base64 | Reference image (optional) |
-| `model` | string | `gen3a_turbo` | Model to use |
+| `model` | string | `gen4_turbo` | Model to use |
+| `prompt_image` | string | URL or base64 | Input image (required) |
+| `prompt_text` | string | - | Motion/animation description |
+| `ratio` | string | `1280:720`, `720:1280` | Output resolution |
 | `duration` | int | 5, 10 | Video duration in seconds |
-| `ratio` | string | `16:9`, `9:16` | Aspect ratio |
-| `seed` | int | 0-4294967295 | Random seed for reproducibility |
-| `watermark` | bool | true/false | Enable Runway watermark |
 
-## Response Format
+### Image Parameters
+| Parameter | Type | Values | Description |
+|-----------|------|--------|-------------|
+| `model` | string | `gen4_image`, `gen4_image_turbo` | Model to use |
+| `prompt_text` | string | - | Image description |
+| `ratio` | string | `1920:1080`, `1280:720`, etc. | Output resolution |
 
-### Initial Response
-```json
-{
-  "id": "task_abc123"
-}
-```
+## Helper Scripts
 
-### Task Status Response
-```json
-{
-  "id": "task_abc123",
-  "status": "SUCCEEDED",
-  "progress": 100,
-  "output": ["https://runway-output.s3.amazonaws.com/video.mp4"]
-}
-```
-
-### Status Values
-- `PENDING` - Task queued
-- `RUNNING` - Generation in progress
-- `SUCCEEDED` - Complete, video URL in `output`
-- `FAILED` - Error, check `failure` field
-- `CANCELLED` - Task was cancelled
-
-## cURL Examples
-
-### Start Generation
+### Video Generation (Image-to-Video)
 ```bash
-curl -X POST "https://api.dev.runwayml.com/v1/image_to_video" \
-  -H "Authorization: Bearer $RUNWAY_API_SECRET" \
-  -H "Content-Type: application/json" \
-  -H "X-Runway-Version: 2024-11-06" \
-  -d '{
-    "promptText": "A beautiful sunset over the ocean",
-    "model": "gen3a_turbo",
-    "duration": 5,
-    "ratio": "16:9"
-  }'
-```
-
-### Check Status
-```bash
-curl "https://api.dev.runwayml.com/v1/tasks/task_abc123" \
-  -H "Authorization: Bearer $RUNWAY_API_SECRET" \
-  -H "X-Runway-Version: 2024-11-06"
-```
-
-### Download Video
-```bash
-curl -o video.mp4 "https://runway-output.s3.amazonaws.com/video.mp4"
-```
-
-## Usage with Helper Script
-
-```bash
-# Text-to-video
-python .claude/skills/runway-video/scripts/generate.py "sunset over ocean" -o sunset.mp4
-
-# Image-to-video
-python .claude/skills/runway-video/scripts/generate.py "camera zoom" -i photo.png -o animated.mp4
+# Basic usage
+python .claude/skills/runway-video/scripts/generate.py "animate this scene" \
+  -i photo.png -o animated.mp4
 
 # With options
-python .claude/skills/runway-video/scripts/generate.py "prompt" -o out.mp4 -d 10 -r 9:16
+python .claude/skills/runway-video/scripts/generate.py "camera zoom in" \
+  -i reference.jpg -o video.mp4 -d 10 -r 16:9
 ```
 
-## Integration with VibeFrame
+### Image Generation (Text-to-Image)
+```bash
+# Fast generation (turbo)
+python .claude/skills/runway-video/scripts/image.py "sunset over mountains" \
+  -o sunset.png
+
+# High quality
+python .claude/skills/runway-video/scripts/image.py "portrait photo" \
+  -o portrait.png -m gen4_image -r 1080p
+
+# Resolution options: 720p, 1080p, square, portrait, portrait_hd
+```
+
+## Integration with VibeFrame CLI
 
 ```bash
-# Generate video (default: Runway)
-vibe ai video "sunset timelapse" -o sunset.mp4
+# Generate video from image
+vibe ai video "animate this scene" -i photo.png -o animated.mp4 -p runway
 
-# Specify Runway explicitly
-vibe ai video "sunset timelapse" -o sunset.mp4 -p runway
-
-# Image-to-video
-vibe ai video "animate this scene" -i reference.png -o animated.mp4 -p runway
+# Generate image (coming soon)
+vibe ai image "sunset over mountains" -o sunset.png -p runway
 ```
-
-## Pricing & Limits
-
-- Gen-3 Alpha Turbo: ~$0.05/second
-- 5-second video: ~$0.25
-- 10-second video: ~$0.50
-- Max concurrent tasks vary by plan
 
 ## Tips
 
-1. **Be descriptive**: "A serene mountain lake at golden hour with mist rising" works better than "lake"
-2. **Camera motion**: Include camera directions like "slowly pan left" or "zoom in"
-3. **Image-to-video**: Best results with high-quality reference images
-4. **Seed**: Use same seed for consistent style across multiple generations
+1. **Video**: gen4_turbo requires an input image (no text-to-video)
+2. **Image**: Use `gen4_image_turbo` for quick iterations (2 credits)
+3. **Quality**: Use `gen4_image` for final/production images
+4. **Prompts**: Be descriptive - include style, lighting, mood
 
 ## References
 
 - [Runway API Docs](https://docs.dev.runwayml.com)
-- [Gen-3 Alpha](https://runwayml.com/research/gen-3-alpha)
+- [Runway SDK](https://pypi.org/project/runwayml/)

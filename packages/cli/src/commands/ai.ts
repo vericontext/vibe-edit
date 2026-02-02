@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
-import { resolve, dirname, basename, extname } from "node:path";
+import { resolve, dirname, basename, extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { execSync, exec } from "node:child_process";
 import { promisify } from "node:util";
@@ -601,7 +602,7 @@ aiCommand
   .command("image")
   .description("Generate image using AI (DALL-E, Gemini Imagen, or Stability)")
   .argument("<prompt>", "Image description prompt")
-  .option("-p, --provider <provider>", "Provider: dalle, gemini, stability", "dalle")
+  .option("-p, --provider <provider>", "Provider: dalle, gemini, stability, runway", "dalle")
   .option("-k, --api-key <key>", "API key (or set env: OPENAI_API_KEY, GOOGLE_API_KEY, STABILITY_API_KEY)")
   .option("-o, --output <path>", "Output file path (downloads image)")
   .option("-s, --size <size>", "Image size (dalle: 1024x1024, 1792x1024, 1024x1792)", "1024x1024")
@@ -612,7 +613,7 @@ aiCommand
   .action(async (prompt: string, options) => {
     try {
       const provider = options.provider.toLowerCase();
-      const validProviders = ["dalle", "gemini", "stability"];
+      const validProviders = ["dalle", "gemini", "stability", "runway"];
       if (!validProviders.includes(provider)) {
         console.error(chalk.red(`Invalid provider: ${provider}`));
         console.error(chalk.dim(`Available providers: ${validProviders.join(", ")}`));
@@ -624,11 +625,13 @@ aiCommand
         dalle: "OPENAI_API_KEY",
         gemini: "GOOGLE_API_KEY",
         stability: "STABILITY_API_KEY",
+        runway: "RUNWAY_API_SECRET",
       };
       const providerNameMap: Record<string, string> = {
         dalle: "OpenAI",
         gemini: "Google",
         stability: "Stability",
+        runway: "Runway",
       };
       const envKey = envKeyMap[provider];
       const providerName = providerNameMap[provider];
@@ -782,6 +785,57 @@ aiCommand
         } else {
           console.log(chalk.yellow("Use -o to save the generated image to a file"));
         }
+      } else if (provider === "runway") {
+        // Use Runway's Gemini model for text-to-image (no reference needed)
+        const { spawn } = await import("child_process");
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const scriptPath = resolve(__dirname, "../../../../.claude/skills/runway-video/scripts/image.py");
+
+        if (!options.output) {
+          spinner.fail(chalk.red("Output path required for Runway. Use -o option."));
+          process.exit(1);
+        }
+
+        const outputPath = resolve(process.cwd(), options.output);
+        const args = [scriptPath, prompt, "-o", outputPath, "-r", options.ratio || "16:9"];
+
+        spinner.text = "Generating image with Runway (gemini_2.5_flash)...";
+
+        await new Promise<void>((resolvePromise, reject) => {
+          const proc = spawn("python3", args, {
+            env: { ...process.env, RUNWAY_API_SECRET: apiKey },
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+
+          let stdout = "";
+          let stderr = "";
+
+          proc.stdout.on("data", (data) => {
+            stdout += data.toString();
+          });
+
+          proc.stderr.on("data", (data) => {
+            stderr += data.toString();
+          });
+
+          proc.on("close", (code) => {
+            if (code === 0) {
+              spinner.succeed(chalk.green("Generated image with Runway"));
+              console.log(chalk.dim(stdout.trim()));
+              resolvePromise();
+            } else {
+              spinner.fail(chalk.red("Runway image generation failed"));
+              console.error(chalk.red(stderr || stdout));
+              reject(new Error("Runway generation failed"));
+            }
+          });
+
+          proc.on("error", (err) => {
+            spinner.fail(chalk.red("Failed to run Runway script"));
+            reject(err);
+          });
+        });
       }
     } catch (error) {
       console.error(chalk.red("Image generation failed"));
