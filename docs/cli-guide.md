@@ -2,6 +2,8 @@
 
 Complete guide to using VibeFrame's command-line interface for AI-powered video editing.
 
+---
+
 ## Installation
 
 ```bash
@@ -13,521 +15,732 @@ curl -fsSL https://raw.githubusercontent.com/vericontext/vibeframe/main/scripts/
 **Requirements:**
 - Node.js 18+
 - Git
-- FFmpeg (optional but recommended)
+- FFmpeg (recommended)
 
 ---
 
-## First 5 Minutes: Step-by-Step Tutorial
-
-After installation, follow these steps to verify everything works.
+## Quick Start: First 5 Minutes
 
 ### Step 1: Verify Installation
 
 ```bash
-# Check version
 vibe --version
 # Expected: 0.1.0
 
-# Check available commands
 vibe --help
+# Shows all available commands
 ```
 
 ### Step 2: Configure API Keys
 
+**Option A: Interactive Setup**
 ```bash
 vibe setup
 ```
 
-Or set environment variables:
-
+**Option B: Environment Variables**
 ```bash
-# Required for most AI features
-export OPENAI_API_KEY="sk-..."           # DALL-E, Whisper
-export ANTHROPIC_API_KEY="sk-ant-..."    # Claude (storyboard, analysis)
-export GOOGLE_API_KEY="AIza..."          # Gemini (image, video analysis)
+# Minimum for testing (Gemini covers image + video analysis)
+export GOOGLE_API_KEY="AIza..."
+
+# Full setup
+export GOOGLE_API_KEY="AIza..."          # Gemini (image gen, video analysis)
 export ELEVENLABS_API_KEY="..."          # TTS, SFX
+export ANTHROPIC_API_KEY="sk-ant-..."    # Claude (storyboard, highlights)
+export OPENAI_API_KEY="sk-..."           # Whisper (transcription), DALL-E
 export STABILITY_API_KEY="sk-..."        # Stable Diffusion
-
-# Optional (video generation)
-export RUNWAY_API_SECRET="..."           # Runway Gen-3
-export KLING_API_KEY="..."               # Kling video
 ```
 
-### Step 3: Test Basic AI Commands
+### Step 3: Test AI Features (CLI Mode)
 
 ```bash
-# Test 1: Generate an image (Gemini - default)
-vibe ai image "a cute robot waving hello, digital art" -o robot.png
+# Test 1: Image Generation (Gemini)
+vibe ai image "a friendly robot mascot, 3D render style" -o test-image.png
 
-# Test 2: Generate TTS (ElevenLabs)
-vibe ai tts "Hello! Welcome to VibeFrame." -o hello.mp3
+# Test 2: Text-to-Speech (ElevenLabs)
+vibe ai tts "Welcome to VibeFrame, the AI video editor." -o test-tts.mp3
 
-# Test 3: Generate sound effect (ElevenLabs)
-vibe ai sfx "whoosh transition sound" -o whoosh.mp3 -d 2
+# Test 3: Sound Effect (ElevenLabs)
+vibe ai sfx "magical sparkle sound" -o test-sfx.mp3 -d 2
 ```
 
-### Step 4: Create Your First Project
+### Step 4: Test REPL Mode (Natural Language)
 
 ```bash
-# Create a new project
-vibe project create "my-first-video" -o my-project.vibe.json
-
-# Check project info
-vibe project info my-project.vibe.json
-
-# Start interactive REPL
 vibe
 ```
 
-In the REPL:
+REPL에서는 자연어로 말하면 LLM이 알아서 명령어로 변환합니다:
+
 ```
-vibe> open my-project.vibe.json
-vibe> info
-vibe> help
-vibe> exit
+vibe> 새 프로젝트 만들어줘
+# → vibe project create "새 프로젝트"
+
+vibe> intro.mp4 파일 추가해
+# → vibe timeline add-source intro.mp4
+
+vibe> 첫번째 클립 5초로 잘라줘
+# → vibe timeline trim clip-1 -d 5
+
+vibe> 모든 클립에 페이드인 효과 넣어줘
+# → vibe batch apply-effect fadeIn --all
+
+vibe> 영상 내보내기
+# → vibe export output.mp4
 ```
 
 ---
 
-## AI Commands Quick Reference
+## Two Ways to Use VibeFrame
 
-### Image Generation (Multi-Provider)
+### 1. CLI Mode (Direct Commands)
+
+터미널에서 직접 명령어 실행. 스크립팅과 자동화에 적합.
 
 ```bash
-# Gemini Imagen 3 (default) - High quality, fast
-vibe ai image "sunset over mountains" -o sunset.png
-
-# DALL-E - Best for creative/artistic images
-vibe ai image "sunset over mountains" -o sunset-dalle.png -p dalle
-
-# Stability AI - Best for photorealistic
-vibe ai image "sunset over mountains" -o sunset-stability.png -p stability
-
-# With aspect ratio
-vibe ai image "vertical phone wallpaper" -o wallpaper.png -r 9:16
+# 직접 명령어 실행
+vibe ai image "sunset" -o sunset.png
+vibe project create "my-video" -o project.vibe.json
+vibe export project.vibe.json -o output.mp4
 ```
 
-### Text-to-Speech & Sound Effects
+### 2. REPL Mode (Natural Language)
+
+대화형 모드. 자연어로 말하면 LLM이 명령어로 변환.
 
 ```bash
-# TTS with default voice
-vibe ai tts "Your narration text here" -o narration.mp3
+vibe  # REPL 시작
+```
 
-# List available voices
+```
+vibe> 일몰 이미지 만들어서 sunset.png로 저장해
+vibe> my-video라는 프로젝트 새로 만들어
+vibe> 영상 내보내기 해줘
+```
+
+---
+
+## AI Commands Reference
+
+### Image Generation
+
+**CLI Mode:**
+```bash
+# Gemini (기본값) - 빠르고 고품질
+vibe ai image "cute cat illustration" -o cat.png
+
+# 세로 비율 (9:16)
+vibe ai image "phone wallpaper, aurora" -o wallpaper.png -r 9:16
+
+# 가로 비율 (16:9)
+vibe ai image "cinematic landscape" -o landscape.png -r 16:9
+
+# DALL-E 사용
+vibe ai image "abstract art" -o art.png -p dalle
+
+# Stability AI 사용 (사실적인 이미지)
+vibe ai image "professional headshot" -o headshot.png -p stability
+```
+
+**REPL Mode:**
+```
+vibe> 고양이 일러스트 만들어줘
+vibe> 오로라 배경 세로 이미지 생성해서 wallpaper.png로 저장
+vibe> DALL-E로 추상화 그려줘
+```
+
+**기본값:**
+| 옵션 | 기본값 |
+|------|--------|
+| `--provider` | `gemini` |
+| `--ratio` | `1:1` |
+| `--size` (DALL-E) | `1024x1024` |
+
+---
+
+### Text-to-Speech (TTS)
+
+**CLI Mode:**
+```bash
+# 기본 음성 (Rachel)
+vibe ai tts "안녕하세요, 바이브프레임입니다." -o greeting.mp3
+
+# 음성 목록 확인
 vibe ai voices
 
-# TTS with specific voice (Bella - soft female)
-vibe ai tts "Hello world" -o hello.mp3 -v EXAVITQu4vr4xnSDxMaL
+# 특정 음성 사용 (Bella - 부드러운 여성)
+vibe ai tts "Welcome to our channel" -o intro.mp3 -v EXAVITQu4vr4xnSDxMaL
 
-# Sound effect generation
-vibe ai sfx "thunder crash" -o thunder.mp3 -d 3
-vibe ai sfx "typing on keyboard" -o typing.mp3 -d 5
-vibe ai sfx "cinematic boom impact" -o boom.mp3 -d 2
+# 긴 나레이션
+vibe ai tts "This is a longer narration for a video. It explains the product features in detail." -o narration.mp3
 ```
 
-### Video Generation
-
-```bash
-# Image-to-video with Runway (requires image input)
-vibe ai video "camera slowly zooming in" -i input.png -o output.mp4
-
-# Image-to-video with Kling
-vibe ai kling "dramatic zoom with particles" -i input.png -o output.mp4
-
-# Check video generation status
-vibe ai video-status <task-id>
+**REPL Mode:**
+```
+vibe> "안녕하세요" 음성으로 만들어줘
+vibe> 사용 가능한 음성 목록 보여줘
+vibe> Bella 목소리로 인트로 나레이션 만들어
 ```
 
-### Transcription
+**기본값:**
+| 옵션 | 기본값 |
+|------|--------|
+| `--voice` | `Rachel` (21m00Tcm4TlvDq8ikWAM) |
+| `--output` | `output.mp3` |
 
+---
+
+### Sound Effects (SFX)
+
+**CLI Mode:**
 ```bash
-# Transcribe audio to SRT subtitles
-vibe ai transcribe audio.mp3 -o subtitles.srt
+# 트랜지션 효과음
+vibe ai sfx "whoosh transition" -o whoosh.mp3 -d 2
 
-# Transcribe to VTT format
-vibe ai transcribe audio.mp3 -o subtitles.vtt
+# 알림음
+vibe ai sfx "notification ding" -o ding.mp3 -d 1
 
-# Transcribe with language hint
-vibe ai transcribe korean-audio.mp3 -o subtitles.srt -l ko
+# 환경음
+vibe ai sfx "rain on window" -o rain.mp3 -d 10
+
+# 임팩트 사운드
+vibe ai sfx "cinematic boom impact" -o boom.mp3 -d 3
+
+# 타이핑 소리
+vibe ai sfx "keyboard typing" -o typing.mp3 -d 5
+```
+
+**REPL Mode:**
+```
+vibe> 휙 하는 트랜지션 효과음 만들어줘
+vibe> 비 오는 소리 10초짜리 생성해
+vibe> 영화같은 임팩트 사운드 만들어
+```
+
+**기본값:**
+| 옵션 | 기본값 |
+|------|--------|
+| `--duration` | auto (AI가 결정) |
+| `--output` | `sound-effect.mp3` |
+
+---
+
+### Transcription (음성→자막)
+
+**CLI Mode:**
+```bash
+# SRT 자막 생성
+vibe ai transcribe interview.mp3 -o subtitles.srt
+
+# VTT 형식
+vibe ai transcribe podcast.mp3 -o subtitles.vtt
+
+# 한국어 힌트
+vibe ai transcribe korean-audio.mp3 -o subs.srt -l ko
+
+# 영어 힌트
+vibe ai transcribe english-audio.mp3 -o subs.srt -l en
+```
+
+**REPL Mode:**
+```
+vibe> interview.mp3 자막 만들어줘
+vibe> 팟캐스트 음성 VTT 형식으로 변환해
+vibe> 한국어 오디오 자막 추출해
 ```
 
 ---
 
-## Advanced AI Workflows
+### Video Generation (Image-to-Video)
 
-### 1. Script-to-Video Pipeline
-
-Generate a complete video from a text script using multiple AI providers.
-
+**CLI Mode:**
 ```bash
-# Basic: Generate storyboard + images only
-vibe ai script-to-video "A day in the life of a developer. Morning coffee. Coding session. Team meeting. Deploy to production." \
-  -o ./my-video/ \
+# Runway Gen-3 (기본)
+vibe ai video "camera slowly zooms in, cinematic" -i photo.png -o video.mp4
+
+# Kling AI
+vibe ai kling "dramatic lighting change" -i scene.png -o dramatic.mp4
+
+# 생성 상태 확인
+vibe ai video-status abc123
+
+# 생성 취소
+vibe ai video-cancel abc123
+```
+
+**REPL Mode:**
+```
+vibe> photo.png를 영상으로 만들어줘, 천천히 줌인하는 느낌으로
+vibe> Kling으로 드라마틱한 영상 생성해
+vibe> 영상 생성 상태 확인해줘
+```
+
+---
+
+## Advanced Workflows
+
+### 1. Script-to-Video (스크립트→영상)
+
+텍스트 스크립트를 이미지/영상으로 자동 변환.
+
+**CLI Mode:**
+```bash
+# 이미지만 생성 (빠른 테스트)
+vibe ai script-to-video "우주 탐험 이야기. 로켓 발사. 우주 비행사. 지구 전경." \
+  -o ./space-video/ \
   --images-only \
   --no-voiceover
 
-# With DALL-E images (default)
-vibe ai script-to-video "Space exploration journey. Rockets launch. Astronauts float. Earth from orbit." \
-  -o ./space-video/ \
+# Gemini 이미지 + 나레이션
+vibe ai script-to-video "제품 소개. 대시보드 화면. 리포트 생성. 가입 유도." \
+  -o ./demo/ \
+  --image-provider gemini
+
+# DALL-E 이미지 사용
+vibe ai script-to-video "판타지 세계. 마법의 숲. 용과 기사." \
+  -o ./fantasy/ \
   --image-provider dalle \
   --images-only
 
-# With Stability AI images
-vibe ai script-to-video "Cyberpunk city tour. Neon streets. Flying cars. Robot vendors." \
-  -o ./cyber-video/ \
+# Stability AI 이미지 (사실적)
+vibe ai script-to-video "요리 레시피. 재료 준비. 조리 과정. 완성된 요리." \
+  -o ./cooking/ \
   --image-provider stability \
   --images-only
+```
 
-# With Gemini images (fast, 2 credits each)
-vibe ai script-to-video "Nature documentary. Forest scenes. Wildlife. Sunset." \
-  -o ./nature-video/ \
-  --image-provider gemini \
-  --images-only
-
-# Full pipeline with voiceover (requires ElevenLabs)
-vibe ai script-to-video "Welcome to our product demo. Feature one. Feature two. Call to action." \
-  -o ./demo-video/ \
-  --image-provider gemini \
-  -v EXAVITQu4vr4xnSDxMaL
+**REPL Mode:**
+```
+vibe> "우주 탐험 이야기" 스크립트로 영상 만들어줘
+vibe> 제품 소개 스크립트를 Gemini 이미지로 생성해
+vibe> 요리 레시피 영상 만들어줘, 사실적인 이미지로
 ```
 
 **Output:**
-- `storyboard.json` - Scene breakdown
-- `scene-1.png`, `scene-2.png`, ... - Generated images
-- `voiceover.mp3` - TTS narration (if enabled)
-- `project.vibe.json` - VibeFrame project file
-
-### 2. Video Highlights Extraction
-
-Extract the best moments from long-form video content.
-
-```bash
-# Traditional method (Whisper + Claude, audio-only)
-vibe ai highlights video.mp4 -o highlights.json
-
-# Gemini Video Understanding (visual + audio analysis)
-vibe ai highlights video.mp4 -o highlights.json --use-gemini
-
-# With options
-vibe ai highlights video.mp4 \
-  -o highlights.json \
-  --use-gemini \
-  --criteria emotional \
-  -n 5 \
-  -t 0.8
-
-# Create project from highlights
-vibe ai highlights video.mp4 \
-  -o highlights.json \
-  -p highlight-reel.vibe.json \
-  --use-gemini
+```
+./space-video/
+├── storyboard.json      # 씬 구성
+├── scene-1.png          # 로켓 발사
+├── scene-2.png          # 우주 비행사
+├── scene-3.png          # 지구 전경
+├── voiceover.mp3        # 나레이션 (옵션)
+└── project.vibe.json    # 프로젝트 파일
 ```
 
-**Options:**
-- `--use-gemini` - Use Gemini Video Understanding (analyzes visuals + audio)
-- `--low-res` - Low resolution mode for longer videos (Gemini only)
-- `--criteria` - `emotional`, `informative`, `funny`, or `all`
-- `-n, --count` - Maximum number of highlights
-- `-t, --threshold` - Confidence threshold (0-1)
-- `-d, --duration` - Target total duration in seconds
+---
 
-### 3. Auto-Generate Shorts
+### 2. Highlights Extraction (하이라이트 추출)
 
-Automatically create short-form content from long videos.
+긴 영상에서 베스트 장면 자동 추출.
 
+**CLI Mode:**
 ```bash
-# Analyze only (preview without generating)
-vibe ai auto-shorts video.mp4 \
-  -n 3 \
-  --analyze-only \
-  --use-gemini
+# 기본 (Whisper + Claude, 오디오 분석)
+vibe ai highlights lecture.mp4 -o highlights.json
 
-# Generate 3 shorts (9:16 aspect ratio)
-vibe ai auto-shorts video.mp4 \
+# Gemini Video (시각 + 오디오 분석) - 권장
+vibe ai highlights lecture.mp4 -o highlights.json --use-gemini
+
+# 감정적인 순간만
+vibe ai highlights wedding.mp4 -o highlights.json --use-gemini --criteria emotional
+
+# 정보성 순간만
+vibe ai highlights tutorial.mp4 -o highlights.json --use-gemini --criteria informative
+
+# 웃긴 순간만
+vibe ai highlights comedy.mp4 -o highlights.json --use-gemini --criteria funny
+
+# 최대 5개, 신뢰도 80% 이상
+vibe ai highlights video.mp4 -o highlights.json --use-gemini -n 5 -t 0.8
+
+# 60초 하이라이트 릴 목표
+vibe ai highlights video.mp4 -o highlights.json --use-gemini -d 60
+
+# 긴 영상 (저해상도 모드)
+vibe ai highlights long-video.mp4 -o highlights.json --use-gemini --low-res
+
+# 프로젝트 파일로 생성
+vibe ai highlights event.mp4 -o hl.json -p highlight-reel.vibe.json --use-gemini
+```
+
+**REPL Mode:**
+```
+vibe> 강의 영상에서 하이라이트 추출해줘
+vibe> 결혼식 영상에서 감동적인 순간들 찾아줘
+vibe> 튜토리얼에서 중요한 부분만 뽑아줘
+vibe> 이 영상에서 웃긴 순간 5개 찾아줘
+```
+
+**Output (highlights.json):**
+```json
+{
+  "sourceFile": "lecture.mp4",
+  "totalDuration": 3600,
+  "highlights": [
+    {
+      "startTime": 120.5,
+      "endTime": 145.2,
+      "duration": 24.7,
+      "category": "informative",
+      "confidence": 0.95,
+      "reason": "핵심 개념 설명",
+      "transcript": "이 부분이 가장 중요합니다..."
+    }
+  ]
+}
+```
+
+---
+
+### 3. Auto-Shorts (자동 숏폼 생성)
+
+긴 영상을 TikTok/Reels/Shorts용 클립으로 자동 변환.
+
+**CLI Mode:**
+```bash
+# 분석만 (미리보기)
+vibe ai auto-shorts podcast.mp4 -n 5 --analyze-only --use-gemini
+
+# TikTok/Reels용 (9:16)
+vibe ai auto-shorts podcast.mp4 \
   -n 3 \
   -d 30 \
   --output-dir ./shorts/ \
   --use-gemini \
   -a 9:16
 
-# Generate square shorts for Instagram
-vibe ai auto-shorts video.mp4 \
-  -n 2 \
+# YouTube Shorts용 (60초)
+vibe ai auto-shorts interview.mp4 \
+  -n 5 \
   -d 60 \
-  --output-dir ./shorts/ \
+  --output-dir ./yt-shorts/ \
+  --use-gemini \
+  -a 9:16
+
+# Instagram 정사각형
+vibe ai auto-shorts vlog.mp4 \
+  -n 3 \
+  -d 45 \
+  --output-dir ./insta/ \
   --use-gemini \
   -a 1:1
+
+# 긴 영상 (저해상도 모드)
+vibe ai auto-shorts webinar.mp4 \
+  -n 5 \
+  --output-dir ./clips/ \
+  --use-gemini \
+  --low-res
+```
+
+**REPL Mode:**
+```
+vibe> 팟캐스트에서 숏폼 3개 만들어줘
+vibe> 인터뷰 영상 틱톡용으로 잘라줘
+vibe> 브이로그에서 인스타 정사각형 클립 만들어
+vibe> 이 영상에서 바이럴 될만한 순간 찾아줘
 ```
 
 **Output:**
-- `video-short-1.mp4` - First short (cropped to aspect ratio)
-- `video-short-2.mp4` - Second short
-- ...
-
-### 4. Gemini Video Analysis
-
-Analyze and understand video content using Gemini.
-
-```bash
-# Summarize a video
-vibe ai gemini-video video.mp4 "Summarize this video in 3 bullet points"
-
-# Extract key events with timestamps
-vibe ai gemini-video video.mp4 "List all key events with timestamps"
-
-# Answer questions about video
-vibe ai gemini-video video.mp4 "What products are shown in this video?"
-
-# Analyze YouTube video (URL)
-vibe ai gemini-video "https://www.youtube.com/watch?v=VIDEO_ID" "What is the main topic?"
-
-# Custom frame rate for action videos
-vibe ai gemini-video action.mp4 "Describe the movements" --fps 5
-
-# Analyze specific segment
-vibe ai gemini-video long-video.mp4 "What happens here?" --start 60 --end 120
 ```
+./shorts/
+├── podcast-short-1.mp4   # 608x1080 (9:16), 30초
+├── podcast-short-2.mp4   # 608x1080 (9:16), 28초
+└── podcast-short-3.mp4   # 608x1080 (9:16), 32초
+```
+
+---
+
+### 4. Gemini Video Analysis (비디오 분석)
+
+Gemini로 비디오 내용 분석 및 Q&A.
+
+**CLI Mode:**
+```bash
+# 요약
+vibe ai gemini-video video.mp4 "이 영상을 3줄로 요약해줘"
+
+# 타임스탬프 추출
+vibe ai gemini-video tutorial.mp4 "주요 단계별 타임스탬프 알려줘"
+
+# 질문 답변
+vibe ai gemini-video product.mp4 "이 영상에 나오는 제품 이름이 뭐야?"
+
+# YouTube URL 분석
+vibe ai gemini-video "https://youtube.com/watch?v=xxx" "영상 주제가 뭐야?"
+
+# 액션 영상 (높은 FPS)
+vibe ai gemini-video sports.mp4 "득점 장면 찾아줘" --fps 5
+
+# 특정 구간 분석
+vibe ai gemini-video movie.mp4 "이 장면에서 무슨 일이 일어나?" --start 60 --end 120
+
+# 긴 영상 (저해상도)
+vibe ai gemini-video lecture.mp4 "강의 목차 만들어줘" --low-res
+```
+
+**REPL Mode:**
+```
+vibe> 이 영상 요약해줘
+vibe> 튜토리얼 타임스탬프 뽑아줘
+vibe> 영상에 나오는 제품이 뭐야?
+vibe> 유튜브 영상 분석해줘
+vibe> 60초부터 2분까지 무슨 내용이야?
+```
+
+---
+
+## Image Editing (Stability AI)
+
+**CLI Mode:**
+```bash
+# 업스케일 (4배)
+vibe ai sd-upscale small.png -o large.png -s 4
+
+# 배경 제거
+vibe ai sd-remove-bg photo.png -o no-bg.png
+
+# 이미지 변환
+vibe ai sd-img2img photo.png "수채화 스타일로 변환" -o watercolor.png
+vibe ai sd-img2img photo.png "사이버펑크 스타일" -o cyberpunk.png
+vibe ai sd-img2img photo.png "애니메이션 스타일" -o anime.png
+
+# 객체 교체
+vibe ai sd-replace photo.png "자동차" "오토바이" -o replaced.png
+vibe ai sd-replace room.png "의자" "소파" -o new-room.png
+
+# 아웃페인팅 (이미지 확장)
+vibe ai sd-outpaint photo.png --left 200 --right 200 -o wider.png
+vibe ai sd-outpaint portrait.png --up 100 --down 100 -o taller.png
+```
+
+**REPL Mode:**
+```
+vibe> 이미지 4배 업스케일해줘
+vibe> 사진 배경 제거해줘
+vibe> 이 사진 수채화 스타일로 바꿔줘
+vibe> 사진에서 자동차를 오토바이로 바꿔
+vibe> 이미지 좌우로 넓혀줘
+```
+
+---
+
+## Project Management
+
+### Creating Projects
+
+**CLI Mode:**
+```bash
+vibe project create "My Video" -o project.vibe.json
+vibe project info project.vibe.json
+vibe project set project.vibe.json --name "New Name"
+```
+
+**REPL Mode:**
+```
+vibe> 새 프로젝트 만들어줘
+vibe> 프로젝트 정보 보여줘
+vibe> 프로젝트 이름 바꿔줘
+```
+
+### Timeline Operations
+
+**CLI Mode:**
+```bash
+# 소스 추가
+vibe timeline add-source project.vibe.json intro.mp4 -d 30
+
+# 클립 추가
+vibe timeline add-clip project.vibe.json source-1 -s 0 -d 10
+
+# 이펙트 추가
+vibe timeline add-effect project.vibe.json clip-1 fadeIn -d 1
+
+# 타임라인 보기
+vibe timeline list project.vibe.json
+
+# 클립 트림
+vibe timeline trim project.vibe.json clip-1 -d 5
+
+# 클립 분할
+vibe timeline split project.vibe.json clip-1 -t 3
+
+# 클립 삭제
+vibe timeline delete project.vibe.json clip-1
+```
+
+**REPL Mode:**
+```
+vibe> intro.mp4 추가해
+vibe> 첫번째 소스로 10초 클립 만들어
+vibe> clip-1에 페이드인 넣어줘
+vibe> 타임라인 보여줘
+vibe> 첫번째 클립 5초로 줄여줘
+vibe> 클립을 3초 지점에서 나눠줘
+vibe> 마지막 클립 삭제해
+```
+
+### Batch Operations
+
+**CLI Mode:**
+```bash
+vibe batch import project.vibe.json ./videos/ --filter ".mp4"
+vibe batch concat project.vibe.json --all
+vibe batch apply-effect project.vibe.json fadeIn --all
+```
+
+**REPL Mode:**
+```
+vibe> videos 폴더의 mp4 파일 다 가져와
+vibe> 모든 클립 연결해
+vibe> 전체 클립에 페이드인 적용해
+```
+
+### Export
+
+**CLI Mode:**
+```bash
+vibe export project.vibe.json -o output.mp4 -p standard
+vibe export project.vibe.json -o output.mp4 -p high -y
+```
+
+**REPL Mode:**
+```
+vibe> 영상 내보내기
+vibe> 고화질로 내보내줘
+vibe> output.mp4로 저장해
+```
+
+**Presets:**
+| Preset | Resolution |
+|--------|------------|
+| `draft` | 360p |
+| `standard` | 720p |
+| `high` | 1080p |
+| `ultra` | 4K |
 
 ---
 
 ## Complete Workflow Examples
 
-### Example A: YouTube Shorts from Podcast
-
-Convert a podcast episode into viral short clips.
+### Example A: 팟캐스트 → 숏폼 클립
 
 ```bash
-# 1. Create output directory
+# 1. 폴더 생성
 mkdir podcast-shorts && cd podcast-shorts
 
-# 2. Analyze and generate shorts with Gemini
-vibe ai auto-shorts ../podcast-episode.mp4 \
+# 2. 분석 (미리보기)
+vibe ai auto-shorts ../podcast.mp4 -n 5 --analyze-only --use-gemini
+
+# 3. 숏폼 생성
+vibe ai auto-shorts ../podcast.mp4 \
   -n 5 \
   -d 45 \
   --output-dir ./ \
   --use-gemini \
   -a 9:16
 
-# 3. Check generated files
+# 4. 결과 확인
 ls -la
-# podcast-episode-short-1.mp4
-# podcast-episode-short-2.mp4
-# ...
 ```
 
-### Example B: Product Demo Video
+**REPL로 하기:**
+```
+vibe> podcast.mp4에서 바이럴 될만한 순간 5개 찾아줘
+vibe> 찾은 순간들 틱톡용 세로 영상으로 만들어줘
+```
 
-Create a product demo from a script.
+### Example B: 스크립트 → 제품 데모
 
 ```bash
-# 1. Create project directory
-mkdir product-demo && cd product-demo
+# 1. 폴더 생성
+mkdir demo && cd demo
 
-# 2. Generate video assets from script
-vibe ai script-to-video "Introducing our new app. \
-Simple dashboard for tracking metrics. \
-One-click reports. \
-Export to PDF or Excel. \
-Start your free trial today." \
+# 2. 스크립트로 이미지 생성
+vibe ai script-to-video "제품 소개. 대시보드. 리포트. 가입 유도." \
   -o ./ \
   --image-provider gemini \
   --images-only
 
-# 3. Add narration
-vibe ai tts "Introducing our new app. A simple dashboard for tracking all your metrics. Generate reports with one click. Export to PDF or Excel instantly. Start your free trial today." \
+# 3. 나레이션 추가
+vibe ai tts "새로운 대시보드를 소개합니다. 한눈에 모든 데이터를 확인하세요." \
   -o narration.mp3
 
-# 4. Add background music
-vibe ai sfx "upbeat corporate background music" -o bgm.mp3 -d 30
+# 4. 배경음악 추가
+vibe ai sfx "upbeat corporate music" -o bgm.mp3 -d 30
 
-# 5. Check generated assets
+# 5. 결과 확인
 ls -la
-# storyboard.json
-# scene-1.png, scene-2.png, ...
-# narration.mp3
-# bgm.mp3
-# project.vibe.json
 ```
 
-### Example C: Highlight Reel from Event
+**REPL로 하기:**
+```
+vibe> "제품 소개 영상" 스크립트로 이미지 만들어줘
+vibe> 나레이션 음성 생성해줘
+vibe> 배경음악 만들어줘
+```
 
-Create a highlight reel from event footage.
+### Example C: 이벤트 → 하이라이트 릴
 
 ```bash
-# 1. Analyze video for highlights
-vibe ai highlights event-footage.mp4 \
+# 1. 하이라이트 추출
+vibe ai highlights event.mp4 \
   -o highlights.json \
-  -p highlight-project.vibe.json \
+  -p reel.vibe.json \
   --use-gemini \
   --criteria emotional \
   -d 120
 
-# 2. View generated project
-vibe project info highlight-project.vibe.json
+# 2. 프로젝트 확인
+vibe project info reel.vibe.json
 
-# 3. Export final video
-vibe export highlight-project.vibe.json -o highlight-reel.mp4
+# 3. 내보내기
+vibe export reel.vibe.json -o highlight-reel.mp4 -p high
 ```
 
----
-
-## Image Editing with Stability AI
-
-```bash
-# Upscale image (4x)
-vibe ai sd-upscale input.png -o upscaled.png -s 4
-
-# Remove background
-vibe ai sd-remove-bg photo.png -o no-bg.png
-
-# Image-to-image transformation
-vibe ai sd-img2img photo.png "make it look like a watercolor painting" -o watercolor.png
-
-# Replace objects
-vibe ai sd-replace photo.png "car" "motorcycle" -o replaced.png
-
-# Outpaint (extend image)
-vibe ai sd-outpaint photo.png --left 200 --right 200 -o wider.png
+**REPL로 하기:**
 ```
-
----
-
-## Project Commands
-
-### Creating and Managing Projects
-
-```bash
-# Create new project
-vibe project create "My Video" -o project.vibe.json
-
-# View project info
-vibe project info project.vibe.json
-
-# Rename project
-vibe project set project.vibe.json --name "New Name"
-```
-
-### Timeline Operations
-
-```bash
-# Add media source
-vibe timeline add-source project.vibe.json video.mp4 -d 30
-
-# Add clip to timeline
-vibe timeline add-clip project.vibe.json source-1 -s 0 -d 10
-
-# Add effect to clip
-vibe timeline add-effect project.vibe.json clip-1 fadeIn -d 1
-
-# List timeline contents
-vibe timeline list project.vibe.json
-
-# Trim clip
-vibe timeline trim project.vibe.json clip-1 -d 5
-
-# Split clip at timestamp
-vibe timeline split project.vibe.json clip-1 -t 3
-
-# Delete clip
-vibe timeline delete project.vibe.json clip-1
-```
-
-### Batch Operations
-
-```bash
-# Import all MP4 files from directory
-vibe batch import project.vibe.json ./videos/ --filter ".mp4"
-
-# Concatenate all clips
-vibe batch concat project.vibe.json --all
-
-# Apply effect to all clips
-vibe batch apply-effect project.vibe.json fadeIn --all
-```
-
-### Export
-
-```bash
-# Export with preset
-vibe export project.vibe.json -o output.mp4 -p standard
-
-# Presets: draft (360p), standard (720p), high (1080p), ultra (4K)
-
-# Export with auto-confirm
-vibe export project.vibe.json -o output.mp4 -p high -y
-```
-
----
-
-## Interactive REPL Mode
-
-Start interactive mode for conversational editing:
-
-```bash
-vibe
-```
-
-**Available Commands:**
-
-| Command | Description |
-|---------|-------------|
-| `new <name>` | Create new project |
-| `open <path>` | Open project file |
-| `save [path]` | Save current project |
-| `info` | Show project information |
-| `list` | List timeline contents |
-| `add <file>` | Add media source |
-| `undo` | Undo last action |
-| `export [path]` | Render video |
-| `help` | Show help |
-| `exit` | Exit REPL |
-
-**Natural Language Examples:**
-
-```
-vibe> "Add intro.mp4 to the timeline"
-vibe> "Trim the first clip to 5 seconds"
-vibe> "Add fade in effect to all clips"
-vibe> "Split the clip at 3 seconds"
-vibe> "Delete the last clip"
+vibe> event.mp4에서 감동적인 순간들 찾아서 2분짜리 하이라이트 만들어줘
+vibe> 프로젝트 정보 보여줘
+vibe> 고화질로 내보내기 해줘
 ```
 
 ---
 
 ## Configuration
 
-### Config File
+### Config File Location
+```
+~/.vibeframe/config.yaml
+```
 
-Location: `~/.vibeframe/config.yaml`
-
+### Example Configuration
 ```yaml
 version: "1.0.0"
 llm:
-  provider: ollama          # claude, openai, gemini, ollama
+  provider: claude          # claude, openai, gemini, ollama
 providers:
-  anthropic: sk-ant-...     # For Claude
-  openai: sk-...            # For GPT-4, Whisper, DALL-E
-  google: AIza...           # For Gemini
-  elevenlabs: ...           # For TTS, SFX
-  stability: sk-...         # For Stable Diffusion
-  runway: ...               # For video generation
-  kling: ...                # For video generation
+  anthropic: sk-ant-...     # Claude
+  openai: sk-...            # GPT, Whisper, DALL-E
+  google: AIza...           # Gemini
+  elevenlabs: ...           # TTS, SFX
+  stability: sk-...         # Stable Diffusion
+  runway: ...               # Video generation
+  kling: ...                # Video generation
 defaults:
   aspectRatio: "16:9"
   exportQuality: standard
 ```
 
 ### Environment Variables
-
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-export GOOGLE_API_KEY="AIza..."
-export ELEVENLABS_API_KEY="..."
-export STABILITY_API_KEY="sk-..."
-export RUNWAY_API_SECRET="..."
-export KLING_API_KEY="..."
-export REPLICATE_API_TOKEN="..."
+export GOOGLE_API_KEY="AIza..."          # Gemini (image, video analysis)
+export ELEVENLABS_API_KEY="..."          # TTS, SFX
+export ANTHROPIC_API_KEY="sk-ant-..."    # Claude
+export OPENAI_API_KEY="sk-..."           # Whisper, DALL-E
+export STABILITY_API_KEY="sk-..."        # Stable Diffusion
+export RUNWAY_API_SECRET="..."           # Runway
+export KLING_API_KEY="..."               # Kling
 ```
 
 ---
@@ -535,47 +748,38 @@ export REPLICATE_API_TOKEN="..."
 ## Troubleshooting
 
 ### "Command not found: vibe"
-
 ```bash
-# Reinstall
 curl -fsSL https://raw.githubusercontent.com/vericontext/vibeframe/main/scripts/install.sh | bash
-
-# Or add to PATH manually
-export PATH="$HOME/.vibeframe/packages/cli/dist:$PATH"
 ```
 
 ### "FFmpeg not found"
-
 ```bash
 # macOS
 brew install ffmpeg
 
 # Ubuntu/Debian
 sudo apt install ffmpeg
-
-# Windows
-winget install ffmpeg
 ```
 
 ### "API key invalid"
-
-1. Verify your API key is correct
-2. Check if the key has required permissions
-3. Run `vibe setup` to re-enter the key
-
-### Video analysis fails with large files
-
-Use `--low-res` flag for videos longer than 30 minutes:
-
 ```bash
-vibe ai highlights long-video.mp4 --use-gemini --low-res
+vibe setup  # 다시 설정
+```
+
+### Video analysis fails (large files)
+```bash
+vibe ai highlights video.mp4 --use-gemini --low-res
 ```
 
 ---
 
 ## Getting Help
 
-- **In-app:** `vibe --help` or `vibe ai --help`
-- **REPL:** `vibe` then `help`
+```bash
+vibe --help              # 전체 명령어
+vibe ai --help           # AI 명령어
+vibe ai image --help     # 특정 명령어
+```
+
 - **GitHub:** https://github.com/vericontext/vibeframe
 - **Issues:** https://github.com/vericontext/vibeframe/issues
