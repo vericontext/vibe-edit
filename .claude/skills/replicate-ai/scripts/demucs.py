@@ -68,10 +68,10 @@ def separate_audio(
 
     url = "https://api.replicate.com/v1/predictions"
 
-    # Using Demucs model
-    # cjwbw/demucs or similar
+    # Using cjwbw/demucs model
+    # https://replicate.com/cjwbw/demucs
     payload = {
-        "version": "25a173108cff36ef9f80f854c162d01df9e6528be175794b81b7a0f3b7c92d0f",
+        "version": "25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953",
         "input": {
             "audio": source,
         }

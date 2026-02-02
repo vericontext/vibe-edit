@@ -18,7 +18,8 @@ import urllib.error
 
 
 BASE_URL = "https://api.replicate.com/v1"
-MODEL_VERSION = "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b"  # Real-ESRGAN
+# nightmareai/real-esrgan - https://replicate.com/nightmareai/real-esrgan
+MODEL_VERSION = "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8"
 POLL_INTERVAL = 2
 MAX_WAIT = 300
 

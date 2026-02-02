@@ -68,13 +68,13 @@ def interpolate_video_from_url(
 
     url = "https://api.replicate.com/v1/predictions"
 
-    # Using pollinations/rife-video-interpolation model
-    # Note: Model version may change, check Replicate for latest
+    # Using zsxkib/film-frame-interpolation-for-large-motion model
+    # https://replicate.com/zsxkib/film-frame-interpolation-for-large-motion
     payload = {
-        "version": "0b8a6b27f9a04b788d7f0c85d7f59fbfda8f1a8ba6ff75a1c5c7a6d7e5fd2a4d",  # Placeholder - check Replicate
+        "version": "222d67420da179935a68afff47093bab48705fe9e09c3c79268c1eb2ee7c5e91",
         "input": {
-            "video": video_url,
-            "multiplier": multiplier,
+            "mp4": video_url,
+            "fps_multiplier": multiplier,
         }
     }
 

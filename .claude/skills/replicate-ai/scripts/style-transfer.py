@@ -56,14 +56,14 @@ def style_transfer(
 
     url = "https://api.replicate.com/v1/predictions"
 
-    # Using a neural style transfer model
-    # Note: Model version may change, check Replicate for latest
+    # Using nkolkin13/neuralneighborstyletransfer model
+    # https://replicate.com/nkolkin13/neuralneighborstyletransfer
     payload = {
-        "version": "7f178b5b60c5a22097f1f3c5ba7ee4e71b5e3c6d8c5f5d9f1f2f3f4f5f6f7f8f9",  # Placeholder
+        "version": "bdeef1dec06f904a113feb7aca86a94ba31ed3c51c2cbdcfe66725597b3dcceb",
         "input": {
             "content": content_url,
             "style": style_url,
-            "style_weight": style_strength,
+            "output_size": 512,
         }
     }
 

@@ -38,12 +38,12 @@ def upscale_video(
 
     url = "https://api.replicate.com/v1/predictions"
 
-    # Using Real-ESRGAN video upscaling model
-    # Note: Check Replicate for the latest video upscaling model
+    # Using lucataco/real-esrgan-video model
+    # https://replicate.com/lucataco/real-esrgan-video
     payload = {
-        "version": "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
+        "version": "3e56ce4b57863bd03048b42bc09bdd4db20d427cca5fde9d8ae4dc60e1bb4775",
         "input": {
-            "video": video_url,
+            "video_path": video_url,
             "scale": scale,
             "face_enhance": face_enhance,
         }
