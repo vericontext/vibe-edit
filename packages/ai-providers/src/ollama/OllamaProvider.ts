@@ -20,7 +20,7 @@ export class OllamaProvider implements AIProvider {
   isAvailable = true;
 
   private baseUrl = "http://localhost:11434";
-  private model = "mistral"; // Default model, can be changed to phi (1.6GB) or tinyllama (0.6GB)
+  private model = "llama3.2"; // Default model, alternatives: mistral (4GB), phi (1.6GB), tinyllama (0.6GB)
 
   async initialize(config: ProviderConfig): Promise<void> {
     if (config.baseUrl) {
