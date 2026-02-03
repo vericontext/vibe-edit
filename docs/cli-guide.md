@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/vericontext/vibeframe/main/scripts/
 
 ```bash
 vibe --version
-# Expected: 0.1.0
+# Expected: 0.2.x
 
 vibe --help
 # Shows all available commands
@@ -103,13 +103,13 @@ vibe> create a new project called my-video
 ✓ Created project: my-video
 
 vibe [my-video]> generate an image of a sunset landscape
-✓ Image saved: sunset.png
+✓ Image saved: a-sunset-landscape.png
 
 vibe [my-video]> create a welcome audio message
 ✓ Audio saved: welcome.mp3
 
-vibe [my-video]> add sunset.png to the project
-✓ Added source: sunset.png (source-1)
+vibe [my-video]> add a-sunset-landscape.png to the project
+✓ Added source: a-sunset-landscape.png (source-1)
 
 vibe [my-video]> add fade-in effect to the clip
 ✓ Added fadeIn effect to clip-1
@@ -169,6 +169,10 @@ vibe> export output.mp4
 | `undo` | Undo last action |
 | `help` | Show help |
 | `exit` | Exit REPL |
+
+> **Note:** IDs shown as `source-1`, `clip-1` are simplified for readability.
+> Actual IDs are timestamp-based (e.g., `1770107336723-8jfmo7kvu`).
+> Use `list` or `info` commands to see real IDs.
 
 ---
 

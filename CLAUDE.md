@@ -103,6 +103,30 @@ After completing any feature, fix, or significant change, **always update**:
 
 2. **docs/roadmap.md** - Mark completed items with `[x]` and update CLI status section if new commands were added.
 
+## Documentation Consistency Rules
+
+When writing or updating documentation (especially `docs/cli-guide.md`):
+
+1. **Filename Consistency**: If an example generates a file, subsequent examples must use the SAME filename
+   - Bad: `generate image` → `sunset.png`, then `add a-sunset-landscape.png`
+   - Good: `generate image` → `sunset.png`, then `add sunset.png`
+
+2. **Version Numbers**: Use `0.2.x` format instead of exact versions to reduce maintenance
+
+3. **ID Examples**: When showing IDs like `source-1`, `clip-1`:
+   - Add a note that these are simplified examples
+   - Real IDs are timestamp-based: `1770107336723-xxxxxxxx`
+
+4. **Test Examples**: Before documenting a workflow, actually run it to verify:
+   - Commands work as shown
+   - Output messages match
+   - File names are consistent throughout
+
+5. **Cross-Reference**: When updating CLI commands, also update:
+   - `docs/cli-guide.md` - User-facing documentation
+   - `docs/roadmap.md` - Feature status
+   - Command `--help` text
+
 Format for progress.md entries:
 ```markdown
 ## YYYY-MM-DD
