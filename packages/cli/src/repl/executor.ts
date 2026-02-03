@@ -727,7 +727,7 @@ async function executeNaturalLanguageCommand(
       case "tts": {
         const text = String(intent.params.text || intent.params.prompt || "Hello");
         spinner.text = `Generating audio: "${text.slice(0, 30)}..."`;
-        const outputFile = String(intent.params.outputFile || "output.mp3");
+        const outputFile = String(intent.params.outputFile || `${text.split(/\s+/).slice(0, 4).join("-").toLowerCase().replace(/[^a-z0-9-]/g, "")}.mp3`);
         spinner.stop();
         return await generateTTS(text, outputFile);
       }
@@ -735,7 +735,7 @@ async function executeNaturalLanguageCommand(
       case "sfx": {
         const prompt = String(intent.params.prompt || input);
         spinner.text = `Generating sound effect: "${prompt}"...`;
-        const outputFile = String(intent.params.outputFile || "sound-effect.mp3");
+        const outputFile = String(intent.params.outputFile || `${prompt.split(/\s+/).slice(0, 3).join("-").toLowerCase().replace(/[^a-z0-9-]/g, "")}-sfx.mp3`);
         spinner.stop();
         return await generateSFX(prompt, outputFile);
       }
