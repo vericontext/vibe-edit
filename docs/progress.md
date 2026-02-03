@@ -6,6 +6,41 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: CLI Version Hardcoding and Image Track Mismatch
+Fixed two bugs discovered during cli-guide.md workflow testing.
+
+**Problem 1: Version Hardcoding**
+- `vibe --version` showed `0.1.0` instead of actual version `0.2.1`
+- Version was hardcoded in `index.ts` instead of reading from package.json
+
+**Problem 2: Image Track Mismatch**
+- CLI `add-clip` command failed for images: "No image track found"
+- CLI used `source.type` directly ("image"), but default tracks are "video" and "audio"
+- REPL correctly mapped images → video track, but CLI didn't
+
+**Solution:**
+1. Version now reads from package.json using `createRequire`
+2. `add-clip` now maps source types: `source.type === "audio" ? "audio" : "video"`
+
+**Files Modified:**
+- `packages/cli/src/index.ts` - Import package.json, use `pkg.version`
+- `packages/cli/src/commands/timeline.ts` - Fix track type mapping for images
+
+**Verification:**
+```bash
+# Version fix
+pnpm vibe --version
+# Expected: 0.2.1 (matches package.json)
+
+# Image track fix
+pnpm vibe project create test -o /tmp/test.vibe.json
+pnpm vibe timeline add-source /tmp/test.vibe.json image.png
+pnpm vibe timeline add-clip /tmp/test.vibe.json <source-id> -d 5
+# Expected: Clip added to video-track-1 (no error)
+```
+
+---
+
 ### Docs: CLI Guide Inconsistencies and Documentation Guidelines
 Fixed several documentation inconsistencies in cli-guide.md and added documentation guidelines to CLAUDE.md.
 
