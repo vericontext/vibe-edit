@@ -77,12 +77,13 @@ timelineCommand
         process.exit(1);
       }
 
-      // Find track
+      // Find track (images use video track, like REPL does)
       let trackId = options.track;
       if (!trackId) {
-        const tracks = project.getTracksByType(source.type);
+        const trackType = source.type === "audio" ? "audio" : "video";
+        const tracks = project.getTracksByType(trackType);
         if (tracks.length === 0) {
-          spinner.fail(chalk.red(`No ${source.type} track found. Create one first.`));
+          spinner.fail(chalk.red(`No ${trackType} track found. Create one first.`));
           process.exit(1);
         }
         trackId = tracks[0].id;

@@ -6,6 +6,10 @@ if (process.env.VIBE_DEBUG === "1") {
 }
 
 import { Command } from "commander";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json");
 
 // Re-export engine for library usage
 export { Project, generateId, type ProjectFile } from "./engine/index.js";
@@ -28,7 +32,7 @@ const program = new Command();
 program
   .name("vibe")
   .description("VibeFrame CLI - AI-First Video Editor")
-  .version("0.1.0");
+  .version(pkg.version);
 
 program.addCommand(projectCommand);
 program.addCommand(timelineCommand);
