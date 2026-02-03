@@ -804,6 +804,41 @@ vibe> save as output.mp4
 | `high` | 1080p |
 | `ultra` | 4K |
 
+### Auto-Detection
+
+Detect scenes, silence, and beats in media files for automated editing.
+
+**CLI Mode:**
+```bash
+# Scene detection (finds cut points in video)
+vibe detect scenes video.mp4
+vibe detect scenes video.mp4 -o scenes.json      # Save to JSON
+vibe detect scenes video.mp4 -t 0.3              # Sensitivity (0-1)
+
+# Silence detection (finds quiet moments)
+vibe detect silence video.mp4
+vibe detect silence podcast.mp3 -d 0.5           # Min silence duration
+vibe detect silence video.mp4 -n -30             # Noise threshold (dB)
+
+# Beat detection (finds music beats for sync)
+vibe detect beats music.mp3
+vibe detect beats song.mp3 -o beats.json         # Save to JSON
+```
+
+**Output Example (scenes):**
+```
+Scene Timestamps
+────────────────────────────────────────────────────────────
+[1] 00:00.00 - 00:05.00 (5.0s)
+[2] 00:05.00 - 00:12.30 (7.3s)
+[3] 00:12.30 - 00:18.00 (5.7s)
+```
+
+**Use Cases:**
+- Auto-split long videos at scene changes
+- Remove silence from podcasts/interviews
+- Sync video cuts to music beats
+
 ---
 
 ## Complete Workflow Examples
