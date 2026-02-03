@@ -6,6 +6,66 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: Export Mixed Resolution Videos with Scale Filter
+Fixed export failing when video clips have different resolutions (common with AI-generated images).
+
+**Problem:** Running `vibe export ./cooking/ -o final.mp4` failed with:
+```
+Input link parameters (size 1280x768) do not match output (1344x768)
+Error reinitializing filters!
+```
+
+AI image providers (Stability, Gemini, DALL-E) generate images with varying resolutions. FFmpeg `concat` requires all inputs to have identical dimensions.
+
+**Solution:** Added scale + pad filters to normalize all video clips:
+```
+scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:(ow-iw)/2:(oh-ih)/2,setsar=1
+```
+- Scales to target resolution while preserving aspect ratio
+- Adds letterboxing/pillarboxing as needed
+- Sets SAR to 1 for consistent playback
+
+**Also fixed:** Only explicit audio sources are used (voiceover.mp3), ignoring embedded video audio to prevent concat conflicts.
+
+**Files Modified:**
+- `packages/cli/src/commands/export.ts` - Added scale filter, fixed audio clip filtering
+
+**Verification:**
+```bash
+vibe ai script-to-video "Cooking recipe..." -o ./cooking/ --image-provider stability
+vibe export ./cooking/ -o final.mp4
+# ✔ Exported: final.mp4 (3.2MB, 45s, 1280x720)
+```
+
+---
+
+### Fix: Directory Path Support in Project Commands
+Fixed `vibe project info` and `vibe export` failing with EISDIR error when given directory paths.
+
+**Problem:** After `script-to-video` outputs to a directory:
+```bash
+vibe project info ./cooking/
+# ✖ Failed to load project
+# EISDIR: illegal operation on a directory, read
+```
+
+**Solution:** Added `resolveProjectPath()` helper that:
+1. Checks if input path is a directory
+2. If so, appends `project.vibe.json`
+3. Applied to `project info`, `project set`, and `export` commands
+
+**Files Modified:**
+- `packages/cli/src/commands/project.ts` - Added resolveProjectPath, updated info/set commands
+- `packages/cli/src/commands/export.ts` - Added resolveProjectPath, updated export command
+
+**Verification:**
+```bash
+vibe project info ./cooking/   # Now reads ./cooking/project.vibe.json
+vibe export ./cooking/ -o out.mp4  # Works correctly
+```
+
+---
+
 ### Docs: Fix Test Count Inconsistency
 Fixed documentation inconsistency where test counts varied across files.
 
