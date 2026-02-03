@@ -12,7 +12,7 @@ import { Session } from "./session.js";
 import { success, error, warn, info, getHelpText, formatProjectInfo } from "./prompts.js";
 import { getApiKeyFromConfig, loadConfig, type LLMProvider } from "../config/index.js";
 import { executeCommand } from "../commands/ai.js";
-import { runExport } from "../commands/export.js";
+import { runExport, getMediaDuration } from "../commands/export.js";
 import { Project } from "../engine/index.js";
 import {
   OpenAIProvider,
@@ -605,12 +605,13 @@ async function executeBuiltinCommand(
       if (audioExts.includes(ext)) mediaType = "audio";
       else if (imageExts.includes(ext)) mediaType = "image";
 
-      // Add source
+      // Add source with actual duration
+      const duration = await getMediaDuration(absPath, mediaType);
       const source = project.addSource({
         name: absPath.split("/").pop() || "media",
         type: mediaType,
         url: absPath,
-        duration: 10, // Placeholder - would need ffprobe for actual duration
+        duration,
         width: 1920,
         height: 1080,
       });
@@ -789,12 +790,13 @@ async function executeNaturalLanguageCommand(
         if (audioExts.includes(ext)) mediaType = "audio";
         else if (imageExts.includes(ext)) mediaType = "image";
 
-        // Add source
+        // Add source with actual duration
+        const duration = await getMediaDuration(absPath, mediaType);
         const source = project.addSource({
           name: absPath.split("/").pop() || "media",
           type: mediaType,
           url: absPath,
-          duration: 10,
+          duration,
           width: 1920,
           height: 1080,
         });

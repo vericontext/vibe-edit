@@ -6,6 +6,55 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: Empty Video Export for Images
+Fixed issue where exporting a project with only images resulted in a 0-second empty video.
+
+**Problem:**
+- Workflow `new project → add image.png → export` resulted in empty 0-second video
+- Root causes:
+  1. Hardcoded `duration: 10` for all media instead of detecting actual duration
+  2. FFmpeg `trim` filter doesn't work for static images without `-loop 1` flag
+
+**Solution:**
+1. Added `getMediaDuration()` utility function using ffprobe to detect actual media duration
+   - Images return a default 5-second duration (configurable)
+   - Video/audio files get actual duration via ffprobe
+2. Updated executor.ts to use `getMediaDuration()` instead of hardcoded duration
+3. Fixed FFmpeg handling for images in `buildFFmpegArgs()`:
+   - Added `-loop 1` flag before image inputs to create continuous video stream
+   - Images use `trim=start=0:end=duration` (no source offset since looped)
+   - Audio filter only applied to video/audio sources, not images
+
+**Files Modified:**
+- `packages/cli/src/commands/export.ts`:
+  - Added `getMediaDuration()` exported function
+  - Modified `buildFFmpegArgs()` to add `-loop 1` before image inputs
+  - Modified video filter to use different trim logic for images vs video
+- `packages/cli/src/repl/executor.ts`:
+  - Import `getMediaDuration` from export.ts
+  - Replace hardcoded `duration: 10` at lines 613 and 797 with actual duration detection
+
+**FFmpeg Command Comparison:**
+```bash
+# Before (broken for images):
+ffmpeg -i image.png -filter_complex "[0:v]trim=start=0:end=10,..." output.mp4
+
+# After (works for images):
+ffmpeg -loop 1 -i image.png -filter_complex "[0:v]trim=start=0:end=5,..." output.mp4
+```
+
+**Verification:**
+```bash
+vibe
+> new test
+> add /path/to/image.png to the project
+> info   # Should show 5s duration
+> export the video
+# Output video should be 5 seconds with the image displayed
+```
+
+---
+
 ### Fix: "export the video" Natural Language Routing
 Fixed "export the video" being incorrectly routed to timeline command instead of export handler.
 

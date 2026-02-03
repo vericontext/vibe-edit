@@ -1,10 +1,37 @@
 import { Command } from "commander";
 import { readFile, access } from "node:fs/promises";
-import { resolve, basename, dirname } from "node:path";
-import { spawn } from "node:child_process";
+import { resolve, basename } from "node:path";
+import { spawn, exec } from "node:child_process";
+import { promisify } from "node:util";
 import chalk from "chalk";
 import ora from "ora";
 import { Project, type ProjectFile } from "../engine/index.js";
+
+const execAsync = promisify(exec);
+
+/**
+ * Get the duration of a media file using ffprobe
+ * For images, returns a default duration since they have no inherent time
+ */
+export async function getMediaDuration(
+  filePath: string,
+  mediaType: "video" | "audio" | "image",
+  defaultImageDuration: number = 5
+): Promise<number> {
+  if (mediaType === "image") {
+    return defaultImageDuration;
+  }
+
+  try {
+    const { stdout } = await execAsync(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+    );
+    const duration = parseFloat(stdout.trim());
+    return isNaN(duration) ? defaultImageDuration : duration;
+  } catch {
+    return defaultImageDuration;
+  }
+}
 
 /**
  * Export result for programmatic usage
@@ -252,6 +279,10 @@ function buildFFmpegArgs(
   for (const clip of clips) {
     const source = sources.find((s) => s.id === clip.sourceId);
     if (source && !sourceMap.has(source.id)) {
+      // Add -loop 1 before image inputs to create a continuous video stream
+      if (source.type === "image") {
+        args.push("-loop", "1");
+      }
       args.push("-i", source.url);
       sourceMap.set(source.id, inputIndex);
       inputIndex++;
@@ -270,11 +301,17 @@ function buildFFmpegArgs(
     const srcIdx = sourceMap.get(source.id);
     if (srcIdx === undefined) return;
 
-    const trimStart = clip.sourceStartOffset;
-    const trimEnd = clip.sourceStartOffset + clip.duration;
-
-    // Video filter chain
-    let videoFilter = `[${srcIdx}:v]trim=start=${trimStart}:end=${trimEnd},setpts=PTS-STARTPTS`;
+    // Video filter chain - images need different handling than video
+    let videoFilter: string;
+    if (source.type === "image") {
+      // Images: trim from 0 to clip duration (no source offset since images are looped)
+      videoFilter = `[${srcIdx}:v]trim=start=0:end=${clip.duration},setpts=PTS-STARTPTS`;
+    } else {
+      // Video: use source offsets
+      const trimStart = clip.sourceStartOffset;
+      const trimEnd = clip.sourceStartOffset + clip.duration;
+      videoFilter = `[${srcIdx}:v]trim=start=${trimStart}:end=${trimEnd},setpts=PTS-STARTPTS`;
+    }
 
     // Apply effects
     for (const effect of clip.effects || []) {
@@ -290,9 +327,11 @@ function buildFFmpegArgs(
     filterParts.push(videoFilter);
     videoStreams.push(`[v${clipIdx}]`);
 
-    // Audio filter chain (if video has audio)
+    // Audio filter chain (only for video/audio sources, not images)
     if (source.type === "video" || source.type === "audio") {
-      let audioFilter = `[${srcIdx}:a]atrim=start=${trimStart}:end=${trimEnd},asetpts=PTS-STARTPTS`;
+      const audioTrimStart = clip.sourceStartOffset;
+      const audioTrimEnd = clip.sourceStartOffset + clip.duration;
+      let audioFilter = `[${srcIdx}:a]atrim=start=${audioTrimStart}:end=${audioTrimEnd},asetpts=PTS-STARTPTS`;
 
       // Apply audio effects
       for (const effect of clip.effects || []) {
