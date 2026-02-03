@@ -745,7 +745,7 @@ vibe timeline add-effect project.vibe.json clip-1 fadeIn -d 1
 vibe timeline list project.vibe.json
 
 # Trim clip
-vibe timeline trim project.vibe.json clip-1 -d 5
+vibe timeline trim project.vibe.json clip-1 --duration 5
 
 # Split clip
 vibe timeline split project.vibe.json clip-1 -t 3
