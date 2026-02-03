@@ -2794,10 +2794,12 @@ aiCommand
               const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
               const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
 
+              // Use 10s video if narration > 5s to avoid video ending before narration
+              const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
               const result = await kling.generateVideo(segment.visuals, {
                 prompt: segment.visuals,
                 referenceImage,
-                duration: Math.min(segment.duration, 10) as 5 | 10,
+                duration: videoDuration,
                 aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
               });
 
@@ -2864,10 +2866,12 @@ aiCommand
               const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
               const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
 
+              // Use 10s video if narration > 5s to avoid video ending before narration
+              const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
               const result = await runway.generateVideo(segment.visuals, {
                 prompt: segment.visuals,
                 referenceImage,
-                duration: Math.min(segment.duration, 10) as 5 | 10,
+                duration: videoDuration,
                 aspectRatio: options.aspectRatio === "1:1" ? "16:9" : (options.aspectRatio as "16:9" | "9:16"),
               });
 
