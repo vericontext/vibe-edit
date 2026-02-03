@@ -6,6 +6,7 @@
 
 import { extname, resolve } from "node:path";
 import { writeFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import chalk from "chalk";
 import ora from "ora";
 import { Session } from "./session.js";
@@ -33,13 +34,14 @@ export interface CommandResult {
 
 /** Unified command intent from LLM */
 interface CommandIntent {
-  type: "image" | "tts" | "sfx" | "video" | "timeline" | "project" | "add-media" | "export" | "unknown";
+  type: "image" | "tts" | "sfx" | "video" | "timeline" | "project" | "add-media" | "export" | "voices" | "unknown";
   params: {
     prompt?: string;
     text?: string;
     outputFile?: string;
     projectName?: string;
     filename?: string;
+    imageFile?: string;
     [key: string]: unknown;
   };
   clarification?: string;
@@ -59,18 +61,20 @@ Analyze the user's natural language input and classify it into one of these type
 1. "image" - Generate an image (e.g., "create an image of sunset", "make a picture of a cat", "generate a welcome banner")
 2. "tts" - Text-to-speech / audio generation (e.g., "create audio saying hello", "generate a welcome message", "make voiceover for intro")
 3. "sfx" - Sound effects (e.g., "create explosion sound", "generate rain sound effect")
-4. "video" - Video generation (e.g., "generate a video of ocean waves")
-5. "timeline" - Timeline editing commands:
+4. "video" - Video generation (e.g., "generate a video of ocean waves", "create video from image.png")
+5. "voices" - List available TTS voices (e.g., "ai voices", "list voices", "show available voices")
+6. "timeline" - Timeline editing commands:
    - Adding effects: "add fade-in effect", "add blur to clip", "apply transition"
    - Trimming: "trim to 5 seconds", "cut the first 10s", "shorten clip"
    - Transitions: "add crossfade between clips", "add dissolve"
    - Modifications: "speed up by 2x", "reverse the clip", "change opacity"
    - Splitting: "split at 3s", "cut at this point"
-6. "project" - Project management (e.g., "create new project called X", "start a project named Y")
-7. "add-media" - Add existing media file to project (e.g., "add sunset.png to the project", "add video.mp4 to timeline", "include intro.mp3")
-8. "export" - Export project to video file (e.g., "export the video", "render the project", "save as mp4", "export to output.mp4", "render to file")
-9. "unknown" - Cannot understand the command
+7. "project" - Project management (e.g., "create new project called X", "start a project named Y")
+8. "add-media" - Add existing media file to project (e.g., "add sunset.png to the project", "add video.mp4 to timeline", "include intro.mp3")
+9. "export" - Export project to video file (e.g., "export the video", "render the project", "save as mp4", "export to output.mp4", "render to file")
+10. "unknown" - Cannot understand the command
 
+IMPORTANT: "ai voices", "voices", "list voices", "show voices" should be classified as "voices", NOT as "tts".
 IMPORTANT: If the input mentions "effect", "fade", "transition", "trim", "cut", "split", "speed", "reverse", "blur", or similar editing terms, classify as "timeline".
 IMPORTANT: If the input mentions "export", "render", "output" in the context of creating a final video file, classify as "export".
 
@@ -78,7 +82,7 @@ Extract relevant parameters:
 - For image: prompt (the image description), outputFile (optional)
 - For tts: text (what to say), outputFile (optional)
 - For sfx: prompt (sound description), outputFile (optional)
-- For video: prompt (video description), outputFile (optional)
+- For video: prompt (video description), outputFile (optional), imageFile (optional reference image for image-to-video generation)
 - For project: projectName
 - For add-media: filename (the file to add, e.g., "sunset.png", "video.mp4")
 - For export: outputFile (optional, e.g., "output.mp4", "my-video.mp4")
@@ -88,7 +92,7 @@ If the command is ambiguous, set clarification to ask for more details.
 
 Respond with JSON only:
 {
-  "type": "image|tts|sfx|video|timeline|project|add-media|export|unknown",
+  "type": "image|tts|sfx|video|voices|timeline|project|add-media|export|unknown",
   "params": {
     "prompt": "extracted prompt if applicable",
     "text": "text to speak if tts",
@@ -110,7 +114,10 @@ Examples:
 - "export the video" → {"type": "export", "params": {}}
 - "render the project" → {"type": "export", "params": {}}
 - "save as mp4" → {"type": "export", "params": {}}
-- "export to output.mp4" → {"type": "export", "params": {"outputFile": "output.mp4"}}`;
+- "export to output.mp4" → {"type": "export", "params": {"outputFile": "output.mp4"}}
+- "ai voices" → {"type": "voices", "params": {}}
+- "list available voices" → {"type": "voices", "params": {}}
+- "create video from sunset.png" → {"type": "video", "params": {"prompt": "sunset", "imageFile": "sunset.png"}}`;
 
   try {
     let endpoint: string;
@@ -207,6 +214,12 @@ Examples:
  */
 function fallbackClassify(input: string): CommandIntent {
   const lower = input.toLowerCase();
+
+  // Check for "voices" command FIRST (before TTS pattern)
+  // This prevents "ai voices" from being classified as TTS
+  if (lower.match(/(?:^|\s)voices(?:\s|$)|list\s+voices|show\s+voices|available\s+voices/)) {
+    return { type: "voices", params: {} };
+  }
 
   // Timeline patterns (check FIRST - catch-all for editing operations)
   // This must come before other patterns to properly route "add fade-in effect" etc.
@@ -741,11 +754,37 @@ async function executeNaturalLanguageCommand(
       }
 
       case "video": {
-        spinner.fail();
-        return {
-          success: false,
-          message: info("Video generation is available via CLI:\n  vibe ai video \"" + (intent.params.prompt || "your prompt") + "\" -o output.mp4"),
-        };
+        const prompt = String(intent.params.prompt || input);
+        const imageFile = intent.params.imageFile as string | undefined;
+        const outputFile = String(intent.params.outputFile || "output.mp4");
+
+        spinner.text = `Generating video: "${prompt.slice(0, 30)}..."`;
+        spinner.stop();
+
+        // Build CLI command
+        let cmd = `npx vibe ai video "${prompt.replace(/"/g, '\\"')}" -o "${outputFile}"`;
+        if (imageFile) {
+          cmd += ` -i "${imageFile}"`;
+        }
+
+        try {
+          const result = execSync(cmd, { encoding: "utf-8", cwd: process.cwd(), stdio: "pipe" });
+          return { success: true, message: success(`Video generation started\n${result.trim()}`) };
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          return { success: false, message: error(`Video generation failed: ${errorMessage}`) };
+        }
+      }
+
+      case "voices": {
+        spinner.stop();
+        try {
+          const result = execSync("npx vibe ai voices", { encoding: "utf-8", cwd: process.cwd(), stdio: "pipe" });
+          return { success: true, message: result.trim() };
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          return { success: false, message: error(`Failed to list voices: ${errorMessage}\nCheck ELEVENLABS_API_KEY is configured.`) };
+        }
       }
 
       case "project": {

@@ -6,6 +6,48 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: REPL "ai voices" and "ai video -i" Bugs
+Fixed two REPL bugs where commands were misclassified or disabled.
+
+**Bug 1: `ai voices` generates audio instead of listing voices**
+- **Problem:** `ai voices` was classified as TTS because the TTS pattern regex matched "voice" in "voices"
+- **Expected:** List available ElevenLabs voices
+- **Actual:** Generated `hello.mp3` audio file
+
+**Bug 2: `ai video -i image.png` doesn't work in REPL**
+- **Problem:** Video case handler was intentionally disabled, redirected to CLI
+- **Expected:** Generate video from image (image-to-video)
+- **Actual:** Shows message "Video generation is available via CLI"
+
+**Solution:**
+1. Added `voices` type to CommandIntent interface
+2. Added pattern check for "voices" command before TTS classification in `fallbackClassify()`
+3. Added "voices" case handler that executes `npx vibe ai voices` via CLI
+4. Updated LLM system prompt to recognize "voices" type with explicit examples
+5. Replaced disabled video handler with working implementation that:
+   - Extracts `imageFile` parameter for image-to-video generation
+   - Builds and executes the appropriate `vibe ai video` CLI command
+
+**Files Modified:**
+- `packages/cli/src/repl/executor.ts` - Both bug fixes
+
+**Verification:**
+```bash
+# Bug 1 fix:
+pnpm vibe
+> ai voices
+# Expected: List of ElevenLabs voices
+# Not: "Audio saved: hello.mp3"
+
+# Bug 2 fix:
+pnpm vibe
+> create a video from sunset.png with ocean waves
+# Expected: Video generation starts (or queued)
+# Not: "Video generation is available via CLI"
+```
+
+---
+
 ### Fix: REPL TTS/SFX Filename Overwriting
 Fixed issue where TTS and SFX commands always saved to the same filename, overwriting previous files.
 
