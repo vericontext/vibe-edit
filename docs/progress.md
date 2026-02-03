@@ -6,6 +6,34 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Fix: REPL TTS/SFX Filename Overwriting
+Fixed issue where TTS and SFX commands always saved to the same filename, overwriting previous files.
+
+**Problem:**
+- `create audio saying "Welcome"` → `output.mp3`
+- `generate voice message "Hello"` → `output.mp3` (overwrites!)
+- `create sfx whoosh` → `sound-effect.mp3`
+- `create sfx explosion` → `sound-effect.mp3` (overwrites!)
+
+**Solution:**
+Generate unique filenames from content (same pattern as image generation):
+- TTS: First 4 words of text → `welcome-to-vibeframe.mp3`
+- SFX: First 3 words of prompt + `-sfx` → `whoosh-sfx.mp3`
+
+**Files Modified:**
+- `packages/cli/src/repl/executor.ts` - TTS and SFX filename generation
+
+**Verification:**
+```
+vibe> create audio saying "Welcome to VibeFrame"
+✓ Audio saved: welcome-to-vibeframe.mp3
+
+vibe> generate voice message "Hello world"
+✓ Audio saved: hello-world.mp3
+```
+
+---
+
 ### Docs: Add Auto-Detection Commands to CLI Guide
 Added missing documentation for `vibe detect` commands.
 
