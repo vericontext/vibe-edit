@@ -86,11 +86,18 @@ export class RunwayProvider implements AIProvider {
     }
 
     try {
+      // Map user-friendly aspect ratios to Runway API format
+      const ratioMap: Record<string, string> = {
+        "16:9": "1280:768",
+        "9:16": "768:1280",
+      };
+      const apiRatio = ratioMap[options?.aspectRatio || "16:9"] || "1280:768";
+
       const body: Record<string, unknown> = {
         promptText: prompt,
         model: "gen3a_turbo",
         duration: options?.duration === 10 ? 10 : 5,
-        ratio: options?.aspectRatio === "9:16" ? "9:16" : "16:9",
+        ratio: apiRatio,
         watermark: false,
       };
 
