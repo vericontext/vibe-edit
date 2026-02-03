@@ -2592,9 +2592,9 @@ aiCommand
         const elevenlabs = new ElevenLabsProvider();
         await elevenlabs.initialize({ apiKey: elevenlabsApiKey });
 
-        // Combine segment audio descriptions or use the script
+        // Use narration field for voiceover, fallback to description if not available
         const voiceoverText = segments
-          .map((seg) => seg.audio || seg.description)
+          .map((seg) => seg.narration || seg.description)
           .join(" ");
 
         const ttsResult = await elevenlabs.textToSpeech(voiceoverText, {

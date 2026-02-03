@@ -78,7 +78,9 @@ export interface StoryboardSegment {
   description: string;
   /** Suggested visuals */
   visuals: string;
-  /** Suggested audio/music */
+  /** Voiceover narration script */
+  narration?: string;
+  /** Suggested background audio/music */
   audio?: string;
   /** Text overlays */
   textOverlays?: string[];
@@ -397,12 +399,17 @@ Respond with JSON array:
     "index": 0,
     "startTime": 0,
     "duration": 5,
-    "description": "What happens in this segment",
-    "visuals": "Suggested visuals/footage",
-    "audio": "Suggested audio/music",
+    "description": "Brief description of this segment",
+    "visuals": "Detailed visual description for AI image generation (scene, objects, style, lighting)",
+    "narration": "Voiceover script to be spoken during this segment - natural, engaging narration",
+    "audio": "Background music/sound effects description (optional)",
     "textOverlays": ["Text to show on screen"]
   }
-]`;
+]
+
+Important: The "narration" field should contain actual spoken text for voiceover, not descriptions of audio.
+Example narration: "First, let's gather our fresh ingredients. You'll need ripe tomatoes, garlic, and olive oil."
+NOT: "Upbeat cooking music plays"`;
 
     try {
       const response = await fetch(`${this.baseUrl}/messages`, {
