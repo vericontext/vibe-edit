@@ -6,6 +6,61 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Feature: Per-Scene TTS for Script-to-Video
+Implemented per-scene text-to-speech generation to properly synchronize narration with video scenes.
+
+**Problem:** Previously, script-to-video generated a single voiceover by concatenating all narrations:
+1. Narration didn't sync with video scenes
+2. TTS actual duration vs estimated duration mismatch caused audio to cut off or video to end early
+3. No way to match narration timing per scene
+
+**Solution:**
+1. Generate individual TTS for each scene (`narration-1.mp3`, `narration-2.mp3`, etc.)
+2. Measure actual audio duration using ffprobe
+3. Update scene duration to match actual narration length
+4. Recalculate startTime for all segments
+5. Add individual audio clips to project with correct positioning
+
+**Files Created:**
+- `packages/cli/src/utils/audio.ts` - `getAudioDuration()` function using ffprobe
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` - Refactored voiceover generation:
+  - Per-scene TTS generation with progress indicator
+  - Actual duration measurement with ffprobe
+  - Dynamic scene duration adjustment
+  - Per-scene audio clips in project assembly
+  - Updated storyboard.json re-save with actual durations
+
+**Usage:**
+```bash
+vibe ai script-to-video "A cooking tutorial" -o ./cooking/
+```
+
+**Output:**
+```
+🎬 Script-to-Video Pipeline
+────────────────────────────────────────────────────────────────
+✔ Generated 4 scenes (total: 20.0s)
+  → Saved: ./cooking/storyboard.json
+
+🎙️ Generating narrations with ElevenLabs...
+  → Saved: ./cooking/narration-1.mp3 (5.2s)
+  → Saved: ./cooking/narration-2.mp3 (4.8s)
+  → Saved: ./cooking/narration-3.mp3 (6.1s)
+  → Saved: ./cooking/narration-4.mp3 (5.5s)
+✔ Generated 4/4 narrations (450 chars, 21.6s total)
+  → Updated storyboard: ./cooking/storyboard.json
+```
+
+**Benefits:**
+- Each scene's duration matches its actual narration length
+- Narration audio starts at correct position in timeline
+- `storyboard.json` reflects true durations for downstream tools
+- Better sync between visuals and voiceover
+
+---
+
 ### Fix: Script-to-Video Voiceover Using Wrong Field
 Fixed script-to-video generating nonsensical voiceovers by using background music descriptions instead of actual narration.
 

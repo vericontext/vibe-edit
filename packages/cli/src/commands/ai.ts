@@ -43,6 +43,7 @@ import { Project, type ProjectFile } from "../engine/index.js";
 import type { EffectType } from "@vibeframe/core/timeline";
 import { detectFormat, formatTranscript } from "../utils/subtitle.js";
 import { getApiKey } from "../utils/api-key.js";
+import { getAudioDuration } from "../utils/audio.js";
 
 const execAsync = promisify(exec);
 
@@ -2573,7 +2574,7 @@ aiCommand
         process.exit(1);
       }
 
-      const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+      let totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
       storyboardSpinner.succeed(chalk.green(`Generated ${segments.length} scenes (total: ${totalDuration}s)`));
 
       // Save storyboard
@@ -2582,33 +2583,64 @@ aiCommand
       console.log(chalk.dim(`  → Saved: ${storyboardPath}`));
       console.log();
 
-      // Step 2: Generate voiceover with ElevenLabs
-      let voiceoverPath: string | undefined;
-      let voiceoverDuration = totalDuration;
+      // Step 2: Generate per-scene voiceovers with ElevenLabs
+      const perSceneTTS: { path: string; duration: number; segmentIndex: number }[] = [];
 
       if (options.voiceover !== false && elevenlabsApiKey) {
-        const ttsSpinner = ora("🎙️ Generating voiceover with ElevenLabs...").start();
+        const ttsSpinner = ora("🎙️ Generating voiceovers with ElevenLabs...").start();
 
         const elevenlabs = new ElevenLabsProvider();
         await elevenlabs.initialize({ apiKey: elevenlabsApiKey });
 
-        // Use narration field for voiceover, fallback to description if not available
-        const voiceoverText = segments
-          .map((seg) => seg.narration || seg.description)
-          .join(" ");
+        let totalCharacters = 0;
 
-        const ttsResult = await elevenlabs.textToSpeech(voiceoverText, {
-          voiceId: options.voice,
-        });
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+          const narrationText = segment.narration || segment.description;
 
-        if (!ttsResult.success || !ttsResult.audioBuffer) {
-          ttsSpinner.warn(chalk.yellow(`Voiceover failed: ${ttsResult.error || "Unknown error"}`));
-        } else {
-          voiceoverPath = resolve(outputDir, "voiceover.mp3");
-          await writeFile(voiceoverPath, ttsResult.audioBuffer);
-          ttsSpinner.succeed(chalk.green(`Voiceover generated (${ttsResult.characterCount} chars)`));
-          console.log(chalk.dim(`  → Saved: ${voiceoverPath}`));
+          if (!narrationText) continue;
+
+          ttsSpinner.text = `🎙️ Generating narration ${i + 1}/${segments.length}...`;
+
+          const ttsResult = await elevenlabs.textToSpeech(narrationText, {
+            voiceId: options.voice,
+          });
+
+          if (!ttsResult.success || !ttsResult.audioBuffer) {
+            ttsSpinner.warn(chalk.yellow(`Narration ${i + 1} failed: ${ttsResult.error || "Unknown error"}`));
+            continue;
+          }
+
+          const audioPath = resolve(outputDir, `narration-${i + 1}.mp3`);
+          await writeFile(audioPath, ttsResult.audioBuffer);
+
+          // Get actual audio duration using ffprobe
+          const actualDuration = await getAudioDuration(audioPath);
+
+          // Update segment duration to match actual narration length
+          segment.duration = actualDuration;
+
+          perSceneTTS.push({ path: audioPath, duration: actualDuration, segmentIndex: i });
+          totalCharacters += ttsResult.characterCount || 0;
+
+          console.log(chalk.dim(`  → Saved: ${audioPath} (${actualDuration.toFixed(1)}s)`));
         }
+
+        // Recalculate startTime for all segments based on updated durations
+        let currentTime = 0;
+        for (const segment of segments) {
+          segment.startTime = currentTime;
+          currentTime += segment.duration;
+        }
+
+        // Update total duration
+        totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+
+        ttsSpinner.succeed(chalk.green(`Generated ${perSceneTTS.length}/${segments.length} narrations (${totalCharacters} chars, ${totalDuration.toFixed(1)}s total)`));
+
+        // Re-save storyboard with updated durations
+        await writeFile(storyboardPath, JSON.stringify(segments, null, 2), "utf-8");
+        console.log(chalk.dim(`  → Updated storyboard: ${storyboardPath}`));
         console.log();
       }
 
@@ -2911,22 +2943,23 @@ aiCommand
         isVisible: true,
       });
 
-      // Add voiceover source and clip
-      if (voiceoverPath) {
-        const voiceoverSource = project.addSource({
-          name: "Voiceover",
-          url: voiceoverPath,
+      // Add per-scene narration sources and clips
+      for (const tts of perSceneTTS) {
+        const segment = segments[tts.segmentIndex];
+        const audioSource = project.addSource({
+          name: `Narration ${tts.segmentIndex + 1}`,
+          url: tts.path,
           type: "audio",
-          duration: voiceoverDuration,
+          duration: tts.duration,
         });
 
         project.addClip({
-          sourceId: voiceoverSource.id,
+          sourceId: audioSource.id,
           trackId: audioTrack.id,
-          startTime: 0,
-          duration: voiceoverDuration,
+          startTime: segment.startTime,
+          duration: tts.duration,
           sourceStartOffset: 0,
-          sourceEndOffset: voiceoverDuration,
+          sourceEndOffset: tts.duration,
         });
       }
 
@@ -3011,8 +3044,8 @@ aiCommand
       console.log(`  🎬 Scenes: ${segments.length}`);
       console.log(`  ⏱️  Duration: ${totalDuration}s`);
       console.log(`  📁 Assets: ${effectiveOutputDir}/`);
-      if (voiceoverPath) {
-        console.log(`  🎙️  Voiceover: voiceover.mp3`);
+      if (perSceneTTS.length > 0) {
+        console.log(`  🎙️  Narrations: ${perSceneTTS.length} narration-*.mp3`);
       }
       console.log(`  🖼️  Images: ${successfulImages} scene-*.png`);
       if (!options.imagesOnly) {
