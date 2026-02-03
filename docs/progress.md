@@ -6,6 +6,44 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Docs: Add Auto-Detection Commands to CLI Guide
+Added missing documentation for `vibe detect` commands.
+
+**Problem:**
+- `detect scenes`, `detect silence`, `detect beats` commands existed but were not documented in cli-guide.md
+- Commands were listed in roadmap.md as completed but users had no usage reference
+
+**Solution:**
+Added "Auto-Detection" section to cli-guide.md with:
+- Scene detection examples (`-t` threshold, `-o` output, `-p` project)
+- Silence detection examples (`-d` duration, `-n` noise threshold)
+- Beat detection examples (`-o` output)
+- Output format example
+- Use cases
+
+**Files Modified:**
+- `docs/cli-guide.md` - Added Auto-Detection section after Export
+
+**Verification:**
+```bash
+vibe detect scenes video.mp4
+vibe detect silence audio.mp3
+vibe detect beats music.mp3
+```
+
+---
+
+### Docs: Fix trim Command Option
+Fixed incorrect option in cli-guide.md timeline trim example.
+
+**Problem:** Documentation showed `vibe timeline trim ... -d 5` but `-d` option doesn't exist.
+**Solution:** Changed to `--duration 5` (the actual option).
+
+**Files Modified:**
+- `docs/cli-guide.md` - Line 748: `-d 5` → `--duration 5`
+
+---
+
 ### Fix: CLI Version Hardcoding and Image Track Mismatch
 Fixed two bugs discovered during cli-guide.md workflow testing.
 
