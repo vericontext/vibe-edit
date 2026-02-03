@@ -6,6 +6,38 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-03
 
+### Docs: CLI Guide Inconsistencies and Documentation Guidelines
+Fixed several documentation inconsistencies in cli-guide.md and added documentation guidelines to CLAUDE.md.
+
+**Problems:**
+1. Version mismatch: showed `0.1.0`, actual is `0.2.1`
+2. Filename mismatch: generated `sunset.png` but added `a-sunset-landscape.png`
+3. ID format: used simplified `source-1`, `clip-1` without explanation that real IDs are timestamp-based
+
+**Solution:**
+1. Updated version format to `0.2.x` to avoid frequent updates
+2. Fixed filename consistency in REPL example workflow
+3. Added note explaining ID format simplification
+4. Added "Documentation Consistency Rules" section to CLAUDE.md with guidelines for:
+   - Filename consistency in examples
+   - Version number formatting
+   - ID example annotations
+   - Testing examples before documenting
+   - Cross-referencing related docs
+
+**Files Modified:**
+- `docs/cli-guide.md` - Version, filename consistency, ID note
+- `CLAUDE.md` - New Documentation Consistency Rules section
+
+**Verification:**
+```bash
+# Check cli-guide.md REPL example - filenames should be consistent
+grep -A 10 "generate an image of a sunset" docs/cli-guide.md
+# Should show: sunset-landscape.png generated AND added (same filename)
+```
+
+---
+
 ### Fix: Empty Video Export for Images
 Fixed issue where exporting a project with only images resulted in a 0-second empty video.
 
