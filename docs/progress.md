@@ -4,7 +4,7 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
-## 2026-02-04
+## 2026-02-04 (v0.4.0)
 
 ### Feature: Media Pipeline Improvements
 
@@ -92,6 +92,20 @@ you> 모든 클립에 fadeIn 효과 적용해줘
 you> 타임라인 클립들 모두 삭제해줘
 # Uses timeline_clear tool
 ```
+
+#### Version Summary
+
+**Version:** 0.3.0 → 0.4.0 (minor bump for new features)
+
+**Key Changes:**
+- Fixed TTS index misalignment in script-to-video pipeline
+- Added voice name validation with 25+ ElevenLabs voices
+- Expanded Agent tools from 39 to 46 (7 new tools)
+- New batch category with 3 tools
+- New media manipulation tools (compress, convert, concat)
+- New timeline_clear tool
+
+**Tests:** 256 passing
 
 ---
 
