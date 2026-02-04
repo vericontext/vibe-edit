@@ -277,6 +277,20 @@ See [docs/roadmap.md](docs/roadmap.md) for details.
 
 ---
 
+## Open Core Model
+
+**VibeFrame Core is 100% open source** (MIT License).
+
+For teams and production workloads, **VibeFrame Cloud** (coming soon) will offer:
+- 🚀 **Distributed Rendering** - Auto-scaling render queues, no memory limits
+- 👥 **Team Workspaces** - Real-time collaboration, version history, comments
+- 🌐 **Hosted MCP Endpoint** - Connect Claude/Cursor without local setup
+- 📦 **Template Marketplace** - Premium templates and AI presets
+
+> Core features will always remain free and open source.
+
+---
+
 ## Development
 
 ```bash
