@@ -144,12 +144,23 @@ Intelligence built into every interaction.
   - Provider descriptions explaining characteristics
   - Ollama-specific guidance for local setup
   - Environment variable fallback notes
-- [x] **Interactive REPL** - Natural language editing mode (run `vibe` with no args)
-  - Built-in commands: new, open, save, info, list, add, export, undo
-  - Natural language: "trim clip to 5s", "add fade in", etc.
-  - Auto-save, undo history, session state management
-  - LLM provider status display on startup
-  - Getting Started quick reference in help
+- [x] ~~**Interactive REPL**~~ (deprecated) - Legacy single-command mode
+  - Replaced by Agent mode as default entry point
+  - Code kept for library usage (marked `@deprecated`)
+- [x] **Agent Mode (Default)** - Claude Code-like autonomous agent (`vibe` or `vibe agent`)
+  - Default entry point: `vibe` starts Agent mode
+  - Multi-turn agentic loop: LLM reasoning → tool call → result → repeat
+  - **39 tools** across 6 categories (project, timeline, filesystem, media, AI, export)
+  - Multi-provider support: OpenAI, Claude, Gemini, Ollama
+  - Verbose mode for tool call visibility (`-v`)
+  - Confirm mode: `--confirm` prompts before each tool execution
+  - Non-interactive mode: `-i "query"` for single query execution
+  - Conversation memory with context management
+  - **Advanced Pipeline Tools:**
+    - `ai_script_to_video` - Full script→video pipeline via natural language
+    - `ai_highlights` - Extract highlights from long-form content
+    - `ai_auto_shorts` - Auto-generate vertical shorts
+    - `ai_gemini_video` - Analyze video with Gemini
 - [x] **Config System** - YAML config at `~/.vibeframe/config.yaml`
 - [x] **CLI Guide** - Comprehensive documentation at `docs/cli-guide.md`
 

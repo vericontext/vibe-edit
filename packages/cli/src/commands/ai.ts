@@ -6723,6 +6723,1134 @@ aiCommand
     }
   });
 
+// ============================================================================
+// Exported Pipeline Functions for Agent Tools
+// ============================================================================
+
+/**
+ * Options for script-to-video pipeline
+ */
+export interface ScriptToVideoOptions {
+  script: string;
+  outputDir?: string;
+  duration?: number;
+  voice?: string;
+  generator?: "runway" | "kling";
+  imageProvider?: "dalle" | "stability" | "gemini";
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  imagesOnly?: boolean;
+  noVoiceover?: boolean;
+  retries?: number;
+}
+
+/**
+ * Result of script-to-video pipeline
+ */
+export interface ScriptToVideoResult {
+  success: boolean;
+  outputDir: string;
+  scenes: number;
+  storyboardPath?: string;
+  projectPath?: string;
+  narrations?: string[];
+  images?: string[];
+  videos?: string[];
+  totalDuration?: number;
+  failedScenes?: number[];
+  error?: string;
+}
+
+/**
+ * Execute the script-to-video pipeline programmatically
+ */
+export async function executeScriptToVideo(
+  options: ScriptToVideoOptions
+): Promise<ScriptToVideoResult> {
+  const outputDir = options.outputDir || "script-video-output";
+
+  try {
+    // Get all required API keys
+    const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+    if (!claudeApiKey) {
+      return { success: false, outputDir, scenes: 0, error: "Anthropic API key required for storyboard generation" };
+    }
+
+    // Get image provider API key
+    let imageApiKey: string | undefined;
+    const imageProvider = options.imageProvider || "dalle";
+
+    if (imageProvider === "dalle") {
+      imageApiKey = (await getApiKey("OPENAI_API_KEY", "OpenAI")) ?? undefined;
+      if (!imageApiKey) {
+        return { success: false, outputDir, scenes: 0, error: "OpenAI API key required for DALL-E image generation" };
+      }
+    } else if (imageProvider === "stability") {
+      imageApiKey = (await getApiKey("STABILITY_API_KEY", "Stability AI")) ?? undefined;
+      if (!imageApiKey) {
+        return { success: false, outputDir, scenes: 0, error: "Stability API key required for image generation" };
+      }
+    } else if (imageProvider === "gemini") {
+      imageApiKey = (await getApiKey("GOOGLE_API_KEY", "Google")) ?? undefined;
+      if (!imageApiKey) {
+        return { success: false, outputDir, scenes: 0, error: "Google API key required for Gemini image generation" };
+      }
+    }
+
+    let elevenlabsApiKey: string | undefined;
+    if (!options.noVoiceover) {
+      elevenlabsApiKey = (await getApiKey("ELEVENLABS_API_KEY", "ElevenLabs")) ?? undefined;
+      if (!elevenlabsApiKey) {
+        return { success: false, outputDir, scenes: 0, error: "ElevenLabs API key required for voiceover (or use noVoiceover option)" };
+      }
+    }
+
+    let videoApiKey: string | undefined;
+    if (!options.imagesOnly) {
+      if (options.generator === "kling") {
+        videoApiKey = (await getApiKey("KLING_API_KEY", "Kling")) ?? undefined;
+        if (!videoApiKey) {
+          return { success: false, outputDir, scenes: 0, error: "Kling API key required (or use imagesOnly option)" };
+        }
+      } else {
+        videoApiKey = (await getApiKey("RUNWAY_API_SECRET", "Runway")) ?? undefined;
+        if (!videoApiKey) {
+          return { success: false, outputDir, scenes: 0, error: "Runway API key required (or use imagesOnly option)" };
+        }
+      }
+    }
+
+    // Create output directory
+    const absOutputDir = resolve(process.cwd(), outputDir);
+    if (!existsSync(absOutputDir)) {
+      await mkdir(absOutputDir, { recursive: true });
+    }
+
+    // Step 1: Generate storyboard with Claude
+    const claude = new ClaudeProvider();
+    await claude.initialize({ apiKey: claudeApiKey });
+
+    const segments = await claude.analyzeContent(options.script, options.duration);
+    if (segments.length === 0) {
+      return { success: false, outputDir, scenes: 0, error: "Failed to generate storyboard" };
+    }
+
+    // Save storyboard
+    const storyboardPath = resolve(absOutputDir, "storyboard.json");
+    await writeFile(storyboardPath, JSON.stringify(segments, null, 2), "utf-8");
+
+    const result: ScriptToVideoResult = {
+      success: true,
+      outputDir: absOutputDir,
+      scenes: segments.length,
+      storyboardPath,
+      narrations: [],
+      images: [],
+      videos: [],
+      failedScenes: [],
+    };
+
+    // Step 2: Generate per-scene voiceovers with ElevenLabs
+    if (!options.noVoiceover && elevenlabsApiKey) {
+      const elevenlabs = new ElevenLabsProvider();
+      await elevenlabs.initialize({ apiKey: elevenlabsApiKey });
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const narrationText = segment.narration || segment.description;
+        if (!narrationText) continue;
+
+        const ttsResult = await elevenlabs.textToSpeech(narrationText, {
+          voiceId: options.voice,
+        });
+
+        if (ttsResult.success && ttsResult.audioBuffer) {
+          const audioPath = resolve(absOutputDir, `narration-${i + 1}.mp3`);
+          await writeFile(audioPath, ttsResult.audioBuffer);
+
+          // Get actual audio duration
+          const actualDuration = await getAudioDuration(audioPath);
+          segment.duration = actualDuration;
+          result.narrations!.push(audioPath);
+        }
+      }
+
+      // Recalculate startTime for all segments
+      let currentTime = 0;
+      for (const segment of segments) {
+        segment.startTime = currentTime;
+        currentTime += segment.duration;
+      }
+
+      // Re-save storyboard with updated durations
+      await writeFile(storyboardPath, JSON.stringify(segments, null, 2), "utf-8");
+    }
+
+    // Step 3: Generate images
+    const dalleImageSizes: Record<string, "1792x1024" | "1024x1792" | "1024x1024"> = {
+      "16:9": "1792x1024",
+      "9:16": "1024x1792",
+      "1:1": "1024x1024",
+    };
+    type StabilityAspectRatio = "16:9" | "1:1" | "21:9" | "2:3" | "3:2" | "4:5" | "5:4" | "9:16" | "9:21";
+    const stabilityAspectRatios: Record<string, StabilityAspectRatio> = {
+      "16:9": "16:9",
+      "9:16": "9:16",
+      "1:1": "1:1",
+    };
+
+    let dalleInstance: DalleProvider | undefined;
+    let stabilityInstance: StabilityProvider | undefined;
+    let geminiInstance: GeminiProvider | undefined;
+
+    if (imageProvider === "dalle") {
+      dalleInstance = new DalleProvider();
+      await dalleInstance.initialize({ apiKey: imageApiKey! });
+    } else if (imageProvider === "stability") {
+      stabilityInstance = new StabilityProvider();
+      await stabilityInstance.initialize({ apiKey: imageApiKey! });
+    } else if (imageProvider === "gemini") {
+      geminiInstance = new GeminiProvider();
+      await geminiInstance.initialize({ apiKey: imageApiKey! });
+    }
+
+    const imagePaths: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const imagePrompt = segment.visualStyle
+        ? `${segment.visuals}. Style: ${segment.visualStyle}`
+        : segment.visuals;
+
+      try {
+        let imageBuffer: Buffer | undefined;
+        let imageUrl: string | undefined;
+
+        if (imageProvider === "dalle" && dalleInstance) {
+          const imageResult = await dalleInstance.generateImage(imagePrompt, {
+            size: dalleImageSizes[options.aspectRatio || "16:9"] || "1792x1024",
+            quality: "standard",
+          });
+          if (imageResult.success && imageResult.images?.[0]?.url) {
+            imageUrl = imageResult.images[0].url;
+          }
+        } else if (imageProvider === "stability" && stabilityInstance) {
+          const imageResult = await stabilityInstance.generateImage(imagePrompt, {
+            aspectRatio: stabilityAspectRatios[options.aspectRatio || "16:9"] || "16:9",
+            model: "sd3.5-large",
+          });
+          if (imageResult.success && imageResult.images?.[0]) {
+            const img = imageResult.images[0];
+            if (img.base64) {
+              imageBuffer = Buffer.from(img.base64, "base64");
+            } else if (img.url) {
+              imageUrl = img.url;
+            }
+          }
+        } else if (imageProvider === "gemini" && geminiInstance) {
+          const imageResult = await geminiInstance.generateImage(imagePrompt, {
+            aspectRatio: (options.aspectRatio || "16:9") as "16:9" | "9:16" | "1:1",
+          });
+          if (imageResult.success && imageResult.images?.[0]?.base64) {
+            imageBuffer = Buffer.from(imageResult.images[0].base64, "base64");
+          }
+        }
+
+        const imagePath = resolve(absOutputDir, `scene-${i + 1}.png`);
+        if (imageBuffer) {
+          await writeFile(imagePath, imageBuffer);
+          imagePaths.push(imagePath);
+          result.images!.push(imagePath);
+        } else if (imageUrl) {
+          const response = await fetch(imageUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          await writeFile(imagePath, buffer);
+          imagePaths.push(imagePath);
+          result.images!.push(imagePath);
+        } else {
+          imagePaths.push("");
+        }
+      } catch {
+        imagePaths.push("");
+      }
+
+      // Rate limiting delay
+      if (i < segments.length - 1) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    // Step 4: Generate videos (if not images-only)
+    const videoPaths: string[] = [];
+    const maxRetries = options.retries ?? DEFAULT_VIDEO_RETRIES;
+
+    if (!options.imagesOnly && videoApiKey) {
+      if (options.generator === "kling") {
+        const kling = new KlingProvider();
+        await kling.initialize({ apiKey: videoApiKey });
+
+        if (!kling.isConfigured()) {
+          return { success: false, outputDir: absOutputDir, scenes: segments.length, error: "Invalid Kling API key format. Use ACCESS_KEY:SECRET_KEY" };
+        }
+
+        for (let i = 0; i < segments.length; i++) {
+          if (!imagePaths[i]) {
+            videoPaths.push("");
+            continue;
+          }
+
+          const segment = segments[i] as StoryboardSegment;
+          const imageBuffer = await readFile(imagePaths[i]);
+          const ext = extname(imagePaths[i]).toLowerCase().slice(1);
+          const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+          const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+          const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
+
+          const taskResult = await generateVideoWithRetryKling(
+            kling,
+            segment,
+            referenceImage,
+            { duration: videoDuration, aspectRatio: (options.aspectRatio || "16:9") as "16:9" | "9:16" | "1:1" },
+            maxRetries
+          );
+
+          if (taskResult) {
+            try {
+              const waitResult = await kling.waitForCompletion(taskResult.taskId, "image2video", undefined, 600000);
+              if (waitResult.status === "completed" && waitResult.videoUrl) {
+                const videoPath = resolve(absOutputDir, `scene-${i + 1}.mp4`);
+                const response = await fetch(waitResult.videoUrl);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await writeFile(videoPath, buffer);
+                videoPaths.push(videoPath);
+                result.videos!.push(videoPath);
+              } else {
+                videoPaths.push("");
+                result.failedScenes!.push(i + 1);
+              }
+            } catch {
+              videoPaths.push("");
+              result.failedScenes!.push(i + 1);
+            }
+          } else {
+            videoPaths.push("");
+            result.failedScenes!.push(i + 1);
+          }
+        }
+      } else {
+        // Runway
+        const runway = new RunwayProvider();
+        await runway.initialize({ apiKey: videoApiKey });
+
+        for (let i = 0; i < segments.length; i++) {
+          if (!imagePaths[i]) {
+            videoPaths.push("");
+            continue;
+          }
+
+          const segment = segments[i] as StoryboardSegment;
+          const imageBuffer = await readFile(imagePaths[i]);
+          const ext = extname(imagePaths[i]).toLowerCase().slice(1);
+          const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+          const referenceImage = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+
+          const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
+          const aspectRatio = options.aspectRatio === "1:1" ? "16:9" : ((options.aspectRatio || "16:9") as "16:9" | "9:16");
+
+          const taskResult = await generateVideoWithRetryRunway(
+            runway,
+            segment,
+            referenceImage,
+            { duration: videoDuration, aspectRatio },
+            maxRetries
+          );
+
+          if (taskResult) {
+            try {
+              const waitResult = await runway.waitForCompletion(taskResult.taskId, undefined, 300000);
+              if (waitResult.status === "completed" && waitResult.videoUrl) {
+                const videoPath = resolve(absOutputDir, `scene-${i + 1}.mp4`);
+                const response = await fetch(waitResult.videoUrl);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await writeFile(videoPath, buffer);
+                videoPaths.push(videoPath);
+                result.videos!.push(videoPath);
+              } else {
+                videoPaths.push("");
+                result.failedScenes!.push(i + 1);
+              }
+            } catch {
+              videoPaths.push("");
+              result.failedScenes!.push(i + 1);
+            }
+          } else {
+            videoPaths.push("");
+            result.failedScenes!.push(i + 1);
+          }
+        }
+      }
+    }
+
+    // Step 5: Create project file
+    const project = new Project("Script-to-Video Output");
+    project.setAspectRatio((options.aspectRatio || "16:9") as "16:9" | "9:16" | "1:1");
+
+    // Clear default tracks
+    const defaultTracks = project.getTracks();
+    for (const track of defaultTracks) {
+      project.removeTrack(track.id);
+    }
+
+    const videoTrack = project.addTrack({
+      name: "Video",
+      type: "video",
+      order: 1,
+      isMuted: false,
+      isLocked: false,
+      isVisible: true,
+    });
+
+    const audioTrack = project.addTrack({
+      name: "Audio",
+      type: "audio",
+      order: 0,
+      isMuted: false,
+      isLocked: false,
+      isVisible: true,
+    });
+
+    // Add narration clips
+    if (result.narrations && result.narrations.length > 0) {
+      for (let i = 0; i < result.narrations.length; i++) {
+        const narrationPath = result.narrations[i];
+        const segment = segments[i];
+        const narrationDuration = await getAudioDuration(narrationPath);
+
+        const audioSource = project.addSource({
+          name: `Narration ${i + 1}`,
+          url: narrationPath,
+          type: "audio",
+          duration: narrationDuration,
+        });
+
+        project.addClip({
+          sourceId: audioSource.id,
+          trackId: audioTrack.id,
+          startTime: segment.startTime,
+          duration: narrationDuration,
+          sourceStartOffset: 0,
+          sourceEndOffset: narrationDuration,
+        });
+      }
+    }
+
+    // Add video/image clips
+    let currentTime = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const hasVideo = videoPaths[i] && videoPaths[i] !== "";
+      const hasImage = imagePaths[i] && imagePaths[i] !== "";
+
+      if (!hasVideo && !hasImage) {
+        currentTime += segment.duration;
+        continue;
+      }
+
+      const assetPath = hasVideo ? videoPaths[i] : imagePaths[i];
+      const mediaType = hasVideo ? "video" : "image";
+
+      const source = project.addSource({
+        name: `Scene ${i + 1}`,
+        url: assetPath,
+        type: mediaType as "video" | "image",
+        duration: segment.duration,
+      });
+
+      project.addClip({
+        sourceId: source.id,
+        trackId: videoTrack.id,
+        startTime: currentTime,
+        duration: segment.duration,
+        sourceStartOffset: 0,
+        sourceEndOffset: segment.duration,
+      });
+
+      currentTime += segment.duration;
+    }
+
+    // Save project file
+    const projectPath = resolve(absOutputDir, "project.vibe.json");
+    await writeFile(projectPath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
+    result.projectPath = projectPath;
+    result.totalDuration = currentTime;
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      outputDir,
+      scenes: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Options for highlights extraction
+ */
+export interface HighlightsOptions {
+  media: string;
+  output?: string;
+  project?: string;
+  duration?: number;
+  count?: number;
+  threshold?: number;
+  criteria?: "emotional" | "informative" | "funny" | "all";
+  language?: string;
+  useGemini?: boolean;
+  lowRes?: boolean;
+}
+
+/**
+ * Result of highlights extraction
+ */
+export interface HighlightsExtractResult {
+  success: boolean;
+  highlights: Highlight[];
+  totalDuration: number;
+  totalHighlightDuration: number;
+  outputPath?: string;
+  projectPath?: string;
+  error?: string;
+}
+
+/**
+ * Execute the highlights extraction pipeline programmatically
+ */
+export async function executeHighlights(
+  options: HighlightsOptions
+): Promise<HighlightsExtractResult> {
+  try {
+    const absPath = resolve(process.cwd(), options.media);
+    if (!existsSync(absPath)) {
+      return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: `File not found: ${absPath}` };
+    }
+
+    const ext = extname(absPath).toLowerCase();
+    const videoExtensions = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"];
+    const isVideo = videoExtensions.includes(ext);
+
+    const targetDuration = options.duration;
+    const maxCount = options.count;
+    const threshold = options.threshold ?? 0.7;
+
+    let allHighlights: Highlight[] = [];
+    let sourceDuration = 0;
+
+    if (options.useGemini && isVideo) {
+      // Gemini Video Understanding flow
+      const geminiApiKey = await getApiKey("GOOGLE_API_KEY", "Google");
+      if (!geminiApiKey) {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: "Google API key required for Gemini Video Understanding" };
+      }
+
+      // Get video duration
+      const durationCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${absPath}"`;
+      const { stdout: durationOut } = await execAsync(durationCmd);
+      sourceDuration = parseFloat(durationOut.trim());
+
+      // Analyze with Gemini Video
+      const gemini = new GeminiProvider();
+      await gemini.initialize({ apiKey: geminiApiKey });
+
+      const videoBuffer = await readFile(absPath);
+
+      const criteriaText = options.criteria === "all" || !options.criteria
+        ? "emotional, informative, and funny moments"
+        : `${options.criteria} moments`;
+
+      const durationText = targetDuration ? `Target a total highlight duration of ${targetDuration} seconds.` : "";
+      const countText = maxCount ? `Find up to ${maxCount} highlights.` : "";
+
+      const geminiPrompt = `Analyze this video and identify the most engaging highlights based on BOTH visual and audio content.
+
+Focus on finding ${criteriaText}. ${durationText} ${countText}
+
+For each highlight, provide:
+1. Start timestamp (in seconds, as a number)
+2. End timestamp (in seconds, as a number)
+3. Category: "emotional", "informative", or "funny"
+4. Confidence score (0-1)
+5. Brief reason why this is a highlight
+6. What is said/shown during this moment
+
+IMPORTANT: Respond ONLY with valid JSON in this exact format:
+{
+  "highlights": [
+    {
+      "startTime": 12.5,
+      "endTime": 28.3,
+      "category": "emotional",
+      "confidence": 0.95,
+      "reason": "Powerful personal story about overcoming challenges",
+      "transcript": "When I first started, everyone said it was impossible..."
+    }
+  ]
+}
+
+Analyze both what is SHOWN (visual cues, actions, expressions) and what is SAID (speech, reactions) to find the most compelling moments.`;
+
+      const result = await gemini.analyzeVideo(videoBuffer, geminiPrompt, {
+        fps: 1,
+        lowResolution: options.lowRes,
+      });
+
+      if (!result.success || !result.response) {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: `Gemini analysis failed: ${result.error}` };
+      }
+
+      // Parse Gemini response
+      try {
+        let jsonStr = result.response;
+        const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) jsonStr = jsonMatch[1];
+        const objectMatch = jsonStr.match(/\{[\s\S]*"highlights"[\s\S]*\}/);
+        if (objectMatch) jsonStr = objectMatch[0];
+
+        const parsed = JSON.parse(jsonStr);
+
+        if (parsed.highlights && Array.isArray(parsed.highlights)) {
+          allHighlights = parsed.highlights.map((h: {
+            startTime: number;
+            endTime: number;
+            category?: string;
+            confidence?: number;
+            reason?: string;
+            transcript?: string;
+          }, i: number) => ({
+            index: i + 1,
+            startTime: h.startTime,
+            endTime: h.endTime,
+            duration: h.endTime - h.startTime,
+            category: h.category || "all",
+            confidence: h.confidence || 0.8,
+            reason: h.reason || "Engaging moment",
+            transcript: h.transcript || "",
+          }));
+        }
+      } catch {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: "Failed to parse Gemini response" };
+      }
+    } else {
+      // Whisper + Claude flow
+      const openaiApiKey = await getApiKey("OPENAI_API_KEY", "OpenAI");
+      if (!openaiApiKey) {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: "OpenAI API key required for Whisper transcription" };
+      }
+
+      const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+      if (!claudeApiKey) {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: "Anthropic API key required for highlight analysis" };
+      }
+
+      let audioPath = absPath;
+      let tempAudioPath: string | null = null;
+
+      // Extract audio if video
+      if (isVideo) {
+        try {
+          execSync("ffmpeg -version", { stdio: "ignore" });
+        } catch {
+          return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: "FFmpeg not found" };
+        }
+
+        tempAudioPath = `/tmp/vibe_highlight_audio_${Date.now()}.wav`;
+        await execAsync(
+          `ffmpeg -i "${absPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${tempAudioPath}" -y`,
+          { maxBuffer: 50 * 1024 * 1024 }
+        );
+        audioPath = tempAudioPath;
+
+        const durationCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${absPath}"`;
+        const { stdout: durationOut } = await execAsync(durationCmd);
+        sourceDuration = parseFloat(durationOut.trim());
+      }
+
+      // Transcribe with Whisper
+      const whisper = new WhisperProvider();
+      await whisper.initialize({ apiKey: openaiApiKey });
+
+      const audioBuffer = await readFile(audioPath);
+      const audioBlob = new Blob([audioBuffer]);
+      const transcriptResult = await whisper.transcribe(audioBlob, options.language);
+
+      // Cleanup temp file
+      if (tempAudioPath && existsSync(tempAudioPath)) {
+        await execAsync(`rm "${tempAudioPath}"`).catch(() => {});
+      }
+
+      if (transcriptResult.status === "failed" || !transcriptResult.segments) {
+        return { success: false, highlights: [], totalDuration: 0, totalHighlightDuration: 0, error: `Transcription failed: ${transcriptResult.error}` };
+      }
+
+      if (transcriptResult.segments.length > 0) {
+        sourceDuration = transcriptResult.segments[transcriptResult.segments.length - 1].endTime;
+      }
+
+      // Analyze with Claude
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: claudeApiKey });
+
+      allHighlights = await claude.analyzeForHighlights(transcriptResult.segments, {
+        criteria: (options.criteria || "all") as HighlightCriteria,
+        targetDuration,
+        maxCount,
+      });
+    }
+
+    if (allHighlights.length === 0) {
+      return { success: true, highlights: [], totalDuration: sourceDuration, totalHighlightDuration: 0 };
+    }
+
+    // Filter and rank
+    const filteredHighlights = filterHighlights(allHighlights, {
+      threshold,
+      targetDuration,
+      maxCount,
+    });
+
+    const totalHighlightDuration = filteredHighlights.reduce((sum, h) => sum + h.duration, 0);
+
+    const extractResult: HighlightsExtractResult = {
+      success: true,
+      highlights: filteredHighlights,
+      totalDuration: sourceDuration,
+      totalHighlightDuration,
+    };
+
+    // Save JSON output
+    if (options.output) {
+      const outputPath = resolve(process.cwd(), options.output);
+      await writeFile(outputPath, JSON.stringify({
+        sourceFile: absPath,
+        totalDuration: sourceDuration,
+        criteria: options.criteria || "all",
+        threshold,
+        highlightsCount: filteredHighlights.length,
+        totalHighlightDuration,
+        highlights: filteredHighlights,
+      }, null, 2), "utf-8");
+      extractResult.outputPath = outputPath;
+    }
+
+    // Create project
+    if (options.project) {
+      const project = new Project("Highlight Reel");
+
+      const source = project.addSource({
+        name: basename(absPath),
+        url: absPath,
+        type: isVideo ? "video" : "audio",
+        duration: sourceDuration,
+      });
+
+      const videoTrack = project.getTracks().find((t) => t.type === "video");
+      if (videoTrack) {
+        let currentTime = 0;
+        for (const highlight of filteredHighlights) {
+          project.addClip({
+            sourceId: source.id,
+            trackId: videoTrack.id,
+            startTime: currentTime,
+            duration: highlight.duration,
+            sourceStartOffset: highlight.startTime,
+            sourceEndOffset: highlight.endTime,
+          });
+          currentTime += highlight.duration;
+        }
+      }
+
+      const projectPath = resolve(process.cwd(), options.project);
+      await writeFile(projectPath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
+      extractResult.projectPath = projectPath;
+    }
+
+    return extractResult;
+  } catch (error) {
+    return {
+      success: false,
+      highlights: [],
+      totalDuration: 0,
+      totalHighlightDuration: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Options for auto-shorts generation
+ */
+export interface AutoShortsOptions {
+  video: string;
+  outputDir?: string;
+  duration?: number;
+  count?: number;
+  aspect?: "9:16" | "1:1";
+  addCaptions?: boolean;
+  captionStyle?: "minimal" | "bold" | "animated";
+  analyzeOnly?: boolean;
+  language?: string;
+  useGemini?: boolean;
+  lowRes?: boolean;
+}
+
+/**
+ * Result of auto-shorts generation
+ */
+export interface AutoShortsResult {
+  success: boolean;
+  shorts: Array<{
+    index: number;
+    startTime: number;
+    endTime: number;
+    duration: number;
+    confidence: number;
+    reason: string;
+    outputPath?: string;
+  }>;
+  error?: string;
+}
+
+/**
+ * Execute the auto-shorts generation pipeline programmatically
+ */
+export async function executeAutoShorts(
+  options: AutoShortsOptions
+): Promise<AutoShortsResult> {
+  try {
+    // Check FFmpeg
+    try {
+      execSync("ffmpeg -version", { stdio: "ignore" });
+    } catch {
+      return { success: false, shorts: [], error: "FFmpeg not found" };
+    }
+
+    const absPath = resolve(process.cwd(), options.video);
+    if (!existsSync(absPath)) {
+      return { success: false, shorts: [], error: `File not found: ${absPath}` };
+    }
+
+    const targetDuration = options.duration ?? 60;
+    const shortCount = options.count ?? 1;
+
+    let highlights: Highlight[] = [];
+
+    if (options.useGemini) {
+      const geminiApiKey = await getApiKey("GOOGLE_API_KEY", "Google");
+      if (!geminiApiKey) {
+        return { success: false, shorts: [], error: "Google API key required for Gemini Video Understanding" };
+      }
+
+      const gemini = new GeminiProvider();
+      await gemini.initialize({ apiKey: geminiApiKey });
+
+      const videoBuffer = await readFile(absPath);
+
+      const geminiPrompt = `Analyze this video to find the BEST moments for short-form vertical video content (TikTok, YouTube Shorts, Instagram Reels).
+
+Find ${shortCount * 3} potential clips that are ${targetDuration} seconds or shorter each.
+
+Look for:
+- Visually striking or surprising moments
+- Emotional peaks (laughter, reactions, reveals)
+- Key quotes or memorable statements
+- Action sequences or dramatic moments
+- Meme-worthy or shareable moments
+- Strong hooks (great opening lines)
+- Satisfying conclusions
+
+For each highlight, provide:
+1. Start timestamp (seconds, as number)
+2. End timestamp (seconds, as number) - ensure duration is close to ${targetDuration}s
+3. Virality score (0-1) - how likely this would perform on social media
+4. Hook quality (0-1) - how strong is the opening
+5. Brief reason why this would work as a short
+
+IMPORTANT: Respond ONLY with valid JSON:
+{
+  "highlights": [
+    {
+      "startTime": 45.2,
+      "endTime": 75.8,
+      "confidence": 0.92,
+      "hookQuality": 0.85,
+      "reason": "Unexpected plot twist with strong visual reaction"
+    }
+  ]
+}
+
+Analyze both VISUALS (expressions, actions, scene changes) and AUDIO (speech, reactions, music) to find viral-worthy moments.`;
+
+      const result = await gemini.analyzeVideo(videoBuffer, geminiPrompt, {
+        fps: 1,
+        lowResolution: options.lowRes,
+      });
+
+      if (!result.success || !result.response) {
+        return { success: false, shorts: [], error: `Gemini analysis failed: ${result.error}` };
+      }
+
+      try {
+        let jsonStr = result.response;
+        const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) jsonStr = jsonMatch[1];
+        const objectMatch = jsonStr.match(/\{[\s\S]*"highlights"[\s\S]*\}/);
+        if (objectMatch) jsonStr = objectMatch[0];
+
+        const parsed = JSON.parse(jsonStr);
+
+        if (parsed.highlights && Array.isArray(parsed.highlights)) {
+          highlights = parsed.highlights.map((h: {
+            startTime: number;
+            endTime: number;
+            confidence?: number;
+            hookQuality?: number;
+            reason?: string;
+          }, i: number) => ({
+            index: i + 1,
+            startTime: h.startTime,
+            endTime: h.endTime,
+            duration: h.endTime - h.startTime,
+            category: "viral" as HighlightCriteria,
+            confidence: h.confidence || 0.8,
+            reason: h.reason || "Engaging moment",
+            transcript: "",
+          }));
+        }
+      } catch {
+        return { success: false, shorts: [], error: "Failed to parse Gemini response" };
+      }
+    } else {
+      // Whisper + Claude flow
+      const openaiApiKey = await getApiKey("OPENAI_API_KEY", "OpenAI");
+      if (!openaiApiKey) {
+        return { success: false, shorts: [], error: "OpenAI API key required for transcription" };
+      }
+
+      const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+      if (!claudeApiKey) {
+        return { success: false, shorts: [], error: "Anthropic API key required for highlight detection" };
+      }
+
+      const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
+      await execAsync(`ffmpeg -i "${absPath}" -vn -acodec libmp3lame -q:a 2 "${tempAudio}" -y`);
+
+      const whisper = new WhisperProvider();
+      await whisper.initialize({ apiKey: openaiApiKey });
+
+      const audioBuffer = await readFile(tempAudio);
+      const audioBlob = new Blob([audioBuffer]);
+      const transcript = await whisper.transcribe(audioBlob, options.language);
+
+      try {
+        await execAsync(`rm "${tempAudio}"`);
+      } catch { /* ignore */ }
+
+      if (!transcript.segments || transcript.segments.length === 0) {
+        return { success: false, shorts: [], error: "No transcript found" };
+      }
+
+      const claude = new ClaudeProvider();
+      await claude.initialize({ apiKey: claudeApiKey });
+
+      highlights = await claude.analyzeForHighlights(transcript.segments, {
+        criteria: "all",
+        targetDuration: targetDuration * shortCount,
+        maxCount: shortCount * 3,
+      });
+    }
+
+    if (highlights.length === 0) {
+      return { success: false, shorts: [], error: "No highlights found" };
+    }
+
+    // Sort by confidence and select best
+    highlights.sort((a, b) => b.confidence - a.confidence);
+    const selectedHighlights = highlights.slice(0, shortCount);
+
+    if (options.analyzeOnly) {
+      return {
+        success: true,
+        shorts: selectedHighlights.map((h, i) => ({
+          index: i + 1,
+          startTime: h.startTime,
+          endTime: h.endTime,
+          duration: h.duration,
+          confidence: h.confidence,
+          reason: h.reason,
+        })),
+      };
+    }
+
+    // Generate shorts
+    const outputDir = options.outputDir
+      ? resolve(process.cwd(), options.outputDir)
+      : dirname(absPath);
+
+    if (options.outputDir && !existsSync(outputDir)) {
+      await mkdir(outputDir, { recursive: true });
+    }
+
+    const result: AutoShortsResult = {
+      success: true,
+      shorts: [],
+    };
+
+    for (let i = 0; i < selectedHighlights.length; i++) {
+      const h = selectedHighlights[i];
+
+      const baseName = basename(absPath, extname(absPath));
+      const outputPath = resolve(outputDir, `${baseName}-short-${i + 1}.mp4`);
+
+      // Get source dimensions
+      const { stdout: probeOut } = await execAsync(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "${absPath}"`
+      );
+      const [width, height] = probeOut.trim().split(",").map(Number);
+
+      // Calculate crop for aspect ratio
+      const aspect = options.aspect || "9:16";
+      const [targetW, targetH] = aspect.split(":").map(Number);
+      const targetRatio = targetW / targetH;
+      const sourceRatio = width / height;
+
+      let cropW: number, cropH: number, cropX: number, cropY: number;
+      if (sourceRatio > targetRatio) {
+        cropH = height;
+        cropW = Math.round(height * targetRatio);
+        cropX = Math.round((width - cropW) / 2);
+        cropY = 0;
+      } else {
+        cropW = width;
+        cropH = Math.round(width / targetRatio);
+        cropX = 0;
+        cropY = Math.round((height - cropH) / 2);
+      }
+
+      const vf = `crop=${cropW}:${cropH}:${cropX}:${cropY}`;
+      const cmd = `ffmpeg -ss ${h.startTime} -i "${absPath}" -t ${h.duration} -vf "${vf}" -c:a aac -b:a 128k "${outputPath}" -y`;
+
+      await execAsync(cmd, { timeout: 300000 });
+
+      result.shorts.push({
+        index: i + 1,
+        startTime: h.startTime,
+        endTime: h.endTime,
+        duration: h.duration,
+        confidence: h.confidence,
+        reason: h.reason,
+        outputPath,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      shorts: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Options for Gemini video analysis
+ */
+export interface GeminiVideoOptions {
+  source: string;
+  prompt: string;
+  model?: "flash" | "flash-2.5" | "pro";
+  fps?: number;
+  start?: number;
+  end?: number;
+  lowRes?: boolean;
+}
+
+/**
+ * Result of Gemini video analysis
+ */
+export interface GeminiVideoResult {
+  success: boolean;
+  response?: string;
+  model?: string;
+  totalTokens?: number;
+  promptTokens?: number;
+  responseTokens?: number;
+  error?: string;
+}
+
+/**
+ * Execute Gemini video analysis programmatically
+ */
+export async function executeGeminiVideo(
+  options: GeminiVideoOptions
+): Promise<GeminiVideoResult> {
+  try {
+    const apiKey = await getApiKey("GOOGLE_API_KEY", "Google");
+    if (!apiKey) {
+      return { success: false, error: "Google API key required" };
+    }
+
+    const isYouTube = options.source.includes("youtube.com") || options.source.includes("youtu.be");
+
+    const modelMap: Record<string, string> = {
+      flash: "gemini-3-flash-preview",
+      "flash-2.5": "gemini-2.5-flash",
+      pro: "gemini-2.5-pro",
+    };
+    const modelId = modelMap[options.model || "flash"] || modelMap.flash;
+
+    let videoData: Buffer | string;
+    if (isYouTube) {
+      videoData = options.source;
+    } else {
+      const absPath = resolve(process.cwd(), options.source);
+      if (!existsSync(absPath)) {
+        return { success: false, error: `File not found: ${absPath}` };
+      }
+      videoData = await readFile(absPath);
+    }
+
+    const gemini = new GeminiProvider();
+    await gemini.initialize({ apiKey });
+
+    const result = await gemini.analyzeVideo(videoData, options.prompt, {
+      model: modelId as "gemini-3-flash-preview" | "gemini-2.5-flash" | "gemini-2.5-pro",
+      fps: options.fps,
+      startOffset: options.start,
+      endOffset: options.end,
+      lowResolution: options.lowRes,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Video analysis failed" };
+    }
+
+    return {
+      success: true,
+      response: result.response,
+      model: result.model,
+      totalTokens: result.totalTokens,
+      promptTokens: result.promptTokens,
+      responseTokens: result.responseTokens,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 aiCommand
   .command("providers")
   .description("List available AI providers")

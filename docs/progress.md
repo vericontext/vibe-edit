@@ -6,6 +6,212 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-04
 
+### Feature: Agent Pipeline Tools (4 new tools)
+
+Added 4 advanced AI pipeline tools to the Agent mode, enabling full script-to-video production and video analysis capabilities directly through natural language.
+
+**New Agent Tools:**
+| Tool | Description |
+|------|-------------|
+| `ai_script_to_video` | Generate complete video from text script (Claude storyboard → ElevenLabs TTS → Image gen → Video gen) |
+| `ai_highlights` | Extract highlights from long-form video/audio using Whisper+Claude or Gemini Video |
+| `ai_auto_shorts` | Auto-generate vertical shorts from long-form video for TikTok/YouTube Shorts/Reels |
+| `ai_gemini_video` | Analyze video with Gemini Video Understanding (summarize, Q&A, timestamps) |
+
+**Implementation Approach:**
+- Extracted core logic from CLI commands into reusable exported functions
+- Agent tools call these functions directly, ensuring CLI and Agent behavior consistency
+- Retry logic, error handling, and all CLI features preserved in Agent tools
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` - Added exported functions: `executeScriptToVideo()`, `executeHighlights()`, `executeAutoShorts()`, `executeGeminiVideo()` with full TypeScript interfaces
+- `packages/cli/src/agent/tools/ai.ts` - Added 4 tool definitions and handlers
+
+**Usage Examples:**
+```bash
+# Start Agent mode
+pnpm vibe
+
+# Script-to-video via natural language
+you> 제품 소개 영상 만들어줘. 스크립트: "새 앱 소개. 주요 기능 설명. 다운로드 방법."
+vibe> (uses: ai_script_to_video)
+✅ Script-to-Video complete!
+📁 Output: ./script-video-output
+🎬 Scenes: 3
+🎙️  Narrations: 3 narration-*.mp3
+🖼️  Images: 3 scene-*.png
+🎥 Videos: 3 scene-*.mp4
+
+# Extract highlights
+you> video.mp4에서 하이라이트 추출해줘
+vibe> (uses: ai_highlights)
+✅ Found 5 highlights (45.2s total)
+1. [0:12.5 - 0:28.3] emotional (95%)
+   Powerful personal story about overcoming challenges
+...
+
+# Analyze video with Gemini
+you> 이 영상 요약해줘 demo.mp4
+vibe> (uses: ai_gemini_video)
+This video demonstrates the new product features...
+
+# Generate shorts
+you> long-video.mp4에서 쇼츠 3개 만들어줘
+vibe> (uses: ai_auto_shorts)
+✅ Generated 3 short(s):
+[Short 1] 0:45.2 - 1:05.8 (20.6s)
+  Unexpected plot twist with strong visual reaction
+  Confidence: 92%
+  📁 ./long-video-short-1.mp4
+...
+```
+
+**Total Agent Tools:** 35 → 39
+
+---
+
+### Feature: Agent Mode as Default Entry Point
+
+Changed `vibe` command to start Agent mode by default instead of REPL mode. Added `--confirm` flag for tool execution confirmation.
+
+**Changes:**
+- `vibe` now starts Agent mode instead of REPL mode
+- Added `-c, --confirm` flag: prompts for confirmation before each tool execution
+- Added `-i, --input <query>` for non-interactive single-query execution
+- Deprecated REPL mode (code kept for library usage, marked with `@deprecated`)
+- Exported `startAgent()` function for programmatic usage
+
+**Files Modified:**
+- `packages/cli/src/index.ts` - Changed default from `startRepl()` to `startAgent()`
+- `packages/cli/src/commands/agent.ts` - Added `--confirm` flag, extracted `startAgent()` function
+- `packages/cli/src/agent/index.ts` - Added `confirmCallback` option to `AgentExecutorOptions`
+- `docs/cli-guide.md` - Updated documentation to reflect Agent mode as default
+
+**Usage:**
+```bash
+vibe                          # Start Agent mode (default)
+vibe --confirm                # Confirm before each tool execution
+vibe -c -p claude             # Confirm mode with Claude provider
+vibe -i "파일 목록 보여줘"     # Run single query and exit
+```
+
+**Confirm Mode Example:**
+```
+you> 프로젝트 만들어줘
+
+Execute project_create?
+{"name": "untitled", "outputPath": "./untitled.vibe.json"}
+(y/n): y
+
+vibe> 프로젝트가 생성되었습니다.
+```
+
+---
+
+### Feature: Agentic System with Multi-Provider LLM Support
+
+Implemented a Claude Code-like agentic loop architecture that allows LLM to reason, call tools, receive results, and continue reasoning autonomously. Converts the single-turn REPL to a full agentic system.
+
+**Architecture:**
+- `User Input → LLM Reasoning → Tool Call → Result → LLM Reasoning → Tool Call → ... → Final Response`
+- Multi-turn conversations with tool-calling capabilities
+- Support for 4 LLM providers: OpenAI, Claude, Gemini, Ollama
+
+**Files Created:**
+- `packages/cli/src/agent/types.ts` - Core type definitions (ToolDefinition, ToolCall, ToolResult, AgentMessage, AgentConfig, etc.)
+- `packages/cli/src/agent/index.ts` - AgentExecutor main loop orchestrator
+- `packages/cli/src/agent/adapters/index.ts` - LLMAdapter interface and factory
+- `packages/cli/src/agent/adapters/openai.ts` - OpenAI Function Calling adapter
+- `packages/cli/src/agent/adapters/claude.ts` - Claude tool_use adapter
+- `packages/cli/src/agent/adapters/gemini.ts` - Gemini Function Calling adapter
+- `packages/cli/src/agent/adapters/ollama.ts` - Ollama JSON parsing adapter
+- `packages/cli/src/agent/tools/index.ts` - ToolRegistry class
+- `packages/cli/src/agent/tools/project.ts` - 5 project tools
+- `packages/cli/src/agent/tools/timeline.ts` - 10 timeline tools
+- `packages/cli/src/agent/tools/filesystem.ts` - 4 filesystem tools
+- `packages/cli/src/agent/tools/media.ts` - 5 media analysis tools
+- `packages/cli/src/agent/tools/ai.ts` - 8 AI generation tools
+- `packages/cli/src/agent/tools/export.ts` - 3 export tools
+- `packages/cli/src/agent/memory/index.ts` - ConversationMemory class
+- `packages/cli/src/agent/prompts/system.ts` - System prompt generation
+- `packages/cli/src/commands/agent.ts` - CLI agent command
+
+**Files Modified:**
+- `packages/cli/src/index.ts` - Added agentCommand and exports
+- `packages/cli/package.json` - Added @anthropic-ai/sdk, @google/generative-ai, openai dependencies
+
+**Tools Implemented (35 total):**
+| Category | Tools |
+|----------|-------|
+| Project (5) | project_create, project_info, project_set, project_open, project_save |
+| Timeline (10) | timeline_add_source, timeline_add_clip, timeline_add_track, timeline_add_effect, timeline_trim, timeline_split, timeline_move, timeline_delete, timeline_duplicate, timeline_list |
+| Filesystem (4) | fs_list, fs_read, fs_write, fs_exists |
+| Media (5) | media_info, detect_scenes, detect_silence, detect_beats, ai_transcribe |
+| AI (8) | ai_image, ai_video, ai_kling, ai_tts, ai_sfx, ai_music, ai_storyboard, ai_motion |
+| Export (3) | export_video, export_audio, export_subtitles |
+
+**Usage:**
+```bash
+# Start agent with default provider (OpenAI)
+vibe agent
+
+# Use Claude as provider
+vibe agent -p claude
+
+# Use Gemini
+vibe agent -p gemini
+
+# Use local Ollama
+vibe agent -p ollama
+
+# Specify model
+vibe agent -p openai -m gpt-4o
+
+# Load project on start
+vibe agent --project ./my-project.vibe.json
+
+# Verbose mode (show tool calls)
+vibe agent -v
+```
+
+**Example Interaction:**
+```
+$ vibe agent
+
+🤖 VibeFrame AI Agent
+Provider: openai
+Type "exit" to quit, "reset" to clear context
+
+you> 새 프로젝트 만들고 sunset.mp4 추가해줘
+
+vibe> 프로젝트를 생성하고 미디어를 추가하겠습니다.
+(used: project_create, timeline_add_source, timeline_add_clip)
+
+완료:
+- 프로젝트 "untitled" 생성
+- sunset.mp4 (45초, 1920x1080) 추가됨
+
+you> 처음 10초만 남기고 페이드 아웃 넣어줘
+
+vibe> 클립을 트리밍하고 효과를 추가하겠습니다.
+(used: timeline_trim, timeline_add_effect)
+
+완료:
+- 0-10초로 트리밍
+- 마지막 2초에 페이드 아웃 적용
+```
+
+**Verification:**
+```bash
+# Check help
+vibe agent --help
+
+# Build passes
+pnpm build
+```
+
+---
+
 ### Feature: Script-to-Video Improvements - Retry Logic & Scene Regeneration
 
 Added automatic retry logic for video generation failures and a new `regenerate-scene` command for fixing failed scenes without regenerating the entire video.
