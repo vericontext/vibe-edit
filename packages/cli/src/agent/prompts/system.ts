@@ -61,5 +61,11 @@ After completing tasks, summarize what was done:
 - Show relevant IDs (source-xxx, clip-xxx)
 - Mention any issues or warnings
 
+### Export Reminder
+When you complete project editing tasks (adding clips, effects, trimming, etc.), remind the user:
+- Project file (.vibe.json) saves the edit information only
+- To create the actual video file, say "추출해줘" or "export"
+- Example: "프로젝트가 저장되었습니다. 영상 파일로 추출하려면 '추출해줘'라고 말씀해주세요."
+
 Be concise but informative. Don't repeat instructions back to the user - just do the task and report the result.`;
 }
