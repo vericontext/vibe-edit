@@ -5,14 +5,31 @@ import type {
 } from "../interface/types.js";
 
 /**
+ * GPT Image model types
+ * - gpt-image-1.5: Latest model (fastest, best quality)
+ * - dall-e-3: Legacy model
+ */
+export type GPTImageModel = "gpt-image-1.5" | "dall-e-3";
+
+/**
+ * GPT Image 1.5 quality tiers
+ * - low: $0.009/image (fastest)
+ * - medium: $0.035/image
+ * - high: $0.133/image (best quality)
+ */
+export type GPTImageQuality = "low" | "medium" | "high";
+
+/**
  * Image generation options
  */
 export interface ImageOptions {
+  /** Model to use */
+  model?: GPTImageModel;
   /** Image size */
-  size?: "1024x1024" | "1792x1024" | "1024x1792";
-  /** Quality */
-  quality?: "standard" | "hd";
-  /** Style */
+  size?: "1024x1024" | "1792x1024" | "1024x1792" | "auto";
+  /** Quality tier (gpt-image-1.5) or standard/hd (dall-e-3) */
+  quality?: GPTImageQuality | "standard" | "hd";
+  /** Style (dall-e-3 only) */
   style?: "vivid" | "natural";
   /** Number of images to generate */
   n?: number;
@@ -44,14 +61,17 @@ export interface ImageEditOptions {
   n?: number;
 }
 
+/** Default model - GPT Image 1.5 is fastest and best quality */
+const DEFAULT_MODEL: GPTImageModel = "gpt-image-1.5";
+
 /**
- * DALL-E provider for image generation
+ * OpenAI Image provider (GPT Image 1.5 / DALL-E)
  */
 export class DalleProvider implements AIProvider {
   id = "dalle";
-  name = "OpenAI DALL-E";
-  description = "AI image generation for thumbnails, backgrounds, and visual assets";
-  capabilities: AICapability[] = ["background-removal"];
+  name = "OpenAI GPT Image";
+  description = "AI image generation with GPT Image 1.5 (fastest, best quality)";
+  capabilities: AICapability[] = ["text-to-image", "background-removal"];
   iconUrl = "/icons/openai.svg";
   isAvailable = true;
 
@@ -71,6 +91,7 @@ export class DalleProvider implements AIProvider {
 
   /**
    * Generate images from text prompt
+   * Uses GPT Image 1.5 by default (fastest, best quality)
    */
   async generateImage(
     prompt: string,
@@ -83,27 +104,43 @@ export class DalleProvider implements AIProvider {
       };
     }
 
+    const model = options.model || DEFAULT_MODEL;
+    const isGPTImage = model === "gpt-image-1.5";
+
     try {
+      // Build request body based on model
+      const body: Record<string, unknown> = {
+        model,
+        prompt,
+        n: options.n || 1,
+        response_format: "url",
+      };
+
+      if (isGPTImage) {
+        // GPT Image 1.5 options
+        body.quality = options.quality || "high";
+        if (options.size && options.size !== "auto") {
+          body.size = options.size;
+        }
+      } else {
+        // DALL-E 3 options
+        body.size = options.size || "1024x1024";
+        body.quality = options.quality === "high" ? "hd" : (options.quality || "standard");
+        body.style = options.style || "vivid";
+      }
+
       const response = await fetch(`${this.baseUrl}/images/generations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
         },
-        body: JSON.stringify({
-          model: "dall-e-3",
-          prompt,
-          n: options.n || 1,
-          size: options.size || "1024x1024",
-          quality: options.quality || "standard",
-          style: options.style || "vivid",
-          response_format: "url",
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         const error = await response.text();
-        console.error("DALL-E API error:", error);
+        console.error("OpenAI Image API error:", error);
         return {
           success: false,
           error: `API error: ${response.status}`,
@@ -158,8 +195,7 @@ export class DalleProvider implements AIProvider {
 
     return this.generateImage(prompt, {
       size: style ? sizeMap[style] : "1792x1024",
-      quality: "hd",
-      style: "vivid",
+      quality: "high",
     });
   }
 
@@ -180,8 +216,7 @@ export class DalleProvider implements AIProvider {
 
     return this.generateImage(prompt, {
       size: sizeMap[aspectRatio],
-      quality: "hd",
-      style: "natural",
+      quality: "high",
     });
   }
 
