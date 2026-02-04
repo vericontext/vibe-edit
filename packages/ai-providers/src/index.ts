@@ -16,6 +16,8 @@ export type { ImageOptions, ImageResult, ImageEditOptions } from "./dalle/index.
 export { RunwayProvider, runwayProvider } from "./runway/index.js";
 export { KlingProvider, klingProvider } from "./kling/index.js";
 export type { KlingVideoExtendOptions } from "./kling/index.js";
+export { GrokProvider, grokProvider } from "./grok/index.js";
+export type { GrokModel, GrokVideoOptions } from "./grok/index.js";
 export { StabilityProvider, stabilityProvider } from "./stability/index.js";
 export { ReplicateProvider, replicateProvider } from "./replicate/index.js";
 export type { ReplicateUpscaleOptions, ReplicateUpscaleResult, ReplicateInpaintOptions, MusicGenerationOptions, MusicGenerationResult, AudioRestorationOptions, AudioRestorationResult } from "./replicate/index.js";

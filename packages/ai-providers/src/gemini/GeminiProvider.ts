@@ -64,10 +64,14 @@ export interface GeminiImageResult {
 
 /**
  * Veo model versions for video generation
- * - veo-3.1-fast: Fast preview ($0.15/sec)
- * - veo-3.1: Standard preview ($0.40/sec)
+ * - veo-3.0: Veo 3 (native audio, 4K)
+ * - veo-3.1: Veo 3.1 Standard ($0.40/sec)
+ * - veo-3.1-fast: Veo 3.1 Fast ($0.15/sec)
  */
-export type VeoModel = "veo-3.1-fast-generate-preview" | "veo-3.1-generate-preview";
+export type VeoModel =
+  | "veo-3.0-generate-preview"
+  | "veo-3.1-generate-preview"
+  | "veo-3.1-fast-generate-preview";
 
 /**
  * Veo video generation options

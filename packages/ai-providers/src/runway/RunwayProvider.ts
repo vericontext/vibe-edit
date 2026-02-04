@@ -8,13 +8,12 @@ import type {
 
 /**
  * Runway model versions
- * - gen4.5: Latest model (best quality, coming soon to API)
- * - gen3a_turbo: Gen-3 Alpha Turbo (current default)
+ * - gen4.5: Latest model (best quality)
  */
-export type RunwayModel = "gen4.5" | "gen3a_turbo";
+export type RunwayModel = "gen4.5";
 
-/** Default model - Gen-4.5 when available, fallback to gen3a_turbo */
-const DEFAULT_MODEL: RunwayModel = "gen3a_turbo"; // TODO: Switch to gen4.5 when API available
+/** Default model - Gen-4.5 */
+const DEFAULT_MODEL: RunwayModel = "gen4.5";
 
 /**
  * Runway video generation options
@@ -52,12 +51,12 @@ interface RunwayTaskResponse {
 
 /**
  * Runway provider for professional video generation
- * Supports Gen-4.5 (when available) and Gen-3 Alpha Turbo
+ * Uses Gen-4.5 model (top-ranked on Artificial Analysis benchmark)
  */
 export class RunwayProvider implements AIProvider {
   id = "runway";
   name = "Runway";
-  description = "Professional AI video generation with Gen-4.5 / Gen-3 Alpha Turbo";
+  description = "Professional AI video generation with Gen-4.5";
   capabilities: AICapability[] = [
     "text-to-video",
     "image-to-video",
