@@ -62,7 +62,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-sm text-primary mb-8 animate-fade-in">
             <Sparkles className="w-4 h-4" />
             <span>AI-native video editing</span>
-            <span className="px-2 py-0.5 rounded-full bg-primary/20 text-xs font-medium">v0.1</span>
+            <span className="px-2 py-0.5 rounded-full bg-primary/20 text-xs font-medium">v0.4</span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in-up">
@@ -100,7 +100,7 @@ export default function LandingPage() {
               className="flex items-center gap-2 rounded-lg border border-border px-6 py-3 font-medium hover:bg-secondary hover:border-primary/30 transition-all"
             >
               <Terminal className="w-5 h-5" />
-              Try Interactive Mode
+              Try Agent Mode
             </Link>
           </div>
         </div>
@@ -112,14 +112,14 @@ export default function LandingPage() {
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/5 px-4 py-1.5 text-sm text-purple-400 mb-4">
               <Terminal className="w-4 h-4" />
-              <span>New Feature</span>
+              <span>Default Mode</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Interactive Mode
+              Agent Mode
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Just type <code className="text-primary bg-primary/10 px-2 py-0.5 rounded">vibe</code> and
-              start editing with natural language. No flags, no memorization.
+              let the AI agent handle multi-step tasks autonomously. 46 tools at your command.
             </p>
           </div>
 
@@ -256,7 +256,7 @@ export default function LandingPage() {
             <FeatureCard
               icon={<Terminal className="w-6 h-6" />}
               title="CLI-First"
-              description="Full video editing from the command line. 220 tests. Zero GUI required."
+              description="Full video editing from the command line. 256 tests. Zero GUI required."
               gradient="from-blue-500 to-cyan-500"
             />
             <FeatureCard
@@ -317,7 +317,7 @@ export default function LandingPage() {
                   </span>
                 ))}
                 <span className="text-xs bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full text-primary">
-                  +8 more tools
+                  +42 more tools
                 </span>
               </div>
             </div>
@@ -419,19 +419,17 @@ function TerminalAnimation() {
 
   const lines = [
     { type: "logo", content: "" },
-    { type: "prompt", content: "new my-awesome-video" },
-    { type: "success", content: "Created project: my-awesome-video" },
-    { type: "prompt", content: "add intro.mp4" },
-    { type: "success", content: "Added: intro.mp4" },
-    { type: "prompt", content: "trim the clip to 5 seconds" },
-    { type: "loading", content: "Processing..." },
-    { type: "success", content: "Executed 1/1 command(s)" },
-    { type: "detail", content: "  - Trim clip to 5.0s duration" },
-    { type: "prompt", content: "add fade in effect" },
-    { type: "success", content: "Executed 1/1 command(s)" },
-    { type: "detail", content: "  - Add fadeIn effect" },
-    { type: "prompt", content: "save" },
-    { type: "success", content: "Saved to: my-awesome-video.vibe.json" },
+    { type: "prompt", content: "create a new project and add intro.mp4" },
+    { type: "agent", content: "I'll create a project and add the media file." },
+    { type: "tool", content: "(uses: project_create, timeline_add_source)" },
+    { type: "success", content: "Project created, intro.mp4 added" },
+    { type: "prompt", content: "trim it to 5 seconds and add fade effects" },
+    { type: "agent", content: "I'll trim the clip and add fade in/out effects." },
+    { type: "tool", content: "(uses: timeline_trim, timeline_add_effect x2)" },
+    { type: "success", content: "Done: trimmed to 5s, fadeIn + fadeOut applied" },
+    { type: "prompt", content: "export to mp4" },
+    { type: "tool", content: "(uses: export_video)" },
+    { type: "success", content: "Exported: my-project.mp4 (5s, 1080p)" },
   ];
 
   useEffect(() => {
@@ -453,20 +451,26 @@ function TerminalAnimation() {
   ╚═══╝  ╚═╝╚═════╝ ╚══════╝  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝`}
       </div>
       <div className="text-muted-foreground text-xs mb-4">
-        AI-First Video Editor<br/>
-        Type <span className="text-foreground">help</span> for commands
+        46 tools · openai<br/>
+        Commands: exit · reset · tools · context
       </div>
 
       {lines.slice(1, Math.min(step + 1, lines.length)).map((line, i) => (
         <div key={i} className="flex items-start gap-2 mb-1">
           {line.type === "prompt" && (
             <>
-              <span className="text-purple-400">vibe&gt;</span>
+              <span className="text-blue-400">you&gt;</span>
               <span className="text-foreground">{line.content}</span>
               {i === Math.min(step, lines.length - 1) - 1 && (
                 <span className="animate-pulse">▊</span>
               )}
             </>
+          )}
+          {line.type === "agent" && (
+            <span className="text-purple-400">vibe&gt; {line.content}</span>
+          )}
+          {line.type === "tool" && (
+            <span className="text-muted-foreground text-xs">{line.content}</span>
           )}
           {line.type === "success" && (
             <span className="text-green-400">✓ {line.content}</span>
@@ -482,7 +486,7 @@ function TerminalAnimation() {
 
       {step >= lines.length && (
         <div className="flex items-start gap-2">
-          <span className="text-purple-400">vibe&gt;</span>
+          <span className="text-blue-400">you&gt;</span>
           <span className="animate-pulse">▊</span>
         </div>
       )}
