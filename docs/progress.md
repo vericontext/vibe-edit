@@ -4,6 +4,51 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
+## 2026-02-04 (v0.4.1)
+
+### Docs: CLI Guide Update & Business Direction
+
+#### 1. CLI Guide v0.4.0 Update
+
+Comprehensive update to `docs/cli-guide.md` to reflect v0.4.0 changes.
+
+**Changes:**
+- Version numbers: `0.2.x` → `0.4.x`
+- Tool counts: `39` → `46` (all occurrences)
+- Updated tool categories table with counts and new tools
+- Added voice names table for TTS (Rachel, Adam, Sam, Bella, Josh, Arnold)
+- Added new Batch Operations section (import, apply-effect, concat)
+- Added new Media Manipulation section (compress, convert, concat)
+- Added `timeline_clear` command documentation
+- Improved Video Generation workflow with complete steps
+- Translated all Korean examples to English
+
+**Files Modified:**
+- `docs/cli-guide.md`
+
+#### 2. VibeFrame Cloud Business Direction
+
+Added business direction hints for future monetization while keeping open-source commitment clear.
+
+**README.md:**
+- Added "Open Core Model" section
+- Core is 100% open source (MIT)
+- VibeFrame Cloud (coming soon) preview: Distributed Rendering, Team Workspaces, Hosted MCP Endpoint, Template Marketplace
+
+**roadmap.md:**
+- Phase 5: Split into Open Source (Self-Hosted) vs VibeFrame Cloud (Managed Service)
+  - Hosted MCP Endpoint, Auto-scaling render queues, CDN storage
+- Phase 6: Split into Local-First (Open Source) vs Team Collaboration (Cloud)
+  - Team Workspaces, role-based access, asset libraries
+- Phase 7: Added VibeFrame Marketplace and Enterprise features
+  - Template Marketplace, Creator monetization, SSO/SAML, SLA
+
+**Files Modified:**
+- `README.md`
+- `docs/roadmap.md`
+
+---
+
 ## 2026-02-04 (v0.4.0)
 
 ### Feature: Media Pipeline Improvements
