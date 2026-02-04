@@ -132,31 +132,34 @@ defaults:
 
 ### Environment Variables
 ```bash
-export GOOGLE_API_KEY="AIza..."          # Gemini (image, video analysis)
+export GOOGLE_API_KEY="AIza..."          # Gemini (image, Veo video)
 export ELEVENLABS_API_KEY="..."          # TTS, SFX
 export ANTHROPIC_API_KEY="sk-ant-..."    # Claude
-export OPENAI_API_KEY="sk-..."           # Whisper, DALL-E
-export STABILITY_API_KEY="sk-..."        # Stable Diffusion
-export RUNWAY_API_SECRET="..."           # Runway
-export KLING_API_KEY="..."               # Kling
+export OPENAI_API_KEY="sk-..."           # GPT, Whisper, GPT Image 1.5
+export STABILITY_API_KEY="sk-..."        # Stability AI (image editing)
+export RUNWAY_API_SECRET="..."           # Runway Gen-4.5
+export KLING_API_KEY="..."               # Kling v2.5/v2.6
+export XAI_API_KEY="..."                 # xAI Grok Imagine
 ```
 
 ### API Keys by Command
 
-| Command | Required API Key |
-|---------|-----------------|
-| `vibe ai image` (default) | `GOOGLE_API_KEY` |
-| `vibe ai image -p dalle` | `OPENAI_API_KEY` |
-| `vibe ai image -p stability` | `STABILITY_API_KEY` |
-| `vibe ai tts`, `sfx`, `voices` | `ELEVENLABS_API_KEY` |
-| `vibe ai transcribe` | `OPENAI_API_KEY` |
-| `vibe ai highlights` | `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` |
-| `vibe ai highlights --use-gemini` | `GOOGLE_API_KEY` |
-| `vibe ai auto-shorts` | Same as highlights |
-| `vibe ai storyboard` | `ANTHROPIC_API_KEY` |
-| `vibe ai script-to-video` | `ANTHROPIC_API_KEY` + `GOOGLE_API_KEY` |
-| `vibe ai video` | `RUNWAY_API_SECRET` |
-| `vibe ai kling` | `KLING_API_KEY` |
+| Command | Required API Key | Model |
+|---------|-----------------|-------|
+| `vibe ai image` (default) | `GOOGLE_API_KEY` | Gemini Nano Banana |
+| `vibe ai image -p dalle` | `OPENAI_API_KEY` | GPT Image 1.5 |
+| `vibe ai image -p stability` | `STABILITY_API_KEY` | Stable Diffusion XL |
+| `vibe ai tts`, `sfx`, `voices` | `ELEVENLABS_API_KEY` | ElevenLabs |
+| `vibe ai transcribe` | `OPENAI_API_KEY` | Whisper |
+| `vibe ai highlights` | `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` | Whisper + Claude |
+| `vibe ai highlights --use-gemini` | `GOOGLE_API_KEY` | Gemini |
+| `vibe ai auto-shorts` | Same as highlights | Same as highlights |
+| `vibe ai storyboard` | `ANTHROPIC_API_KEY` | Claude |
+| `vibe ai script-to-video` | `ANTHROPIC_API_KEY` + `GOOGLE_API_KEY` | Claude + Gemini |
+| `vibe ai video` | `RUNWAY_API_SECRET` | Runway Gen-4.5 |
+| `vibe ai video -p veo` | `GOOGLE_API_KEY` | Veo 3.0/3.1 |
+| `vibe ai video -p grok` | `XAI_API_KEY` | Grok Imagine |
+| `vibe ai kling` | `KLING_API_KEY` | Kling v2.5-turbo/v2.6 |
 
 ---
 
@@ -291,6 +294,14 @@ Done:
 
 ### Image Generation
 
+**Available Models:**
+
+| Provider | Model | Notes |
+|----------|-------|-------|
+| `gemini` (default) | Nano Banana Flash/Pro | Fast, high quality |
+| `dalle` | GPT Image 1.5 | Quality tiers: low/medium/high |
+| `stability` | Stable Diffusion XL | Best for editing workflows |
+
 ```bash
 # Gemini (default) - fast and high quality
 vibe ai image "cute robot mascot" -o robot.png
@@ -301,8 +312,11 @@ vibe ai image "aurora borealis, night sky" -o wallpaper.png -r 9:16
 # Landscape ratio (16:9) for video background
 vibe ai image "cinematic mountain landscape" -o background.png -r 16:9
 
-# Use DALL-E
+# Use GPT Image 1.5 (OpenAI)
 vibe ai image "abstract digital art" -o art.png -p dalle
+
+# GPT Image 1.5 with quality tier
+vibe ai image "professional photo" -o photo.png -p dalle --quality high
 
 # Use Stability AI (realistic images)
 vibe ai image "professional headshot, studio lighting" -o headshot.png -p stability
@@ -320,7 +334,7 @@ you> make a 16:9 mountain landscape image for video background
 |--------|---------|
 | `--provider` | `gemini` |
 | `--ratio` | `1:1` |
-| `--size` (DALL-E) | `1024x1024` |
+| `--quality` (DALL-E) | `medium` |
 
 ---
 
@@ -428,9 +442,19 @@ you> create subtitles for Korean audio
 
 ---
 
-### Video Generation (Image-to-Video)
+### Video Generation (Image-to-Video / Text-to-Video)
 
-> **Note:** Video generation requires an image. Generate one first if you don't have one.
+**Available Models:**
+
+| Provider | Model | Duration | Notes |
+|----------|-------|----------|-------|
+| `runway` (default) | Gen-4.5 | 5-10 sec | Top-ranked quality |
+| `veo` | Veo 3.0/3.1/3.1-fast | 5-8 sec | Google, native audio |
+| `grok` | Grok Imagine | 1-15 sec | xAI, native audio, $4.20/min |
+| `kling` | v2.5-turbo (default) | 5-10 sec | Fast (~36s generation) |
+| `kling` | v2.6 | 5-10 sec | Higher quality |
+
+> **Note:** Video generation requires an image for image-to-video. Generate one first if you don't have one.
 
 #### Complete Workflow (Recommended)
 
@@ -438,21 +462,30 @@ you> create subtitles for Korean audio
 # Step 1: Generate image (if needed)
 vibe ai image "beautiful sunset over ocean, cinematic" -o sunset.png
 
-# Step 2: Generate video from image
+# Step 2: Generate video from image (Runway Gen-4.5)
 vibe ai video "gentle waves, golden hour" -i sunset.png -o sunset.mp4
 
 # Step 3: Check status (async operation)
 vibe ai video-status <task-id>
 ```
 
-#### If You Already Have an Image
+#### Different Providers
 
 ```bash
-# Convert existing image to video with Runway Gen-3
+# Runway Gen-4.5 (default, highest quality)
 vibe ai video "camera slowly zooms in, golden hour lighting" -i my-photo.png -o video.mp4
 
-# Or use Kling AI
+# Kling v2.5 turbo (fast, ~36 seconds)
 vibe ai kling "waves gently moving, cinematic" -i my-photo.png -o video-kling.mp4
+
+# Kling v2.6 (higher quality)
+vibe ai kling "waves gently moving, cinematic" -i my-photo.png -o video-kling.mp4 --model kling-v2-6
+
+# Google Veo 3.1 (native audio)
+vibe ai video "cinematic scene" -i my-photo.png -o video-veo.mp4 -p veo
+
+# xAI Grok Imagine (1-15 sec, native audio)
+vibe ai video "cinematic scene" -i my-photo.png -o video-grok.mp4 -p grok
 ```
 
 #### Status & Control
@@ -470,8 +503,8 @@ vibe ai video-cancel <task-id>
 you> create an image and convert it to video
 # Agent will: 1) Generate image 2) Generate video
 
-you> convert sunset.png to video
-# Agent will use existing image
+you> convert sunset.png to video using kling
+# Agent will use Kling v2.5-turbo
 
 you> check video generation status
 ```

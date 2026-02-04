@@ -36,7 +36,7 @@ Engine (Project state management)
     ↓
 Core (Zustand + Immer store, timeline operations, FFmpeg export)
     ↓
-AI Providers (pluggable: OpenAI, Claude, Gemini, ElevenLabs, Runway, Kling, etc.)
+AI Providers (pluggable: OpenAI, Claude, Gemini, ElevenLabs, Runway, Kling, xAI Grok, etc.)
 ```
 
 ### Skills → CLI → Agent Workflow
@@ -297,8 +297,46 @@ git tag vX.Y.Z
 ## Environment Variables
 
 Copy `.env.example` to `.env`. Each AI provider has its own API key:
-- `OPENAI_API_KEY` - GPT, Whisper, DALL-E
+- `OPENAI_API_KEY` - GPT, Whisper, GPT Image 1.5
 - `ANTHROPIC_API_KEY` - Claude
-- `GOOGLE_API_KEY` - Gemini
+- `GOOGLE_API_KEY` - Gemini (image, Veo video)
 - `ELEVENLABS_API_KEY` - TTS, SFX
-- `RUNWAY_API_SECRET`, `KLING_API_KEY`, `STABILITY_API_KEY` - Video/image generation
+- `RUNWAY_API_SECRET` - Runway Gen-4.5 video
+- `KLING_API_KEY` - Kling v2.5/v2.6 video
+- `XAI_API_KEY` - xAI Grok Imagine video
+- `STABILITY_API_KEY` - Stability AI image editing
+
+## AI Provider Models
+
+### Text-to-Image
+
+| Provider | Model | Notes |
+|----------|-------|-------|
+| **OpenAI** | `gpt-image-1.5` | Default. Quality tiers: low ($0.009), medium ($0.035), high ($0.133) |
+| **Gemini** | `gemini-2.5-flash-image` | Nano Banana Flash - fast |
+| **Gemini** | `gemini-3-pro-image-preview` | Nano Banana Pro - higher quality |
+| **Stability** | `stable-diffusion-xl` | For image editing (upscale, remove-bg, outpaint) |
+
+### Text-to-Video
+
+| Provider | Model | Duration | Notes |
+|----------|-------|----------|-------|
+| **Runway** | `gen4.5` | 5-10 sec | Top-ranked quality |
+| **Google Veo** | `veo-3.0-generate-preview` | 5-8 sec | Native audio support |
+| **Google Veo** | `veo-3.1-generate-preview` | 5-8 sec | Latest version |
+| **Google Veo** | `veo-3.1-fast-generate-preview` | 5-8 sec | Faster generation |
+| **xAI Grok** | `grok-imagine-video` | 1-15 sec | Native audio, $4.20/min |
+| **Kling** | `kling-v2-5-turbo` | 5-10 sec | Default, fast (~36s) |
+| **Kling** | `kling-v2-6` | 5-10 sec | Higher quality |
+
+### Image-to-Video
+
+Same providers as text-to-video. Note: Kling uses text2video mode internally (API requires URL, not base64 for image2video).
+
+### Audio
+
+| Provider | Capability | Notes |
+|----------|------------|-------|
+| **ElevenLabs** | TTS, SFX, Voice Clone | Default voice: Rachel |
+| **Whisper** | Transcription | OpenAI API |
+| **Replicate** | Music generation, Audio restoration | Various models |
