@@ -19,6 +19,45 @@ curl -fsSL https://vibeframe.ai/install.sh | bash
 
 ---
 
+## Supported Capabilities
+
+### Agent LLM Providers (5)
+| Provider | Model | Notes |
+|----------|-------|-------|
+| OpenAI | GPT-4 | Default provider |
+| Claude | Claude 3.5 | Best reasoning |
+| Gemini | Gemini 2.5 | Google AI |
+| xAI | Grok-3 | xAI's latest |
+| Ollama | Local models | Free, no API key |
+
+### Image Generation (3 providers)
+| Provider | Model | Notes |
+|----------|-------|-------|
+| Gemini | Nano Banana | Default, fast |
+| OpenAI | GPT Image 1.5 | Quality tiers |
+| Stability | SDXL | Image editing |
+
+### Video Generation (4 providers)
+| Provider | Model | Duration | Notes |
+|----------|-------|----------|-------|
+| Runway | Gen-4.5 | 5-10 sec | Top quality |
+| Google Veo | Veo 3.0/3.1 | 5-8 sec | Native audio |
+| xAI Grok | Grok Imagine | 1-15 sec | Native audio |
+| Kling | v2.5/v2.6 | 5-10 sec | Fast generation |
+
+### Audio (2 providers)
+| Provider | Capabilities |
+|----------|-------------|
+| ElevenLabs | TTS, SFX, Voice Clone |
+| OpenAI Whisper | Transcription |
+
+### Video Analysis
+| Provider | Capabilities |
+|----------|-------------|
+| Gemini | Video Q&A, Highlights, Auto-Shorts |
+
+---
+
 ## Quick Start: First 5 Minutes
 
 ### Step 1: Verify Installation
@@ -116,11 +155,12 @@ Done:
 ```yaml
 version: "1.0.0"
 llm:
-  provider: claude          # claude, openai, gemini, ollama
+  provider: claude          # claude, openai, gemini, ollama, xai
 providers:
   anthropic: sk-ant-...     # Claude
   openai: sk-...            # GPT, Whisper, DALL-E
   google: AIza...           # Gemini
+  xai: xai-...              # xAI Grok
   elevenlabs: ...           # TTS, SFX
   stability: sk-...         # Stable Diffusion
   runway: ...               # Video generation
@@ -139,13 +179,18 @@ export OPENAI_API_KEY="sk-..."           # GPT, Whisper, GPT Image 1.5
 export STABILITY_API_KEY="sk-..."        # Stability AI (image editing)
 export RUNWAY_API_SECRET="..."           # Runway Gen-4.5
 export KLING_API_KEY="..."               # Kling v2.5/v2.6
-export XAI_API_KEY="..."                 # xAI Grok Imagine
+export XAI_API_KEY="..."                 # xAI Grok (Agent LLM + Grok Imagine)
 ```
 
 ### API Keys by Command
 
 | Command | Required API Key | Model |
 |---------|-----------------|-------|
+| `vibe` / `vibe -p openai` | `OPENAI_API_KEY` | GPT-4 (Agent LLM) |
+| `vibe -p claude` | `ANTHROPIC_API_KEY` | Claude (Agent LLM) |
+| `vibe -p gemini` | `GOOGLE_API_KEY` | Gemini (Agent LLM) |
+| `vibe -p xai` | `XAI_API_KEY` | Grok-3 (Agent LLM) |
+| `vibe -p ollama` | (none) | Local models (Agent LLM) |
 | `vibe ai image` (default) | `GOOGLE_API_KEY` | Gemini Nano Banana |
 | `vibe ai image -p dalle` | `OPENAI_API_KEY` | GPT Image 1.5 |
 | `vibe ai image -p stability` | `STABILITY_API_KEY` | Stable Diffusion XL |
@@ -238,7 +283,7 @@ vibe agent  # Start agent with default provider (OpenAI)
 
 | Flag | Description |
 |------|-------------|
-| `-p, --provider <provider>` | LLM provider: openai, claude, gemini, ollama (default: openai) |
+| `-p, --provider <provider>` | LLM provider: openai, claude, gemini, ollama, xai (default: openai) |
 | `-m, --model <model>` | Model to use (provider-specific) |
 | `--project <path>` | Load project file on start |
 | `-v, --verbose` | Show tool calls in output |

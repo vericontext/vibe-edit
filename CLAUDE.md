@@ -66,7 +66,7 @@ Agent (vibe)              Natural language → LLM tool calling → autonomous e
 - `vibe` starts Agent mode by default
 - Claude Code-like agentic loop architecture
 - Multi-turn: LLM reasoning → tool call → result → repeat until complete
-- 4 LLM providers: OpenAI, Claude, Gemini, Ollama
+- 5 LLM providers: OpenAI, Claude, Gemini, Ollama, xAI Grok
 - 46 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
 - `--confirm` flag: prompts before each tool execution
 - Example: "create project and add video" → multiple tool calls autonomously
@@ -86,7 +86,8 @@ packages/cli/src/agent/
 │   ├── openai.ts            # OpenAI Function Calling
 │   ├── claude.ts            # Claude tool_use
 │   ├── gemini.ts            # Gemini Function Calling
-│   └── ollama.ts            # Ollama JSON parsing
+│   ├── ollama.ts            # Ollama JSON parsing
+│   └── xai.ts               # xAI Grok (OpenAI-compatible)
 ├── tools/
 │   ├── index.ts             # ToolRegistry
 │   ├── project.ts           # 5 project tools
@@ -108,6 +109,7 @@ vibe                           # Start Agent mode (default: OpenAI)
 vibe -p claude                 # Use Claude
 vibe -p gemini                 # Use Gemini
 vibe -p ollama                 # Use local Ollama
+vibe -p xai                    # Use xAI Grok
 vibe --confirm                 # Confirm before each tool execution
 vibe -i "query" -v             # Non-interactive mode with verbose output
 vibe agent                     # Explicit agent command (same as `vibe`)
@@ -303,7 +305,7 @@ Copy `.env.example` to `.env`. Each AI provider has its own API key:
 - `ELEVENLABS_API_KEY` - TTS, SFX
 - `RUNWAY_API_SECRET` - Runway Gen-4.5 video
 - `KLING_API_KEY` - Kling v2.5/v2.6 video
-- `XAI_API_KEY` - xAI Grok Imagine video
+- `XAI_API_KEY` - xAI Grok (Agent LLM + Grok Imagine video)
 - `STABILITY_API_KEY` - Stability AI image editing
 
 ## AI Provider Models
