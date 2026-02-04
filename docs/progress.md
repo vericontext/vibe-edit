@@ -6,6 +6,70 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-04
 
+### Fix: Agent Mode Multi-turn Conversation Loop
+
+Fixed critical issue where Agent mode would exit after the first response instead of continuing the conversation.
+
+**Problem:**
+- User enters a message, Agent responds, but then exits immediately
+- `you>` prompt appears but process terminates without "Goodbye!" message
+- Caused by ora spinner's `discardStdin: true` default, which discards stdin input
+
+**Solution:**
+1. Set `discardStdin: false` on ora spinner (root cause fix)
+2. Wrap readline in Promise that only resolves on close event
+3. Add keepalive timer to prevent event loop exit
+4. Call `process.stdin.ref()` after async operations
+5. Call `rl.resume()` before `rl.prompt()` after spinner stops
+
+**Files Modified:**
+- `packages/cli/src/commands/agent.ts` - Fixed readline loop and ora spinner configuration
+
+**Verification:**
+```bash
+vibe
+you> hello
+vibe> (responds)
+you> (can continue conversation - no longer exits)
+exit
+Goodbye!
+```
+
+---
+
+### Feature: Export Reminder in System Prompt
+
+Added instruction for Agent to remind users about exporting after project editing tasks.
+
+**Problem:**
+- Users expected video file to be created immediately after editing commands
+- Only .vibe.json project file was saved, requiring separate "export" command
+
+**Solution:**
+Added guideline in system prompt to remind users:
+> "Project saved. To create the video file, say 'export' or 'extract'."
+
+**Files Modified:**
+- `packages/cli/src/agent/prompts/system.ts` - Added "Export Reminder" section
+
+---
+
+### Docs: Auto-bump Version Rule for Claude Code
+
+Added rule in CLAUDE.md for automatic version bumping after feat/fix commits.
+
+**Rule:**
+- `fix:` commits → bump `patch`
+- `feat:` commits → bump `minor`
+- Multiple commits → bump once based on highest level (feat > fix)
+
+**Files Modified:**
+- `CLAUDE.md` - Added "Auto-bump rule for Claude Code" section
+
+**Version:** 0.2.1 → 0.3.0
+
+---
+
 ### Feature: Agent Pipeline Tools (4 new tools)
 
 Added 4 advanced AI pipeline tools to the Agent mode, enabling full script-to-video production and video analysis capabilities directly through natural language.
