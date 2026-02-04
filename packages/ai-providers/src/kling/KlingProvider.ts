@@ -8,21 +8,11 @@ import type {
 } from "../interface/types.js";
 
 /**
- * Kling model versions
- * - kling-v1: Original model
- * - kling-v1-5: Improved v1.5 (pro mode only)
- * - kling-v1-6: Latest v1 series (std/pro)
- * - kling-v2-master: v2.0 master (std/pro, faster)
- * - kling-v2-1-master: v2.1 master (std/pro)
+ * Kling model versions (v2.5+ only)
  * - kling-v2-5-turbo: v2.5 turbo (fastest, best quality/speed ratio)
+ * - kling-v2-6: v2.6 (latest, highest quality)
  */
-export type KlingModel =
-  | "kling-v1"
-  | "kling-v1-5"
-  | "kling-v1-6"
-  | "kling-v2-master"
-  | "kling-v2-1-master"
-  | "kling-v2-5-turbo";
+export type KlingModel = "kling-v2-5-turbo" | "kling-v2-6";
 
 /**
  * Kling video generation options
@@ -107,8 +97,8 @@ export interface KlingVideoExtendOptions {
 /** Default model for Kling - v2.5 turbo is fastest */
 const DEFAULT_MODEL: KlingModel = "kling-v2-5-turbo";
 
-/** Models that support std mode (faster, cheaper) */
-const STD_MODE_MODELS: KlingModel[] = ["kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo"];
+/** All v2.5+ models support std mode */
+const STD_MODE_MODELS: KlingModel[] = ["kling-v2-5-turbo", "kling-v2-6"];
 
 export class KlingProvider implements AIProvider {
   id = "kling";

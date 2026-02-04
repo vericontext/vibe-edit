@@ -22,19 +22,15 @@ BASE_URL = "https://api.klingai.com/v1"
 POLL_INTERVAL = 3  # seconds (faster for v2.x)
 MAX_WAIT = 600  # 10 minutes
 
-# Available models
+# Available models (v2.5+ only)
 MODELS = {
-    "v1": "kling-v1",
-    "v1.5": "kling-v1-5",
-    "v1.6": "kling-v1-6",
-    "v2": "kling-v2-master",
-    "v2.1": "kling-v2-1-master",
     "v2.5": "kling-v2-5-turbo",
-    "turbo": "kling-v2-5-turbo",
+    "v2.6": "kling-v2-6",
+    "turbo": "kling-v2-5-turbo",  # alias
 }
 
-# Models that support std mode (faster, cheaper)
-STD_MODE_MODELS = ["kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo"]
+# All v2.5+ models support std mode
+STD_MODE_MODELS = ["kling-v2-5-turbo", "kling-v2-6"]
 DEFAULT_MODEL = "kling-v2-5-turbo"
 
 
@@ -217,7 +213,7 @@ def main():
     parser.add_argument("-r", "--ratio", choices=["16:9", "9:16", "1:1"], default="16:9", help="Aspect ratio")
     parser.add_argument("-m", "--mode", choices=["std", "pro"], default="std", help="Quality mode (std=faster, pro=better)")
     parser.add_argument("-M", "--model", choices=list(MODELS.keys()) + list(MODELS.values()),
-                        default="v2.5", help="Model version (v1, v1.5, v1.6, v2, v2.1, v2.5/turbo)")
+                        default="v2.5", help="Model version: v2.5 (turbo, fastest) or v2.6 (latest)")
     parser.add_argument("-n", "--negative", help="Negative prompt")
     parser.add_argument("-k", "--api-key", help="API key (ACCESS_KEY:SECRET_KEY or set KLING_API_KEY)")
 
