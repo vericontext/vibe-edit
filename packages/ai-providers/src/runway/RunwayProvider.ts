@@ -7,7 +7,17 @@ import type {
 } from "../interface/types.js";
 
 /**
- * Runway Gen-3 Alpha Turbo video generation options
+ * Runway model versions
+ * - gen4.5: Latest model (best quality, coming soon to API)
+ * - gen3a_turbo: Gen-3 Alpha Turbo (current default)
+ */
+export type RunwayModel = "gen4.5" | "gen3a_turbo";
+
+/** Default model - Gen-4.5 when available, fallback to gen3a_turbo */
+const DEFAULT_MODEL: RunwayModel = "gen3a_turbo"; // TODO: Switch to gen4.5 when API available
+
+/**
+ * Runway video generation options
  */
 export interface RunwayVideoOptions {
   /** Text prompt describing the video */
@@ -17,7 +27,7 @@ export interface RunwayVideoOptions {
   /** Random seed for reproducibility (0-4294967295) */
   seed?: number;
   /** Model to use */
-  model?: "gen3a_turbo";
+  model?: RunwayModel;
   /** Duration in seconds (5 or 10) */
   duration?: 5 | 10;
   /** Aspect ratio */
@@ -41,12 +51,13 @@ interface RunwayTaskResponse {
 }
 
 /**
- * Runway Gen-3 Alpha Turbo provider for professional video generation
+ * Runway provider for professional video generation
+ * Supports Gen-4.5 (when available) and Gen-3 Alpha Turbo
  */
 export class RunwayProvider implements AIProvider {
   id = "runway";
-  name = "Runway Gen-3";
-  description = "Professional AI video generation with Gen-3 Alpha Turbo";
+  name = "Runway";
+  description = "Professional AI video generation with Gen-4.5 / Gen-3 Alpha Turbo";
   capabilities: AICapability[] = [
     "text-to-video",
     "image-to-video",
@@ -93,9 +104,12 @@ export class RunwayProvider implements AIProvider {
       };
       const apiRatio = ratioMap[options?.aspectRatio || "16:9"] || "1280:768";
 
+      // Use specified model or default
+      const model = (options?.model as RunwayModel) || DEFAULT_MODEL;
+
       const body: Record<string, unknown> = {
         promptText: prompt,
-        model: "gen3a_turbo",
+        model,
         duration: options?.duration === 10 ? 10 : 5,
         ratio: apiRatio,
         watermark: false,

@@ -63,6 +63,27 @@ export interface GeminiImageResult {
 }
 
 /**
+ * Veo model versions for video generation
+ * - veo-3.1-fast: Fast preview ($0.15/sec)
+ * - veo-3.1: Standard preview ($0.40/sec)
+ */
+export type VeoModel = "veo-3.1-fast-generate-preview" | "veo-3.1-generate-preview";
+
+/**
+ * Veo video generation options
+ */
+export interface VeoVideoOptions {
+  /** Model to use */
+  model?: VeoModel;
+  /** Duration in seconds (4, 6, or 8) */
+  duration?: 4 | 6 | 8;
+  /** Aspect ratio */
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  /** Reference image URL or base64 for image-to-video */
+  referenceImage?: string;
+}
+
+/**
  * Video analysis options for Gemini
  */
 export interface GeminiVideoOptions {
@@ -102,12 +123,14 @@ const MODEL_MAP: Record<string, string> = {
 
 /**
  * Google Gemini provider for AI video generation, image generation, and editing
+ * - Video: Veo 3.1 Fast / Veo 3.1 (text-to-video, image-to-video)
+ * - Image: Nano Banana (gemini-2.5-flash-image) / Nano Banana Pro (gemini-3-pro-image-preview)
  */
 export class GeminiProvider implements AIProvider {
   id = "gemini";
   name = "Google Gemini";
-  description = "AI video generation, image generation (Nano Banana), and smart editing suggestions";
-  capabilities: AICapability[] = ["text-to-video", "auto-edit", "text-to-image"];
+  description = "AI video (Veo 3.1) and image (Nano Banana) generation";
+  capabilities: AICapability[] = ["text-to-video", "image-to-video", "text-to-image", "auto-edit"];
   iconUrl = "/icons/gemini.svg";
   isAvailable = true;
 
@@ -125,9 +148,13 @@ export class GeminiProvider implements AIProvider {
     return !!this.apiKey;
   }
 
+  /**
+   * Generate video using Google Veo 3.1
+   * Supports text-to-video and image-to-video
+   */
   async generateVideo(
-    _prompt: string,
-    _options?: GenerateOptions
+    prompt: string,
+    options?: GenerateOptions
   ): Promise<VideoResult> {
     if (!this.apiKey) {
       return {
@@ -137,15 +164,106 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
-    // TODO: Implement actual Gemini Veo API integration when available
-    const id = crypto.randomUUID();
+    try {
+      // Default to Veo 3.1 Fast for better speed/cost ratio
+      const model = (options?.model as VeoModel) || "veo-3.1-fast-generate-preview";
 
-    return {
-      id,
-      status: "pending",
-      progress: 0,
-      estimatedTimeRemaining: 60,
-    };
+      // Map aspect ratio
+      const aspectRatioMap: Record<string, string> = {
+        "16:9": "16:9",
+        "9:16": "9:16",
+        "1:1": "1:1",
+      };
+
+      const requestBody: Record<string, unknown> = {
+        instances: [{
+          prompt,
+        }],
+        parameters: {
+          aspectRatio: aspectRatioMap[options?.aspectRatio || "16:9"] || "16:9",
+          durationSeconds: options?.duration || 6,
+        },
+      };
+
+      // Add reference image for image-to-video
+      if (options?.referenceImage) {
+        const imageData = options.referenceImage as string;
+        if (imageData.startsWith("data:")) {
+          // Extract base64 from data URI
+          const base64 = imageData.split(",")[1];
+          const mimeType = imageData.split(";")[0].split(":")[1];
+          (requestBody.instances as Array<Record<string, unknown>>)[0].image = {
+            bytesBase64Encoded: base64,
+            mimeType,
+          };
+        } else if (imageData.startsWith("http")) {
+          (requestBody.instances as Array<Record<string, unknown>>)[0].image = {
+            gcsUri: imageData,
+          };
+        }
+      }
+
+      const response = await fetch(
+        `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          id: "",
+          status: "failed",
+          error: `Veo API error (${response.status}): ${errorText}`,
+        };
+      }
+
+      const data = await response.json() as {
+        name?: string;
+        done?: boolean;
+        response?: {
+          generatedVideos?: Array<{
+            uri?: string;
+          }>;
+        };
+        error?: { message: string };
+      };
+
+      // Veo uses long-running operations
+      if (data.name) {
+        return {
+          id: data.name,
+          status: "pending",
+          progress: 0,
+        };
+      }
+
+      // Immediate response (unlikely for video)
+      if (data.response?.generatedVideos?.[0]?.uri) {
+        return {
+          id: crypto.randomUUID(),
+          status: "completed",
+          videoUrl: data.response.generatedVideos[0].uri,
+        };
+      }
+
+      return {
+        id: "",
+        status: "failed",
+        error: data.error?.message || "Unknown Veo error",
+      };
+    } catch (error) {
+      return {
+        id: "",
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
   }
 
   async getGenerationStatus(id: string): Promise<VideoResult> {
