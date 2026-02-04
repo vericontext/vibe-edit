@@ -11,6 +11,7 @@ import ora from "ora";
 import { AgentExecutor } from "../agent/index.js";
 import { loadConfig, getApiKeyFromConfig, type LLMProvider } from "../config/index.js";
 import { hasTTY } from "../utils/tty.js";
+import { loadEnv } from "../utils/api-key.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json");
@@ -70,6 +71,9 @@ export async function startAgent(options: StartAgentOptions = {}): Promise<void>
   const provider = (options.provider || "openai") as LLMProvider;
   const verbose = options.verbose || false;
   const maxTurns = parseInt(options.maxTurns || "10", 10) || 10;
+
+  // Load environment variables from .env
+  loadEnv();
 
   // Get API key
   const spinner = ora("Initializing agent...").start();
