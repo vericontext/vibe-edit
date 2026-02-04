@@ -168,6 +168,17 @@ export async function startAgent(options: StartAgentOptions = {}): Promise<void>
   // Wrap readline in a Promise that resolves only when readline closes
   // This keeps the Node.js event loop alive until the user exits
   return new Promise<void>((resolve) => {
+    // Ensure stdin keeps the event loop alive
+    if (typeof process.stdin.ref === "function") {
+      process.stdin.ref();
+    }
+
+    // Keepalive timer to prevent event loop from exiting
+    // This is cleared when readline closes
+    const keepalive = setInterval(() => {
+      // Keep event loop alive
+    }, 60000);
+
     // Create readline interface
     const rl = createInterface({
       input: process.stdin,
@@ -265,6 +276,10 @@ export async function startAgent(options: StartAgentOptions = {}): Promise<void>
       }
 
       rl.prompt();
+      // Ensure stdin stays referenced after async operations
+      if (typeof process.stdin.ref === "function") {
+        process.stdin.ref();
+      }
     };
 
     // Handle each line
@@ -277,6 +292,7 @@ export async function startAgent(options: StartAgentOptions = {}): Promise<void>
 
     // Handle close - resolve the Promise to allow natural exit
     rl.on("close", () => {
+      clearInterval(keepalive);
       console.log();
       console.log(chalk.dim("Goodbye!"));
       resolve();
