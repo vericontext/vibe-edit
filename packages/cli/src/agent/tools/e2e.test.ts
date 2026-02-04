@@ -40,7 +40,7 @@ const TEST_OUTPUT_DIR = resolve(process.cwd(), ".e2e-test-output");
 // Mock context for tool execution
 const createContext = (subdir?: string): AgentContext => ({
   workingDirectory: subdir ? join(TEST_OUTPUT_DIR, subdir) : TEST_OUTPUT_DIR,
-  projectPath: undefined,
+  projectPath: null,
 });
 
 // Check if required API keys are available
