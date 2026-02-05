@@ -491,9 +491,22 @@ const generateImage: ToolHandler = async (args, context): Promise<ToolResult> =>
         };
       }
 
-      // Fetch and save image
-      const response = await fetch(result.images[0].url);
-      const buffer = Buffer.from(await response.arrayBuffer());
+      // Save image (handle both URL and base64)
+      const image = result.images[0];
+      let buffer: Buffer;
+      if (image.url) {
+        const response = await fetch(image.url);
+        buffer = Buffer.from(await response.arrayBuffer());
+      } else if (image.base64) {
+        buffer = Buffer.from(image.base64, "base64");
+      } else {
+        return {
+          toolCallId: "",
+          success: false,
+          output: "",
+          error: "Image generated but no URL or base64 data returned",
+        };
+      }
       await writeFile(outputPath, buffer);
     } else if (provider === "gemini") {
       const { GeminiProvider } = await import("@vibeframe/ai-providers");

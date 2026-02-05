@@ -992,22 +992,22 @@ aiCommand
 
 aiCommand
   .command("video")
-  .description("Generate video using AI (Runway or Kling)")
+  .description("Generate video using AI (Runway, Kling, or Veo)")
   .argument("<prompt>", "Text prompt describing the video")
-  .option("-p, --provider <provider>", "Provider: runway, kling", "runway")
-  .option("-k, --api-key <key>", "API key (or set RUNWAY_API_SECRET / KLING_API_KEY env)")
+  .option("-p, --provider <provider>", "Provider: runway, kling, veo", "kling")
+  .option("-k, --api-key <key>", "API key (or set RUNWAY_API_SECRET / KLING_API_KEY / GOOGLE_API_KEY env)")
   .option("-o, --output <path>", "Output file path (downloads video)")
   .option("-i, --image <path>", "Reference image for image-to-video")
   .option("-d, --duration <sec>", "Duration: 5 or 10 seconds", "5")
-  .option("-r, --ratio <ratio>", "Aspect ratio: 16:9, 9:16, or 1:1 (Kling only)", "16:9")
+  .option("-r, --ratio <ratio>", "Aspect ratio: 16:9, 9:16, or 1:1", "16:9")
   .option("-s, --seed <number>", "Random seed for reproducibility (Runway only)")
-  .option("-m, --mode <mode>", "Generation mode: std or pro (Kling only)", "pro")
+  .option("-m, --mode <mode>", "Generation mode: std or pro (Kling only)", "std")
   .option("-n, --negative <prompt>", "Negative prompt - what to avoid (Kling only)")
   .option("--no-wait", "Start generation and return task ID without waiting")
   .action(async (prompt: string, options) => {
     try {
       const provider = options.provider.toLowerCase();
-      const validProviders = ["runway", "kling"];
+      const validProviders = ["runway", "kling", "veo"];
       if (!validProviders.includes(provider)) {
         console.error(chalk.red(`Invalid provider: ${provider}`));
         console.error(chalk.dim(`Available providers: ${validProviders.join(", ")}`));
@@ -1015,8 +1015,18 @@ aiCommand
       }
 
       // Get API key based on provider
-      const envKey = provider === "runway" ? "RUNWAY_API_SECRET" : "KLING_API_KEY";
-      const providerName = provider === "runway" ? "Runway" : "Kling";
+      const envKeyMap: Record<string, string> = {
+        runway: "RUNWAY_API_SECRET",
+        kling: "KLING_API_KEY",
+        veo: "GOOGLE_API_KEY",
+      };
+      const providerNameMap: Record<string, string> = {
+        runway: "Runway",
+        kling: "Kling",
+        veo: "Veo",
+      };
+      const envKey = envKeyMap[provider];
+      const providerName = providerNameMap[provider];
       const apiKey = await getApiKey(envKey, providerName, options.apiKey);
       if (!apiKey) {
         console.error(chalk.red(`${providerName} API key required.`));
@@ -1097,7 +1107,7 @@ aiCommand
           },
           300000 // 5 minute timeout
         );
-      } else {
+      } else if (provider === "kling") {
         // Kling provider
         const kling = new KlingProvider();
         await kling.initialize({ apiKey });
@@ -1147,6 +1157,47 @@ aiCommand
             spinner.text = `Generating video... ${status.status}`;
           },
           600000 // 10 minute timeout
+        );
+      } else if (provider === "veo") {
+        // Veo (Google) provider
+        const gemini = new GeminiProvider();
+        await gemini.initialize({ apiKey });
+
+        result = await gemini.generateVideo(prompt, {
+          prompt,
+          referenceImage,
+          duration: parseInt(options.duration) as 5 | 8,
+          aspectRatio: options.ratio as "16:9" | "9:16",
+          model: "veo-3.1-fast-generate-preview",
+        });
+
+        if (result.status === "failed") {
+          spinner.fail(chalk.red(result.error || "Failed to start generation"));
+          process.exit(1);
+        }
+
+        console.log();
+        console.log(chalk.bold.cyan("Video Generation Started"));
+        console.log(chalk.dim("─".repeat(60)));
+        console.log(`Provider: ${chalk.bold("Google Veo 3.1")}`);
+        console.log(`Task ID: ${chalk.bold(result.id)}`);
+
+        if (!options.wait) {
+          spinner.succeed(chalk.green("Generation started"));
+          console.log();
+          console.log(chalk.dim("Veo generation is synchronous - video URL available above"));
+          console.log();
+          return;
+        }
+
+        // Veo waitForCompletion
+        spinner.text = "Generating video (this may take 1-3 minutes)...";
+        finalResult = await gemini.waitForVideoCompletion(
+          result.id,
+          (status) => {
+            spinner.text = `Generating video... ${status.status}`;
+          },
+          300000 // 5 minute timeout
         );
       }
 

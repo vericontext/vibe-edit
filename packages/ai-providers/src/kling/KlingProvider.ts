@@ -214,20 +214,27 @@ export class KlingProvider implements AIProvider {
       if (options?.referenceImage) {
         const imageInput = options.referenceImage;
 
-        // Check if it's a URL (http/https) or needs base64 conversion
+        // v2.x models require image URL (not base64)
+        // Use kling-v1-5 for base64 support
         if (typeof imageInput === "string") {
           if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
-            // Use URL directly for v2.x models (they prefer URLs)
+            // URL - works with all models
             body.image = imageInput;
-          } else if (imageInput.startsWith("data:")) {
-            // Already a data URI
-            body.image = imageInput;
-          } else {
-            // Assume it's raw base64, add data URI prefix
-            body.image = `data:image/png;base64,${imageInput}`;
+          } else if (imageInput.startsWith("data:") || !imageInput.includes("/")) {
+            // Base64 or data URI - use v1.5 model which supports base64
+            body.model_name = "kling-v1-5";
+            body.mode = "std";
+            if (imageInput.startsWith("data:")) {
+              body.image = imageInput;
+            } else {
+              // Raw base64, add data URI prefix
+              body.image = `data:image/png;base64,${imageInput}`;
+            }
           }
         } else {
-          // Blob - convert to data URI
+          // Blob - convert to data URI, use v1.5
+          body.model_name = "kling-v1-5";
+          body.mode = "std";
           body.image = await this.blobToDataUri(imageInput as Blob);
         }
 

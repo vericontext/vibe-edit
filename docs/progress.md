@@ -81,7 +81,49 @@ vibe agent -p xai  # Use xAI Grok as Agent LLM
 - `docs/cli-guide.md`
 - `CLAUDE.md`
 
-#### 5. Test Results
+#### 5. Fix: Kling v2.x Base64 Image Compatibility
+
+**Problem:**
+- Kling v2.x models require image URL, not base64
+- Error: "File is not in a valid base64 format"
+
+**Solution:**
+- Use `kling-v1-5` model for base64 images (supports data URI)
+- Keep v2.x models for URL-based images
+
+**Files Modified:**
+- `packages/ai-providers/src/kling/KlingProvider.ts`
+
+#### 6. Feature: Veo (Google) Video Provider
+
+**Changes:**
+- Added Veo 3.1 as third video generation provider
+- Added `waitForVideoCompletion` method to GeminiProvider for async polling
+- Added proper `getGenerationStatus` for Veo operations
+- CLI video command now supports `-p veo` provider option
+
+**Files Modified:**
+- `packages/ai-providers/src/gemini/GeminiProvider.ts`
+- `packages/cli/src/commands/ai.ts`
+
+**Usage:**
+```bash
+vibe ai video "A sunset over the ocean" -p veo
+vibe ai video "A cat playing" -p veo -d 8 -r 16:9
+```
+
+#### 7. Fix: Agent Image Tool Base64 Support
+
+**Problem:**
+- Agent `ai_image` tool crashed when DALL-E returned base64 instead of URL
+
+**Solution:**
+- Added handling for both URL and base64 image responses
+
+**Files Modified:**
+- `packages/cli/src/agent/tools/ai.ts`
+
+#### 8. Test Results
 
 | Category | Status |
 |----------|--------|
@@ -90,7 +132,7 @@ vibe agent -p xai  # Use xAI Grok as Agent LLM
 | Image Gen (3) | ✅ Gemini, DALL-E, Stability |
 | Audio (3) | ✅ TTS, SFX, Whisper |
 | Video Analysis | ✅ Gemini |
-| Video Gen | ⚠️ API changes need verification |
+| Video Gen (3) | ✅ Kling (v1.5 for base64), Veo 3.1, Runway (needs Python SDK) |
 
 ---
 

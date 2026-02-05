@@ -270,17 +270,138 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  async getGenerationStatus(id: string): Promise<VideoResult> {
+  /**
+   * Get status of Veo video generation operation
+   */
+  async getGenerationStatus(operationName: string): Promise<VideoResult> {
+    if (!this.apiKey) {
+      return {
+        id: operationName,
+        status: "failed",
+        error: "Gemini API key not configured",
+      };
+    }
+
+    try {
+      // Poll the operation status
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${this.apiKey}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          id: operationName,
+          status: "failed",
+          error: `Status check failed (${response.status}): ${errorText}`,
+        };
+      }
+
+      const data = await response.json() as {
+        name: string;
+        done?: boolean;
+        metadata?: {
+          "@type": string;
+        };
+        response?: {
+          generatedVideos?: Array<{
+            video?: {
+              uri?: string;
+            };
+          }>;
+        };
+        error?: {
+          code: number;
+          message: string;
+        };
+      };
+
+      if (data.error) {
+        return {
+          id: operationName,
+          status: "failed",
+          error: data.error.message,
+        };
+      }
+
+      if (data.done && data.response?.generatedVideos?.[0]?.video?.uri) {
+        return {
+          id: operationName,
+          status: "completed",
+          videoUrl: data.response.generatedVideos[0].video.uri,
+        };
+      }
+
+      if (data.done) {
+        return {
+          id: operationName,
+          status: "failed",
+          error: "Generation completed but no video URL returned",
+        };
+      }
+
+      return {
+        id: operationName,
+        status: "processing",
+        progress: 50,
+      };
+    } catch (error) {
+      return {
+        id: operationName,
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Wait for Veo video generation to complete with polling
+   */
+  async waitForVideoCompletion(
+    operationName: string,
+    onProgress?: (result: VideoResult) => void,
+    maxWaitMs: number = 300000 // 5 minutes default
+  ): Promise<VideoResult> {
+    const startTime = Date.now();
+    const pollingInterval = 5000; // 5 seconds
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const result = await this.getGenerationStatus(operationName);
+
+      if (onProgress) {
+        onProgress(result);
+      }
+
+      if (result.status === "completed" || result.status === "failed" || result.status === "cancelled") {
+        return result;
+      }
+
+      await this.sleep(pollingInterval);
+    }
+
     return {
-      id,
-      status: "processing",
-      progress: 50,
-      estimatedTimeRemaining: 30,
+      id: operationName,
+      status: "failed",
+      error: "Generation timed out",
     };
   }
 
+  /**
+   * Sleep helper
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async cancelGeneration(_id: string): Promise<boolean> {
-    return true;
+    // Veo operations cannot be cancelled
+    return false;
   }
 
   /**
