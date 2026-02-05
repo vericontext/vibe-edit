@@ -158,7 +158,7 @@ After completing any feature, fix, or significant change, **always update**:
 
 ## Documentation Consistency Rules
 
-When writing or updating documentation (especially `docs/cli-guide.md`):
+When writing or updating documentation (especially `docs/guide.md`):
 
 1. **Filename Consistency**: If an example generates a file, subsequent examples must use the SAME filename
    - Bad: `generate image` → `sunset.png`, then `add a-sunset-landscape.png`
@@ -176,7 +176,7 @@ When writing or updating documentation (especially `docs/cli-guide.md`):
    - File names are consistent throughout
 
 5. **Cross-Reference**: When updating CLI commands, also update:
-   - `docs/cli-guide.md` - User-facing documentation
+   - `docs/guide.md` - User-facing documentation
    - `docs/roadmap.md` - Feature status
    - Command `--help` text
 

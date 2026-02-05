@@ -54,7 +54,7 @@ you> combine person1.png and person2.png into a group photo
 **Files Modified:**
 - `packages/cli/src/commands/ai.ts` - Added openai provider, deprecation warning
 - `packages/cli/src/agent/tools/ai.ts` - Updated ai_image tool
-- `docs/cli-guide.md` - Updated examples and tables
+- `docs/guide.md` - Updated examples and tables
 
 **Usage:**
 ```bash
@@ -140,7 +140,7 @@ vibe agent -p xai  # Use xAI Grok as Agent LLM
 #### 4. Docs: Supported Capabilities Update
 
 **Changes:**
-- Added "Supported Capabilities" quick-reference section to cli-guide.md
+- Added "Supported Capabilities" quick-reference section to guide.md
 - Updated Agent LLM providers: 4 → 5 (added xAI)
 - Updated model names to actual versions:
   - OpenAI: GPT-4 → GPT-4o
@@ -149,7 +149,7 @@ vibe agent -p xai  # Use xAI Grok as Agent LLM
 - Added AI Provider Models section to CLAUDE.md
 
 **Files Modified:**
-- `docs/cli-guide.md`
+- `docs/guide.md`
 - `CLAUDE.md`
 
 #### 5. Fix: Kling v2.x Base64 Image Compatibility
@@ -213,7 +213,7 @@ vibe ai video "A cat playing" -p veo -d 8 -r 16:9
 
 #### 1. CLI Guide v0.4.0 Update
 
-Comprehensive update to `docs/cli-guide.md` to reflect v0.4.0 changes.
+Comprehensive update to `docs/guide.md` to reflect v0.4.0 changes.
 
 **Changes:**
 - Version numbers: `0.2.x` → `0.4.x`
@@ -227,7 +227,7 @@ Comprehensive update to `docs/cli-guide.md` to reflect v0.4.0 changes.
 - Translated all Korean examples to English
 
 **Files Modified:**
-- `docs/cli-guide.md`
+- `docs/guide.md`
 
 #### 2. VibeFrame Cloud Business Direction
 
@@ -500,7 +500,7 @@ Changed `vibe` command to start Agent mode by default instead of REPL mode. Adde
 - `packages/cli/src/index.ts` - Changed default from `startRepl()` to `startAgent()`
 - `packages/cli/src/commands/agent.ts` - Added `--confirm` flag, extracted `startAgent()` function
 - `packages/cli/src/agent/index.ts` - Added `confirmCallback` option to `AgentExecutorOptions`
-- `docs/cli-guide.md` - Updated documentation to reflect Agent mode as default
+- `docs/guide.md` - Updated documentation to reflect Agent mode as default
 
 **Usage:**
 ```bash
@@ -1064,7 +1064,7 @@ vibe export ./launch-video/project.vibe.json -o final.mp4
 
 ---
 
-### Docs: Clarify script-to-video Output in cli-guide.md
+### Docs: Clarify script-to-video Output in guide.md
 Updated script-to-video documentation to accurately reflect video file output and full pipeline usage.
 
 **Problem:** Previous documentation was misleading:
@@ -1079,7 +1079,7 @@ Updated script-to-video documentation to accurately reflect video file output an
 4. Reordered examples to show full pipeline first, `--images-only` as secondary option
 
 **Files Modified:**
-- `docs/cli-guide.md` - Updated Script-to-Video section (lines 392-453)
+- `docs/guide.md` - Updated Script-to-Video section (lines 392-453)
 
 **Usage:**
 ```bash
@@ -1115,10 +1115,10 @@ vibe ai video "camera slowly zooms in" -i image.png -o video.mp4 -r 16:9
 
 ---
 
-### Docs: Reorganize cli-guide.md to Reduce Duplication
+### Docs: Reorganize guide.md to Reduce Duplication
 Reorganized the CLI guide documentation to eliminate redundant content and improve maintainability.
 
-**Problem:** cli-guide.md had ~1006 lines with significant duplication:
+**Problem:** guide.md had ~1006 lines with significant duplication:
 - API keys listed 3 times (Quick Start, API table, Config section)
 - "Supported REPL Patterns" section duplicated examples already in AI Commands Reference
 - Core Concepts explained project concept multiple times with overlapping workflow examples
@@ -1135,7 +1135,7 @@ Reorganized the CLI guide documentation to eliminate redundant content and impro
 8. Fixed filename consistency in Quick Start REPL example (sunset-landscape.png used consistently)
 
 **Files Modified:**
-- `docs/cli-guide.md` - Reorganized and deduplicated
+- `docs/guide.md` - Reorganized and deduplicated
 
 **Result:**
 - Before: ~1006 lines
@@ -1220,11 +1220,11 @@ vibe> generate voice message "Hello world"
 Added missing documentation for `vibe detect` commands.
 
 **Problem:**
-- `detect scenes`, `detect silence`, `detect beats` commands existed but were not documented in cli-guide.md
+- `detect scenes`, `detect silence`, `detect beats` commands existed but were not documented in guide.md
 - Commands were listed in roadmap.md as completed but users had no usage reference
 
 **Solution:**
-Added "Auto-Detection" section to cli-guide.md with:
+Added "Auto-Detection" section to guide.md with:
 - Scene detection examples (`-t` threshold, `-o` output, `-p` project)
 - Silence detection examples (`-d` duration, `-n` noise threshold)
 - Beat detection examples (`-o` output)
@@ -1232,7 +1232,7 @@ Added "Auto-Detection" section to cli-guide.md with:
 - Use cases
 
 **Files Modified:**
-- `docs/cli-guide.md` - Added Auto-Detection section after Export
+- `docs/guide.md` - Added Auto-Detection section after Export
 
 **Verification:**
 ```bash
@@ -1244,18 +1244,18 @@ vibe detect beats music.mp3
 ---
 
 ### Docs: Fix trim Command Option
-Fixed incorrect option in cli-guide.md timeline trim example.
+Fixed incorrect option in guide.md timeline trim example.
 
 **Problem:** Documentation showed `vibe timeline trim ... -d 5` but `-d` option doesn't exist.
 **Solution:** Changed to `--duration 5` (the actual option).
 
 **Files Modified:**
-- `docs/cli-guide.md` - Line 748: `-d 5` → `--duration 5`
+- `docs/guide.md` - Line 748: `-d 5` → `--duration 5`
 
 ---
 
 ### Fix: CLI Version Hardcoding and Image Track Mismatch
-Fixed two bugs discovered during cli-guide.md workflow testing.
+Fixed two bugs discovered during guide.md workflow testing.
 
 **Problem 1: Version Hardcoding**
 - `vibe --version` showed `0.1.0` instead of actual version `0.2.1`
@@ -1290,7 +1290,7 @@ pnpm vibe timeline add-clip /tmp/test.vibe.json <source-id> -d 5
 ---
 
 ### Docs: CLI Guide Inconsistencies and Documentation Guidelines
-Fixed several documentation inconsistencies in cli-guide.md and added documentation guidelines to CLAUDE.md.
+Fixed several documentation inconsistencies in guide.md and added documentation guidelines to CLAUDE.md.
 
 **Problems:**
 1. Version mismatch: showed `0.1.0`, actual is `0.2.1`
@@ -1309,13 +1309,13 @@ Fixed several documentation inconsistencies in cli-guide.md and added documentat
    - Cross-referencing related docs
 
 **Files Modified:**
-- `docs/cli-guide.md` - Version, filename consistency, ID note
+- `docs/guide.md` - Version, filename consistency, ID note
 - `CLAUDE.md` - New Documentation Consistency Rules section
 
 **Verification:**
 ```bash
-# Check cli-guide.md REPL example - filenames should be consistent
-grep -A 10 "generate an image of a sunset" docs/cli-guide.md
+# Check guide.md REPL example - filenames should be consistent
+grep -A 10 "generate an image of a sunset" docs/guide.md
 # Should show: sunset-landscape.png generated AND added (same filename)
 ```
 
@@ -1937,7 +1937,7 @@ Added `--provider` option to video and image generation commands, enabling users
 - `packages/cli/src/commands/ai.ts` - Updated video and image commands
 - `packages/ai-providers/src/gemini/GeminiProvider.ts` - Added image generation
 - `packages/ai-providers/src/interface/types.ts` - Added text-to-image capability
-- `docs/cli-guide.md` - Updated command examples and provider table
+- `docs/guide.md` - Updated command examples and provider table
 
 **Usage:**
 ```bash
@@ -1998,7 +1998,7 @@ bash promo/create-video.sh
 ```
 
 **Documentation:**
-- Added "Example 5: Multi-Provider Promo Video (Advanced)" to `docs/cli-guide.md`
+- Added "Example 5: Multi-Provider Promo Video (Advanced)" to `docs/guide.md`
 
 ---
 
@@ -2006,7 +2006,7 @@ bash promo/create-video.sh
 Enhanced CLI onboarding, documentation, and installation experience.
 
 **New Documentation:**
-- Created `docs/cli-guide.md` - Comprehensive CLI usage guide in English
+- Created `docs/guide.md` - Comprehensive CLI usage guide in English
   - Quick Start section
   - AI provider structure (LLM and media providers)
   - Command reference and API requirements by feature
@@ -2037,7 +2037,7 @@ Enhanced CLI onboarding, documentation, and installation experience.
 - Updated completion messages to show relevant commands
 
 **Files Created:**
-- `docs/cli-guide.md` - CLI usage guide
+- `docs/guide.md` - CLI usage guide
 
 **Files Modified:**
 - `packages/cli/src/repl/prompts.ts` - Status display, Getting Started section

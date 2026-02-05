@@ -142,7 +142,7 @@ export function getHelpText(): string {
   lines.push(`  ${chalk.white('"Split the clip at 3 seconds"')}`);
   lines.push(`  ${chalk.white('"Delete the last clip"')}`);
   lines.push("");
-  lines.push(chalk.dim(`  See docs/cli-guide.md for full documentation`));
+  lines.push(chalk.dim(`  See docs/guide.md for full documentation`));
   lines.push("");
 
   return lines.join("\n");
