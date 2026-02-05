@@ -3452,6 +3452,7 @@ aiCommand
   .option("--no-voiceover", "Skip voiceover generation")
   .option("--output-dir <dir>", "Directory for generated assets", "script-video-output")
   .option("--retries <count>", "Number of retries for video generation failures", String(DEFAULT_VIDEO_RETRIES))
+  .option("--sequential", "Generate videos one at a time (slower but more reliable)")
   .action(async (script: string, options) => {
     try {
       // Load environment variables from .env file
@@ -3874,111 +3875,179 @@ aiCommand
             }
           }
 
-          // Submit all video generation tasks with retry logic
-          const tasks: Array<{ taskId: string; index: number; segment: StoryboardSegment; type: "text2video" | "image2video" }> = [];
+          // Sequential mode: generate one video at a time (slower but more reliable)
+          if (options.sequential) {
+            for (let i = 0; i < segments.length; i++) {
+              const segment = segments[i] as StoryboardSegment;
+              videoSpinner.text = `🎬 Scene ${i + 1}/${segments.length}: Starting...`;
 
-          for (let i = 0; i < segments.length; i++) {
-            const segment = segments[i] as StoryboardSegment;
-            videoSpinner.text = `🎬 Submitting video task ${i + 1}/${segments.length}...`;
+              const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
+              const referenceImage = imageUrls[i];
 
-            // Use 10s video if narration > 5s to avoid video ending before narration
-            const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
-
-            // Use image URL if available for image-to-video
-            const referenceImage = imageUrls[i];
-
-            const result = await generateVideoWithRetryKling(
-              kling,
-              segment,
-              {
-                duration: videoDuration,
-                aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
-                referenceImage, // Pass URL for image-to-video (Kling v2.x)
-              },
-              maxRetries,
-              (msg) => {
-                videoSpinner.text = `🎬 Scene ${i + 1}: ${msg}`;
-              }
-            );
-
-            if (result) {
-              tasks.push({ taskId: result.taskId, index: i, segment, type: result.type });
-              // Initialize videoPaths array if needed
-              if (!videoPaths[i]) videoPaths[i] = "";
-            } else {
-              console.log(chalk.yellow(`\n  ⚠ Failed to start video generation for scene ${i + 1} (after ${maxRetries} retries)`));
-              videoPaths[i] = "";
-              failedScenes.push(i + 1);
-            }
-          }
-
-          // Wait for all tasks to complete with retry logic
-          videoSpinner.text = `🎬 Waiting for ${tasks.length} video(s) to complete...`;
-
-          for (const task of tasks) {
-            let completed = false;
-            let currentTaskId = task.taskId;
-            let currentType = task.type;
-
-            for (let attempt = 0; attempt <= maxRetries && !completed; attempt++) {
-              try {
-                const result = await kling.waitForCompletion(
-                  currentTaskId,
-                  currentType,
-                  (status) => {
-                    videoSpinner.text = `🎬 Scene ${task.index + 1}: ${status.status}...`;
+              let completed = false;
+              for (let attempt = 0; attempt <= maxRetries && !completed; attempt++) {
+                const result = await generateVideoWithRetryKling(
+                  kling,
+                  segment,
+                  {
+                    duration: videoDuration,
+                    aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
+                    referenceImage,
                   },
-                  600000 // 10 minute timeout per video
+                  0, // Handle retries at this level
+                  (msg) => {
+                    videoSpinner.text = `🎬 Scene ${i + 1}/${segments.length}: ${msg}`;
+                  }
                 );
 
-                if (result.status === "completed" && result.videoUrl) {
-                  const videoPath = resolve(outputDir, `scene-${task.index + 1}.mp4`);
-                  const response = await fetch(result.videoUrl);
-                  const buffer = Buffer.from(await response.arrayBuffer());
-                  await writeFile(videoPath, buffer);
-                  videoPaths[task.index] = videoPath;
-                  completed = true;
-                } else if (attempt < maxRetries) {
-                  // Resubmit task on failure
-                  videoSpinner.text = `🎬 Scene ${task.index + 1}: Retry ${attempt + 1}/${maxRetries}...`;
-                  await sleep(RETRY_DELAY_MS);
+                if (!result) {
+                  if (attempt < maxRetries) {
+                    videoSpinner.text = `🎬 Scene ${i + 1}: Submit failed, retry ${attempt + 1}/${maxRetries}...`;
+                    await sleep(RETRY_DELAY_MS);
+                    continue;
+                  }
+                  console.log(chalk.yellow(`\n  ⚠ Failed to start video generation for scene ${i + 1}`));
+                  videoPaths[i] = "";
+                  failedScenes.push(i + 1);
+                  break;
+                }
 
-                  const videoDuration = (task.segment.duration > 5 ? 10 : 5) as 5 | 10;
-
-                  // Use already uploaded image URL for retry
-                  const retryReferenceImage = imageUrls[task.index];
-
-                  const retryResult = await generateVideoWithRetryKling(
-                    kling,
-                    task.segment,
-                    {
-                      duration: videoDuration,
-                      aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
-                      referenceImage: retryReferenceImage,
+                try {
+                  const waitResult = await kling.waitForCompletion(
+                    result.taskId,
+                    result.type,
+                    (status) => {
+                      videoSpinner.text = `🎬 Scene ${i + 1}/${segments.length}: ${status.status}...`;
                     },
-                    0 // No nested retries
+                    600000
                   );
 
-                  if (retryResult) {
-                    currentTaskId = retryResult.taskId;
-                    currentType = retryResult.type;
+                  if (waitResult.status === "completed" && waitResult.videoUrl) {
+                    const videoPath = resolve(outputDir, `scene-${i + 1}.mp4`);
+                    const response = await fetch(waitResult.videoUrl);
+                    const buffer = Buffer.from(await response.arrayBuffer());
+                    await writeFile(videoPath, buffer);
+                    videoPaths[i] = videoPath;
+                    completed = true;
+                    console.log(chalk.green(`\n  ✓ Scene ${i + 1} completed`));
+                  } else if (attempt < maxRetries) {
+                    videoSpinner.text = `🎬 Scene ${i + 1}: Failed, retry ${attempt + 1}/${maxRetries}...`;
+                    await sleep(RETRY_DELAY_MS);
+                  } else {
+                    videoPaths[i] = "";
+                    failedScenes.push(i + 1);
+                  }
+                } catch (err) {
+                  if (attempt < maxRetries) {
+                    videoSpinner.text = `🎬 Scene ${i + 1}: Error, retry ${attempt + 1}/${maxRetries}...`;
+                    await sleep(RETRY_DELAY_MS);
+                  } else {
+                    console.log(chalk.yellow(`\n  ⚠ Error for scene ${i + 1}: ${err}`));
+                    videoPaths[i] = "";
+                    failedScenes.push(i + 1);
+                  }
+                }
+              }
+            }
+          } else {
+            // Parallel mode (default): submit all tasks, then wait for all
+            const tasks: Array<{ taskId: string; index: number; segment: StoryboardSegment; type: "text2video" | "image2video" }> = [];
+
+            for (let i = 0; i < segments.length; i++) {
+              const segment = segments[i] as StoryboardSegment;
+              videoSpinner.text = `🎬 Submitting video task ${i + 1}/${segments.length}...`;
+
+              const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
+              const referenceImage = imageUrls[i];
+
+              const result = await generateVideoWithRetryKling(
+                kling,
+                segment,
+                {
+                  duration: videoDuration,
+                  aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
+                  referenceImage,
+                },
+                maxRetries,
+                (msg) => {
+                  videoSpinner.text = `🎬 Scene ${i + 1}: ${msg}`;
+                }
+              );
+
+              if (result) {
+                tasks.push({ taskId: result.taskId, index: i, segment, type: result.type });
+                if (!videoPaths[i]) videoPaths[i] = "";
+              } else {
+                console.log(chalk.yellow(`\n  ⚠ Failed to start video generation for scene ${i + 1} (after ${maxRetries} retries)`));
+                videoPaths[i] = "";
+                failedScenes.push(i + 1);
+              }
+            }
+
+            videoSpinner.text = `🎬 Waiting for ${tasks.length} video(s) to complete...`;
+
+            for (const task of tasks) {
+              let completed = false;
+              let currentTaskId = task.taskId;
+              let currentType = task.type;
+
+              for (let attempt = 0; attempt <= maxRetries && !completed; attempt++) {
+                try {
+                  const result = await kling.waitForCompletion(
+                    currentTaskId,
+                    currentType,
+                    (status) => {
+                      videoSpinner.text = `🎬 Scene ${task.index + 1}: ${status.status}...`;
+                    },
+                    600000
+                  );
+
+                  if (result.status === "completed" && result.videoUrl) {
+                    const videoPath = resolve(outputDir, `scene-${task.index + 1}.mp4`);
+                    const response = await fetch(result.videoUrl);
+                    const buffer = Buffer.from(await response.arrayBuffer());
+                    await writeFile(videoPath, buffer);
+                    videoPaths[task.index] = videoPath;
+                    completed = true;
+                  } else if (attempt < maxRetries) {
+                    videoSpinner.text = `🎬 Scene ${task.index + 1}: Retry ${attempt + 1}/${maxRetries}...`;
+                    await sleep(RETRY_DELAY_MS);
+
+                    const videoDuration = (task.segment.duration > 5 ? 10 : 5) as 5 | 10;
+                    const retryReferenceImage = imageUrls[task.index];
+
+                    const retryResult = await generateVideoWithRetryKling(
+                      kling,
+                      task.segment,
+                      {
+                        duration: videoDuration,
+                        aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
+                        referenceImage: retryReferenceImage,
+                      },
+                      0
+                    );
+
+                    if (retryResult) {
+                      currentTaskId = retryResult.taskId;
+                      currentType = retryResult.type;
+                    } else {
+                      videoPaths[task.index] = "";
+                      failedScenes.push(task.index + 1);
+                      completed = true;
+                    }
                   } else {
                     videoPaths[task.index] = "";
                     failedScenes.push(task.index + 1);
-                    completed = true; // Exit retry loop
                   }
-                } else {
-                  videoPaths[task.index] = "";
-                  failedScenes.push(task.index + 1);
-                }
-              } catch (err) {
-                if (attempt >= maxRetries) {
-                  console.log(chalk.yellow(`\n  ⚠ Error completing video for scene ${task.index + 1}: ${err}`));
-                  videoPaths[task.index] = "";
-                  failedScenes.push(task.index + 1);
-                } else {
-                  videoSpinner.text = `🎬 Scene ${task.index + 1}: Error, retry ${attempt + 1}/${maxRetries}...`;
-                  await sleep(RETRY_DELAY_MS);
+                } catch (err) {
+                  if (attempt >= maxRetries) {
+                    console.log(chalk.yellow(`\n  ⚠ Error completing video for scene ${task.index + 1}: ${err}`));
+                    videoPaths[task.index] = "";
+                    failedScenes.push(task.index + 1);
+                  } else {
+                    videoSpinner.text = `🎬 Scene ${task.index + 1}: Error, retry ${attempt + 1}/${maxRetries}...`;
+                    await sleep(RETRY_DELAY_MS);
+                  }
                 }
               }
             }
