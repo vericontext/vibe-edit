@@ -6,6 +6,58 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-06
 
+### Fix: Video/Narration Sync Bug in Script-to-Video
+
+Fixed a critical bug where narration would continue playing after the video ended in script-to-video exports.
+
+**Problem:**
+- Generated videos (Kling/Runway) are limited to 5 or 10 seconds
+- Narration can be longer than 10 seconds per scene
+- Video clips were created using narration duration, not actual video duration
+- Result: video ends early while audio continues
+
+**Solution:**
+Added automatic video extension to match narration duration using progressive techniques:
+- 0-15% extension: Simple slowdown using setpts filter
+- 15-40% extension: Frame interpolation (minterpolate) + slowdown for smooth slow-motion
+- 40%+ extension: Slowdown to 0.7x + freeze last frame with tpad
+
+**Files Modified:**
+- `packages/cli/src/utils/audio.ts`:
+  - Added `getVideoDuration()` function
+  - Added `extendVideoNaturally()` function with progressive extension
+- `packages/cli/src/commands/ai.ts`:
+  - Import new video utility functions
+  - Added video extension after Kling/Runway download in all locations:
+    - CLI `script-to-video` command (sequential and parallel modes)
+    - `executeScriptToVideo()` function
+    - CLI `regenerate-scene` command
+    - `executeRegenerateScene()` function
+  - Updated project assembly to use actual video duration
+
+**Usage:**
+```bash
+# No changes to user workflow - extension happens automatically
+vibe ai script-to-video "A morning routine..." -d 60 -a 9:16 -g kling
+
+# Videos are automatically extended to match narration
+# Scene with 11.7s narration + 10s video → video extended to 11.7s
+```
+
+**Example:**
+```
+Before fix:
+  Narration: 11.7s, Video: 10s → 1.7s mismatch
+  Export: narration plays over black screen for 1.7s
+
+After fix:
+  Narration: 11.7s, Video: 10s → 17% extension needed
+  Applied: minterpolate + setpts=0.85 → Video: 11.76s
+  Export: video and narration end together ✓
+```
+
+---
+
 ### Feature: Character Consistency for Scene Regeneration
 
 Added `--reference-scene` option to `regenerate-scene` command to maintain character consistency when regenerating scene images.

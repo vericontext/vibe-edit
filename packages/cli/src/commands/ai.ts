@@ -10,7 +10,7 @@
  */
 
 import { Command } from "commander";
-import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, stat, unlink, rename } from "node:fs/promises";
 import { resolve, dirname, basename, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -55,7 +55,7 @@ import type { EffectType } from "@vibeframe/core/timeline";
 import { detectFormat, formatTranscript } from "../utils/subtitle.js";
 import { getApiKey, loadEnv } from "../utils/api-key.js";
 import { getApiKeyFromConfig } from "../config/index.js";
-import { getAudioDuration } from "../utils/audio.js";
+import { getAudioDuration, getVideoDuration, extendVideoNaturally } from "../utils/audio.js";
 
 const execAsync = promisify(exec);
 
@@ -3954,6 +3954,19 @@ aiCommand
                     const response = await fetch(waitResult.videoUrl);
                     const buffer = Buffer.from(await response.arrayBuffer());
                     await writeFile(videoPath, buffer);
+
+                    // Extend video to match narration duration if needed
+                    const targetDuration = segment.duration;
+                    const actualVideoDuration = await getVideoDuration(videoPath);
+
+                    if (actualVideoDuration < targetDuration - 0.1) {
+                      videoSpinner.text = `🎬 Scene ${i + 1}: Extending to match narration...`;
+                      const extendedPath = resolve(outputDir, `scene-${i + 1}-extended.mp4`);
+                      await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                      await unlink(videoPath);
+                      await rename(extendedPath, videoPath);
+                    }
+
                     videoPaths[i] = videoPath;
                     completed = true;
                     console.log(chalk.green(`\n  ✓ Scene ${i + 1} completed`));
@@ -4034,6 +4047,19 @@ aiCommand
                     const response = await fetch(result.videoUrl);
                     const buffer = Buffer.from(await response.arrayBuffer());
                     await writeFile(videoPath, buffer);
+
+                    // Extend video to match narration duration if needed
+                    const targetDuration = task.segment.duration;
+                    const actualVideoDuration = await getVideoDuration(videoPath);
+
+                    if (actualVideoDuration < targetDuration - 0.1) {
+                      videoSpinner.text = `🎬 Scene ${task.index + 1}: Extending to match narration...`;
+                      const extendedPath = resolve(outputDir, `scene-${task.index + 1}-extended.mp4`);
+                      await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                      await unlink(videoPath);
+                      await rename(extendedPath, videoPath);
+                    }
+
                     videoPaths[task.index] = videoPath;
                     completed = true;
                   } else if (attempt < maxRetries) {
@@ -4150,6 +4176,19 @@ aiCommand
                   const response = await fetch(result.videoUrl);
                   const buffer = Buffer.from(await response.arrayBuffer());
                   await writeFile(videoPath, buffer);
+
+                  // Extend video to match narration duration if needed
+                  const targetDuration = task.segment.duration;
+                  const actualVideoDuration = await getVideoDuration(videoPath);
+
+                  if (actualVideoDuration < targetDuration - 0.1) {
+                    videoSpinner.text = `🎬 Scene ${task.index + 1}: Extending to match narration...`;
+                    const extendedPath = resolve(outputDir, `scene-${task.index + 1}-extended.mp4`);
+                    await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                    await unlink(videoPath);
+                    await rename(extendedPath, videoPath);
+                  }
+
                   videoPaths[task.index] = videoPath;
                   completed = true;
                 } else if (attempt < maxRetries) {
@@ -4797,6 +4836,19 @@ Generate the single-person scene image now.`;
                   const response = await fetch(waitResult.videoUrl);
                   const buffer = Buffer.from(await response.arrayBuffer());
                   await writeFile(videoPath, buffer);
+
+                  // Extend video to match narration duration if needed
+                  const targetDuration = segment.duration;
+                  const actualVideoDuration = await getVideoDuration(videoPath);
+
+                  if (actualVideoDuration < targetDuration - 0.1) {
+                    videoSpinner.text = `🎬 Scene ${sceneNum}: Extending video to match narration...`;
+                    const extendedPath = resolve(outputDir, `scene-${sceneNum}-extended.mp4`);
+                    await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                    await unlink(videoPath);
+                    await rename(extendedPath, videoPath);
+                  }
+
                   videoGenerated = true;
                 } else if (attempt < maxRetries) {
                   videoSpinner.text = `🎬 Scene ${sceneNum}: Retry ${attempt + 1}/${maxRetries}...`;
@@ -4848,6 +4900,19 @@ Generate the single-person scene image now.`;
                   const response = await fetch(waitResult.videoUrl);
                   const buffer = Buffer.from(await response.arrayBuffer());
                   await writeFile(videoPath, buffer);
+
+                  // Extend video to match narration duration if needed
+                  const targetDuration = segment.duration;
+                  const actualVideoDuration = await getVideoDuration(videoPath);
+
+                  if (actualVideoDuration < targetDuration - 0.1) {
+                    videoSpinner.text = `🎬 Scene ${sceneNum}: Extending video to match narration...`;
+                    const extendedPath = resolve(outputDir, `scene-${sceneNum}-extended.mp4`);
+                    await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                    await unlink(videoPath);
+                    await rename(extendedPath, videoPath);
+                  }
+
                   videoGenerated = true;
                 } else if (attempt < maxRetries) {
                   videoSpinner.text = `🎬 Scene ${sceneNum}: Retry ${attempt + 1}/${maxRetries}...`;
@@ -8341,6 +8406,19 @@ export async function executeScriptToVideo(
                 const response = await fetch(waitResult.videoUrl);
                 const buffer = Buffer.from(await response.arrayBuffer());
                 await writeFile(videoPath, buffer);
+
+                // Extend video to match narration duration if needed
+                const targetDuration = segment.duration; // Already updated to narration length
+                const actualVideoDuration = await getVideoDuration(videoPath);
+
+                if (actualVideoDuration < targetDuration - 0.1) {
+                  const extendedPath = resolve(absOutputDir, `scene-${i + 1}-extended.mp4`);
+                  await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                  // Replace original with extended version
+                  await unlink(videoPath);
+                  await rename(extendedPath, videoPath);
+                }
+
                 videoPaths.push(videoPath);
                 result.videos!.push(videoPath);
               } else {
@@ -8392,6 +8470,19 @@ export async function executeScriptToVideo(
                 const response = await fetch(waitResult.videoUrl);
                 const buffer = Buffer.from(await response.arrayBuffer());
                 await writeFile(videoPath, buffer);
+
+                // Extend video to match narration duration if needed
+                const targetDuration = segment.duration; // Already updated to narration length
+                const actualVideoDuration = await getVideoDuration(videoPath);
+
+                if (actualVideoDuration < targetDuration - 0.1) {
+                  const extendedPath = resolve(absOutputDir, `scene-${i + 1}-extended.mp4`);
+                  await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                  // Replace original with extended version
+                  await unlink(videoPath);
+                  await rename(extendedPath, videoPath);
+                }
+
                 videoPaths.push(videoPath);
                 result.videos!.push(videoPath);
               } else {
@@ -8480,23 +8571,28 @@ export async function executeScriptToVideo(
       const assetPath = hasVideo ? videoPaths[i] : imagePaths[i];
       const mediaType = hasVideo ? "video" : "image";
 
+      // Use actual video duration (after extension) instead of segment.duration
+      const actualDuration = hasVideo
+        ? await getVideoDuration(assetPath)
+        : segment.duration;
+
       const source = project.addSource({
         name: `Scene ${i + 1}`,
         url: assetPath,
         type: mediaType as "video" | "image",
-        duration: segment.duration,
+        duration: actualDuration,
       });
 
       project.addClip({
         sourceId: source.id,
         trackId: videoTrack.id,
         startTime: currentTime,
-        duration: segment.duration,
+        duration: actualDuration,
         sourceStartOffset: 0,
-        sourceEndOffset: segment.duration,
+        sourceEndOffset: actualDuration,
       });
 
-      currentTime += segment.duration;
+      currentTime += actualDuration;
     }
 
     // Save project file
@@ -8650,6 +8746,18 @@ export async function executeRegenerateScene(
                 const response = await fetch(waitResult.videoUrl);
                 const buffer = Buffer.from(await response.arrayBuffer());
                 await writeFile(videoPath, buffer);
+
+                // Extend video to match narration duration if needed
+                const targetDuration = segment.duration;
+                const actualVideoDuration = await getVideoDuration(videoPath);
+
+                if (actualVideoDuration < targetDuration - 0.1) {
+                  const extendedPath = resolve(outputDir, `scene-${sceneNum}-extended.mp4`);
+                  await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                  await unlink(videoPath);
+                  await rename(extendedPath, videoPath);
+                }
+
                 result.regeneratedScenes.push(sceneNum);
               } else {
                 result.failedScenes.push(sceneNum);
@@ -8686,6 +8794,18 @@ export async function executeRegenerateScene(
                 const response = await fetch(waitResult.videoUrl);
                 const buffer = Buffer.from(await response.arrayBuffer());
                 await writeFile(videoPath, buffer);
+
+                // Extend video to match narration duration if needed
+                const targetDuration = segment.duration;
+                const actualVideoDuration = await getVideoDuration(videoPath);
+
+                if (actualVideoDuration < targetDuration - 0.1) {
+                  const extendedPath = resolve(outputDir, `scene-${sceneNum}-extended.mp4`);
+                  await extendVideoNaturally(videoPath, targetDuration, extendedPath);
+                  await unlink(videoPath);
+                  await rename(extendedPath, videoPath);
+                }
+
                 result.regeneratedScenes.push(sceneNum);
               } else {
                 result.failedScenes.push(sceneNum);
