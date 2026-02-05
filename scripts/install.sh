@@ -176,9 +176,9 @@ if [ -w "/usr/local/bin" ]; then
   chmod +x "$BIN_PATH"
   echo -e "  ${DIM}Linked to $BIN_PATH${NC}"
 else
-  # Need sudo
+  # Need sudo - use /dev/tty to read password when stdin is piped
   warn "Need sudo to create symlink in /usr/local/bin"
-  sudo ln -sf "$VIBE_HOME/packages/cli/dist/index.js" "$BIN_PATH"
+  sudo -S ln -sf "$VIBE_HOME/packages/cli/dist/index.js" "$BIN_PATH" < /dev/tty
   sudo chmod +x "$BIN_PATH"
   echo -e "  ${DIM}Linked to $BIN_PATH${NC}"
 fi
