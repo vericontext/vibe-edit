@@ -106,7 +106,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Interactive REPL Section */}
+      {/* Agent Mode Section */}
       <section id="interactive" className="py-20 px-4 border-t border-border/50 relative">
         <div className="mx-auto max-w-5xl">
           <div className="text-center mb-12">
@@ -517,7 +517,7 @@ function FeatureCard({
   );
 }
 
-// Feature Item Component (for REPL section)
+// Feature Item Component (for Agent section)
 function FeatureItem({
   icon,
   title,
