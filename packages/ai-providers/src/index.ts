@@ -22,8 +22,8 @@ export type { MotionOptions, MotionResult, RemotionComponent, StoryboardSegment 
 export { OllamaProvider, ollamaProvider } from "./ollama/index.js";
 export { ElevenLabsProvider, elevenLabsProvider, KNOWN_VOICES, resolveVoiceId } from "./elevenlabs/index.js";
 export type { Voice, TTSOptions, TTSResult, SoundEffectOptions, SoundEffectResult, AudioIsolationResult, VoiceCloneOptions, VoiceCloneResult } from "./elevenlabs/index.js";
-export { DalleProvider, dalleProvider } from "./dalle/index.js";
-export type { ImageOptions, ImageResult, ImageEditOptions } from "./dalle/index.js";
+export { OpenAIImageProvider, openaiImageProvider } from "./openai-image/index.js";
+export type { ImageOptions, ImageResult, ImageEditOptions } from "./openai-image/index.js";
 export { RunwayProvider, runwayProvider } from "./runway/index.js";
 export { KlingProvider, klingProvider } from "./kling/index.js";
 export type { KlingVideoExtendOptions } from "./kling/index.js";

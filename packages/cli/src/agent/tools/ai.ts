@@ -524,11 +524,11 @@ const generateImage: ToolHandler = async (args, context): Promise<ToolResult> =>
     const outputPath = resolve(context.workingDirectory, output);
 
     if (provider === "dalle" || provider === "openai") {
-      const { DalleProvider } = await import("@vibeframe/ai-providers");
-      const dalle = new DalleProvider();
-      await dalle.initialize({ apiKey });
+      const { OpenAIImageProvider } = await import("@vibeframe/ai-providers");
+      const openaiImage = new OpenAIImageProvider();
+      await openaiImage.initialize({ apiKey });
 
-      const result = await dalle.generateImage(prompt, {
+      const result = await openaiImage.generateImage(prompt, {
         size: size as "1024x1024" | "1536x1024" | "1024x1536",
       });
 

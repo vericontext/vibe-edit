@@ -25,7 +25,7 @@ import {
   OpenAIProvider,
   ClaudeProvider,
   ElevenLabsProvider,
-  DalleProvider,
+  OpenAIImageProvider,
   RunwayProvider,
   KlingProvider,
   StabilityProvider,
@@ -35,7 +35,7 @@ import {
   openaiProvider,
   claudeProvider,
   elevenLabsProvider,
-  dalleProvider,
+  openaiImageProvider,
   runwayProvider,
   klingProvider,
   stabilityProvider,
@@ -665,10 +665,10 @@ aiCommand
       const spinner = ora(`Generating image with ${providerName}...`).start();
 
       if (provider === "dalle" || provider === "openai") {
-        const dalle = new DalleProvider();
-        await dalle.initialize({ apiKey });
+        const openaiImage = new OpenAIImageProvider();
+        await openaiImage.initialize({ apiKey });
 
-        const result = await dalle.generateImage(prompt, {
+        const result = await openaiImage.generateImage(prompt, {
           size: options.size,
           quality: options.quality,
           style: options.style,
@@ -893,10 +893,10 @@ aiCommand
 
       const spinner = ora("Generating thumbnail...").start();
 
-      const dalle = new DalleProvider();
-      await dalle.initialize({ apiKey });
+      const openaiImage = new OpenAIImageProvider();
+      await openaiImage.initialize({ apiKey });
 
-      const result = await dalle.generateThumbnail(description, options.style);
+      const result = await openaiImage.generateThumbnail(description, options.style);
 
       if (!result.success || !result.images) {
         spinner.fail(chalk.red(result.error || "Thumbnail generation failed"));
@@ -959,10 +959,10 @@ aiCommand
 
       const spinner = ora("Generating background...").start();
 
-      const dalle = new DalleProvider();
-      await dalle.initialize({ apiKey });
+      const openaiImage = new OpenAIImageProvider();
+      await openaiImage.initialize({ apiKey });
 
-      const result = await dalle.generateBackground(description, options.aspect);
+      const result = await openaiImage.generateBackground(description, options.aspect);
 
       if (!result.success || !result.images) {
         spinner.fail(chalk.red(result.error || "Background generation failed"));
@@ -2942,13 +2942,13 @@ aiCommand
       const imagePaths: string[] = [];
 
       // Initialize the selected provider
-      let dalleInstance: DalleProvider | undefined;
+      let openaiImageInstance: OpenAIImageProvider | undefined;
       let stabilityInstance: StabilityProvider | undefined;
       let geminiInstance: GeminiProvider | undefined;
 
       if (imageProvider === "openai" || imageProvider === "dalle") {
-        dalleInstance = new DalleProvider();
-        await dalleInstance.initialize({ apiKey: imageApiKey });
+        openaiImageInstance = new OpenAIImageProvider();
+        await openaiImageInstance.initialize({ apiKey: imageApiKey });
       } else if (imageProvider === "stability") {
         stabilityInstance = new StabilityProvider();
         await stabilityInstance.initialize({ apiKey: imageApiKey });
@@ -2971,8 +2971,8 @@ aiCommand
           let imageUrl: string | undefined;
           let imageError: string | undefined;
 
-          if ((imageProvider === "openai" || imageProvider === "dalle") && dalleInstance) {
-            const imageResult = await dalleInstance.generateImage(imagePrompt, {
+          if ((imageProvider === "openai" || imageProvider === "dalle") && openaiImageInstance) {
+            const imageResult = await openaiImageInstance.generateImage(imagePrompt, {
               size: dalleImageSizes[options.aspectRatio] || "1536x1024",
               quality: "standard",
             });
@@ -3673,9 +3673,9 @@ aiCommand
         let imageError: string | undefined;
 
         if (imageProvider === "openai" || imageProvider === "dalle") {
-          const dalle = new DalleProvider();
-          await dalle.initialize({ apiKey: imageApiKey });
-          const imageResult = await dalle.generateImage(imagePrompt, {
+          const openaiImage = new OpenAIImageProvider();
+          await openaiImage.initialize({ apiKey: imageApiKey });
+          const imageResult = await openaiImage.generateImage(imagePrompt, {
             size: dalleImageSizes[options.aspectRatio] || "1536x1024",
             quality: "standard",
           });
@@ -7084,13 +7084,13 @@ export async function executeScriptToVideo(
       "1:1": "1:1",
     };
 
-    let dalleInstance: DalleProvider | undefined;
+    let openaiImageInstance: OpenAIImageProvider | undefined;
     let stabilityInstance: StabilityProvider | undefined;
     let geminiInstance: GeminiProvider | undefined;
 
     if (imageProvider === "openai" || imageProvider === "dalle") {
-      dalleInstance = new DalleProvider();
-      await dalleInstance.initialize({ apiKey: imageApiKey! });
+      openaiImageInstance = new OpenAIImageProvider();
+      await openaiImageInstance.initialize({ apiKey: imageApiKey! });
     } else if (imageProvider === "stability") {
       stabilityInstance = new StabilityProvider();
       await stabilityInstance.initialize({ apiKey: imageApiKey! });
@@ -7111,8 +7111,8 @@ export async function executeScriptToVideo(
         let imageUrl: string | undefined;
         let imageError: string | undefined;
 
-        if ((imageProvider === "openai" || imageProvider === "dalle") && dalleInstance) {
-          const imageResult = await dalleInstance.generateImage(imagePrompt, {
+        if ((imageProvider === "openai" || imageProvider === "dalle") && openaiImageInstance) {
+          const imageResult = await openaiImageInstance.generateImage(imagePrompt, {
             size: dalleImageSizes[options.aspectRatio || "16:9"] || "1536x1024",
             quality: "standard",
           });
@@ -8059,7 +8059,7 @@ aiCommand
     providerRegistry.register(openaiProvider);
     providerRegistry.register(claudeProvider);
     providerRegistry.register(elevenLabsProvider);
-    providerRegistry.register(dalleProvider);
+    providerRegistry.register(openaiImageProvider);
     providerRegistry.register(runwayProvider);
     providerRegistry.register(klingProvider);
     providerRegistry.register(stabilityProvider);

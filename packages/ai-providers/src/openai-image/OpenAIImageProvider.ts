@@ -68,8 +68,8 @@ const DEFAULT_MODEL: GPTImageModel = "gpt-image-1.5";
 /**
  * OpenAI Image provider (GPT Image 1.5 / DALL-E)
  */
-export class DalleProvider implements AIProvider {
-  id = "dalle";
+export class OpenAIImageProvider implements AIProvider {
+  id = "openai-image";
   name = "OpenAI GPT Image";
   description = "AI image generation with GPT Image 1.5 (fastest, best quality)";
   capabilities: AICapability[] = ["text-to-image", "background-removal"];
@@ -245,7 +245,7 @@ export class DalleProvider implements AIProvider {
   }
 
   /**
-   * Create image variations
+   * Create image variations (uses DALL-E 2)
    */
   async createVariation(
     imageBuffer: Buffer,
@@ -299,4 +299,4 @@ export class DalleProvider implements AIProvider {
   }
 }
 
-export const dalleProvider = new DalleProvider();
+export const openaiImageProvider = new OpenAIImageProvider();
