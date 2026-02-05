@@ -161,7 +161,7 @@ const projectCreate: ToolHandler = async (args, context): Promise<ToolResult> =>
 };
 
 const projectInfo: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const path = args.path as string;
+  const path = (args.path || args.project) as string;
 
   try {
     const filePath = await resolveProjectPath(path, context.workingDirectory);
@@ -200,7 +200,7 @@ const projectInfo: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const projectSet: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const path = args.path as string;
+  const path = (args.path || args.project) as string;
   const updates: string[] = [];
 
   try {
@@ -240,7 +240,7 @@ const projectSet: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const projectOpen: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const path = args.path as string;
+  const path = (args.path || args.project) as string;
 
   try {
     const filePath = await resolveProjectPath(path, context.workingDirectory);

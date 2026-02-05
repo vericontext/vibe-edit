@@ -364,7 +364,7 @@ const clearDef: ToolDefinition = {
 
 // Tool Handlers
 const addSource: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const mediaPath = args.media as string;
 
   try {
@@ -400,7 +400,7 @@ const addSource: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const addClip: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const sourceId = args.sourceId as string;
 
   try {
@@ -463,7 +463,7 @@ const addClip: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const addTrack: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const type = args.type as MediaType;
 
   try {
@@ -500,7 +500,7 @@ const addTrack: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const addEffect: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
   const effectType = args.effectType as EffectType;
 
@@ -561,7 +561,7 @@ const addEffect: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const trim: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
 
   try {
@@ -603,7 +603,7 @@ const trim: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const split: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
   const splitTime = args.time as number;
 
@@ -658,7 +658,7 @@ const split: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const move: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
 
   try {
@@ -706,7 +706,7 @@ const move: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const deleteClip: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
 
   try {
@@ -750,7 +750,7 @@ const deleteClip: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const duplicate: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const clipId = args.clipId as string;
 
   try {
@@ -796,7 +796,8 @@ const duplicate: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const list: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  // Accept both 'project' and 'path' for robustness (LLMs sometimes use alternative names)
+  const projectPath = (args.project || args.path) as string;
   const listType = (args.type as string) || "all";
 
   try {
@@ -858,7 +859,7 @@ const list: ToolHandler = async (args, context): Promise<ToolResult> => {
 };
 
 const clear: ToolHandler = async (args, context): Promise<ToolResult> => {
-  const projectPath = args.project as string;
+  const projectPath = (args.project || args.path) as string;
   const what = (args.what as string) || "clips";
   const keepTracks = args.keepTracks !== false; // default true
 
