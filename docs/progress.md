@@ -6,6 +6,43 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-05
 
+### Fix: Export Timeline Gap Handling
+
+Fixed export to fill timeline gaps with black frames, ensuring video duration matches audio duration.
+
+**Problem:**
+- B-Roll Matcher placed video clips at specific timestamps (e.g., 0-3s, 6.72-10.8s, 28.96-33s)
+- Export used simple concat which ignored `clip.startTime` and removed gaps
+- Result: 14.96s video with 33.04s audio (gaps removed)
+- Expected: 33s video with black frames in gaps, synchronized with audio
+
+**Solution:**
+- Added `detectTimelineGaps()` function to find gaps between clips
+- Modified `buildFFmpegArgs()` to interleave black frames (`color=c=black`) for video gaps
+- Added silence (`anullsrc`) for audio gaps
+- Uses audio track duration as reference for total timeline length
+
+**Files Modified:**
+- `packages/cli/src/commands/export.ts` - Added gap detection and black frame generation
+
+**Usage:**
+```bash
+# Export project with gaps (gaps will be filled with black frames)
+pnpm vibe export project.vibe.json -o output.mp4
+
+# Verify video/audio duration match
+ffprobe -v error -show_entries stream=codec_type,duration output.mp4
+# video: 33.1s, audio: 33.04s ✓
+```
+
+**Verification:**
+```bash
+pnpm build  # Builds successfully
+pnpm test   # 256 tests passing
+```
+
+---
+
 ### Fix: Show Image Generation Error Details in script-to-video
 
 When `vibe ai script-to-video` fails to generate images, the CLI now shows detailed error messages instead of just "Failed to generate image".

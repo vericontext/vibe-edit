@@ -299,6 +299,46 @@ async function findFFmpeg(): Promise<string | null> {
 }
 
 /**
+ * Detect gaps in timeline between clips
+ * Returns array of gaps with start and end times
+ */
+function detectTimelineGaps(
+  clips: Array<{ startTime: number; duration: number }>,
+  totalDuration?: number
+): Array<{ start: number; end: number }> {
+  if (clips.length === 0) return [];
+
+  const gaps: Array<{ start: number; end: number }> = [];
+  const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime);
+
+  // Check for gap at the start (first clip doesn't start at 0)
+  if (sortedClips[0].startTime > 0.001) {
+    gaps.push({ start: 0, end: sortedClips[0].startTime });
+  }
+
+  // Check for gaps between clips
+  for (let i = 0; i < sortedClips.length - 1; i++) {
+    const clipEnd = sortedClips[i].startTime + sortedClips[i].duration;
+    const nextStart = sortedClips[i + 1].startTime;
+    // Allow small tolerance for floating point errors
+    if (nextStart > clipEnd + 0.001) {
+      gaps.push({ start: clipEnd, end: nextStart });
+    }
+  }
+
+  // Check for gap at the end if totalDuration is provided
+  if (totalDuration !== undefined) {
+    const lastClip = sortedClips[sortedClips.length - 1];
+    const lastClipEnd = lastClip.startTime + lastClip.duration;
+    if (totalDuration > lastClipEnd + 0.001) {
+      gaps.push({ start: lastClipEnd, end: totalDuration });
+    }
+  }
+
+  return gaps;
+}
+
+/**
  * Build FFmpeg arguments for export
  */
 function buildFFmpegArgs(
@@ -335,15 +375,13 @@ function buildFFmpegArgs(
 
   // Build filter complex
   const filterParts: string[] = [];
-  const videoStreams: string[] = [];
-  const audioStreams: string[] = [];
 
   // Separate clips by track type for proper timeline-based export
   // Get track info to determine clip types
   const videoClips = clips.filter((clip) => {
     const source = sources.find((s) => s.id === clip.sourceId);
     return source && (source.type === "image" || source.type === "video");
-  });
+  }).sort((a, b) => a.startTime - b.startTime);
 
   // Include audio clips from:
   // 1. Explicit audio sources (narration, music)
@@ -351,7 +389,7 @@ function buildFFmpegArgs(
   const explicitAudioClips = clips.filter((clip) => {
     const source = sources.find((s) => s.id === clip.sourceId);
     return source && source.type === "audio";
-  });
+  }).sort((a, b) => a.startTime - b.startTime);
 
   // If no explicit audio clips, extract audio from video clips
   const audioClips = explicitAudioClips.length > 0
@@ -359,85 +397,170 @@ function buildFFmpegArgs(
     : clips.filter((clip) => {
         const source = sources.find((s) => s.id === clip.sourceId);
         return source && source.type === "video";
-      });
+      }).sort((a, b) => a.startTime - b.startTime);
 
   // Get target resolution for scaling (all clips must match for concat)
   const [targetWidth, targetHeight] = presetSettings.resolution.split("x").map(Number);
 
-  // Process video clips
-  videoClips.forEach((clip, clipIdx) => {
-    const source = sources.find((s) => s.id === clip.sourceId);
-    if (!source) return;
+  // Detect gaps in video timeline
+  // For totalDuration, use the longest audio clip end time if explicit audio exists
+  // (audio is usually the reference for timing in b-roll scenarios)
+  let totalDuration: number | undefined;
+  if (explicitAudioClips.length > 0) {
+    const audioEnd = Math.max(...explicitAudioClips.map(c => c.startTime + c.duration));
+    totalDuration = audioEnd;
+  }
+  const videoGaps = detectTimelineGaps(videoClips, totalDuration);
 
-    const srcIdx = sourceMap.get(source.id);
-    if (srcIdx === undefined) return;
+  // Build ordered list of video segments (clips and gaps interleaved)
+  interface VideoSegment {
+    type: 'clip' | 'gap';
+    clip?: typeof videoClips[0];
+    gap?: { start: number; end: number };
+    startTime: number;
+  }
+  const videoSegments: VideoSegment[] = [];
 
-    // Video filter chain - images need different handling than video
-    let videoFilter: string;
-    if (source.type === "image") {
-      // Images: trim from 0 to clip duration (no source offset since images are looped)
-      videoFilter = `[${srcIdx}:v]trim=start=0:end=${clip.duration},setpts=PTS-STARTPTS`;
-    } else {
-      // Video: use source offsets
-      const trimStart = clip.sourceStartOffset;
-      const trimEnd = clip.sourceStartOffset + clip.duration;
-      videoFilter = `[${srcIdx}:v]trim=start=${trimStart}:end=${trimEnd},setpts=PTS-STARTPTS`;
-    }
+  // Add video clips as segments
+  for (const clip of videoClips) {
+    videoSegments.push({ type: 'clip', clip, startTime: clip.startTime });
+  }
 
-    // Scale to target resolution for concat compatibility (force same size, pad if needed)
-    videoFilter += `,scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  // Add gaps as segments
+  for (const gap of videoGaps) {
+    videoSegments.push({ type: 'gap', gap, startTime: gap.start });
+  }
 
-    // Apply effects
-    for (const effect of clip.effects || []) {
-      if (effect.type === "fadeIn") {
-        videoFilter += `,fade=t=in:st=0:d=${effect.duration}`;
-      } else if (effect.type === "fadeOut") {
-        const fadeStart = clip.duration - effect.duration;
-        videoFilter += `,fade=t=out:st=${fadeStart}:d=${effect.duration}`;
+  // Sort by start time
+  videoSegments.sort((a, b) => a.startTime - b.startTime);
+
+  // Process video segments (clips and gaps)
+  const videoStreams: string[] = [];
+  let videoStreamIdx = 0;
+
+  for (const segment of videoSegments) {
+    if (segment.type === 'clip' && segment.clip) {
+      const clip = segment.clip;
+      const source = sources.find((s) => s.id === clip.sourceId);
+      if (!source) continue;
+
+      const srcIdx = sourceMap.get(source.id);
+      if (srcIdx === undefined) continue;
+
+      // Video filter chain - images need different handling than video
+      let videoFilter: string;
+      if (source.type === "image") {
+        // Images: trim from 0 to clip duration (no source offset since images are looped)
+        videoFilter = `[${srcIdx}:v]trim=start=0:end=${clip.duration},setpts=PTS-STARTPTS`;
+      } else {
+        // Video: use source offsets
+        const trimStart = clip.sourceStartOffset;
+        const trimEnd = clip.sourceStartOffset + clip.duration;
+        videoFilter = `[${srcIdx}:v]trim=start=${trimStart}:end=${trimEnd},setpts=PTS-STARTPTS`;
       }
-    }
 
-    videoFilter += `[v${clipIdx}]`;
-    filterParts.push(videoFilter);
-    videoStreams.push(`[v${clipIdx}]`);
-  });
+      // Scale to target resolution for concat compatibility (force same size, pad if needed)
+      videoFilter += `,scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
-  // Process audio clips
-  audioClips.forEach((clip, clipIdx) => {
-    const source = sources.find((s) => s.id === clip.sourceId);
-    if (!source) return;
-
-    const srcIdx = sourceMap.get(source.id);
-    if (srcIdx === undefined) return;
-
-    // Check if source has audio (audio sources always have audio, video sources need to be checked)
-    const hasAudio = source.type === "audio" || sourceAudioMap.get(source.id) === true;
-
-    let audioFilter: string;
-    if (hasAudio) {
-      // Source has audio - extract and trim it
-      const audioTrimStart = clip.sourceStartOffset;
-      const audioTrimEnd = clip.sourceStartOffset + clip.duration;
-      audioFilter = `[${srcIdx}:a]atrim=start=${audioTrimStart}:end=${audioTrimEnd},asetpts=PTS-STARTPTS`;
-    } else {
-      // Source has no audio - generate silence for the clip duration
-      audioFilter = `anullsrc=r=48000:cl=stereo,atrim=0:${clip.duration},asetpts=PTS-STARTPTS`;
-    }
-
-    // Apply audio effects
-    for (const effect of clip.effects || []) {
-      if (effect.type === "fadeIn") {
-        audioFilter += `,afade=t=in:st=0:d=${effect.duration}`;
-      } else if (effect.type === "fadeOut") {
-        const fadeStart = clip.duration - effect.duration;
-        audioFilter += `,afade=t=out:st=${fadeStart}:d=${effect.duration}`;
+      // Apply effects
+      for (const effect of clip.effects || []) {
+        if (effect.type === "fadeIn") {
+          videoFilter += `,fade=t=in:st=0:d=${effect.duration}`;
+        } else if (effect.type === "fadeOut") {
+          const fadeStart = clip.duration - effect.duration;
+          videoFilter += `,fade=t=out:st=${fadeStart}:d=${effect.duration}`;
+        }
       }
-    }
 
-    audioFilter += `[a${clipIdx}]`;
-    filterParts.push(audioFilter);
-    audioStreams.push(`[a${clipIdx}]`);
-  });
+      videoFilter += `[v${videoStreamIdx}]`;
+      filterParts.push(videoFilter);
+      videoStreams.push(`[v${videoStreamIdx}]`);
+      videoStreamIdx++;
+    } else if (segment.type === 'gap' && segment.gap) {
+      // Generate black frame for the gap duration
+      const gapDuration = segment.gap.end - segment.gap.start;
+      const gapFilter = `color=c=black:s=${targetWidth}x${targetHeight}:d=${gapDuration}:r=30,format=yuv420p[v${videoStreamIdx}]`;
+      filterParts.push(gapFilter);
+      videoStreams.push(`[v${videoStreamIdx}]`);
+      videoStreamIdx++;
+    }
+  }
+
+  // Detect gaps in audio timeline (use same totalDuration for consistency)
+  const audioGaps = detectTimelineGaps(audioClips, totalDuration);
+
+  // Build ordered list of audio segments
+  interface AudioSegment {
+    type: 'clip' | 'gap';
+    clip?: typeof audioClips[0];
+    gap?: { start: number; end: number };
+    startTime: number;
+  }
+  const audioSegments: AudioSegment[] = [];
+
+  // Add audio clips as segments
+  for (const clip of audioClips) {
+    audioSegments.push({ type: 'clip', clip, startTime: clip.startTime });
+  }
+
+  // Add gaps as segments
+  for (const gap of audioGaps) {
+    audioSegments.push({ type: 'gap', gap, startTime: gap.start });
+  }
+
+  // Sort by start time
+  audioSegments.sort((a, b) => a.startTime - b.startTime);
+
+  // Process audio segments (clips and gaps)
+  const audioStreams: string[] = [];
+  let audioStreamIdx = 0;
+
+  for (const segment of audioSegments) {
+    if (segment.type === 'clip' && segment.clip) {
+      const clip = segment.clip;
+      const source = sources.find((s) => s.id === clip.sourceId);
+      if (!source) continue;
+
+      const srcIdx = sourceMap.get(source.id);
+      if (srcIdx === undefined) continue;
+
+      // Check if source has audio (audio sources always have audio, video sources need to be checked)
+      const hasAudio = source.type === "audio" || sourceAudioMap.get(source.id) === true;
+
+      let audioFilter: string;
+      if (hasAudio) {
+        // Source has audio - extract and trim it
+        const audioTrimStart = clip.sourceStartOffset;
+        const audioTrimEnd = clip.sourceStartOffset + clip.duration;
+        audioFilter = `[${srcIdx}:a]atrim=start=${audioTrimStart}:end=${audioTrimEnd},asetpts=PTS-STARTPTS`;
+      } else {
+        // Source has no audio - generate silence for the clip duration
+        audioFilter = `anullsrc=r=48000:cl=stereo,atrim=0:${clip.duration},asetpts=PTS-STARTPTS`;
+      }
+
+      // Apply audio effects
+      for (const effect of clip.effects || []) {
+        if (effect.type === "fadeIn") {
+          audioFilter += `,afade=t=in:st=0:d=${effect.duration}`;
+        } else if (effect.type === "fadeOut") {
+          const fadeStart = clip.duration - effect.duration;
+          audioFilter += `,afade=t=out:st=${fadeStart}:d=${effect.duration}`;
+        }
+      }
+
+      audioFilter += `[a${audioStreamIdx}]`;
+      filterParts.push(audioFilter);
+      audioStreams.push(`[a${audioStreamIdx}]`);
+      audioStreamIdx++;
+    } else if (segment.type === 'gap' && segment.gap) {
+      // Generate silence for the gap duration
+      const gapDuration = segment.gap.end - segment.gap.start;
+      const audioGapFilter = `anullsrc=r=48000:cl=stereo,atrim=0:${gapDuration},asetpts=PTS-STARTPTS[a${audioStreamIdx}]`;
+      filterParts.push(audioGapFilter);
+      audioStreams.push(`[a${audioStreamIdx}]`);
+      audioStreamIdx++;
+    }
+  }
 
   // Concatenate video clips
   if (videoStreams.length > 1) {
