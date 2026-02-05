@@ -214,22 +214,15 @@ export class KlingProvider implements AIProvider {
       if (options?.referenceImage) {
         const imageInput = options.referenceImage;
 
-        // v2.x models require image URL (not base64)
-        // Use kling-v1-5 for base64 support
+        // v2.5/v2.6 models require image URL (not base64)
+        // Only URLs are supported for image-to-video
         if (typeof imageInput === "string") {
           if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
-            // URL - works with all models
+            // URL - works with v2.x models
             body.image = imageInput;
-          } else if (imageInput.startsWith("data:") || !imageInput.includes("/")) {
-            // Base64 or data URI - use v1.5 model which supports base64
-            body.model_name = "kling-v1-5";
-            body.mode = "std";
-            if (imageInput.startsWith("data:")) {
-              body.image = imageInput;
-            } else {
-              // Raw base64, add data URI prefix
-              body.image = `data:image/png;base64,${imageInput}`;
-            }
+          } else {
+            // Base64 or data URI not supported for v2.x - skip image-to-video
+            // Fall through to text2video endpoint
           }
         } else {
           // Blob - convert to data URI, use v1.5

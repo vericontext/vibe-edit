@@ -2568,8 +2568,44 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Upload image to ImgBB and return the URL
+ * Used for Kling v2.5/v2.6 image-to-video which requires URL (not base64)
+ */
+async function uploadToImgbb(
+  imageBuffer: Buffer,
+  apiKey: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const base64Image = imageBuffer.toString("base64");
+
+    const formData = new URLSearchParams();
+    formData.append("key", apiKey);
+    formData.append("image", base64Image);
+
+    const response = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = (await response.json()) as {
+      success?: boolean;
+      data?: { url?: string };
+      error?: { message?: string };
+    };
+
+    if (data.success && data.data?.url) {
+      return { success: true, url: data.data.url };
+    } else {
+      return { success: false, error: data.error?.message || "Upload failed" };
+    }
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+
+/**
  * Generate video with retry logic for Kling provider
- * Supports image-to-video with base64 images (uses v1.5 model for base64)
+ * Supports image-to-video with URL (v2.5/v2.6 models)
  */
 async function generateVideoWithRetryKling(
   kling: KlingProvider,
@@ -3100,8 +3136,42 @@ aiCommand
             process.exit(1);
           }
 
+          // Check for ImgBB API key for image-to-video support
+          const imgbbApiKey = process.env.IMGBB_API_KEY;
+          const useImageToVideo = !!imgbbApiKey;
+
+          if (useImageToVideo) {
+            videoSpinner.text = `🎬 Uploading images to ImgBB for image-to-video...`;
+          }
+
+          // Upload images to ImgBB if API key is available (for Kling v2.x image-to-video)
+          const imageUrls: (string | undefined)[] = [];
+          if (useImageToVideo) {
+            for (let i = 0; i < imagePaths.length; i++) {
+              if (imagePaths[i] && imagePaths[i] !== "") {
+                try {
+                  const imageBuffer = await readFile(imagePaths[i]);
+                  const uploadResult = await uploadToImgbb(imageBuffer, imgbbApiKey);
+                  if (uploadResult.success && uploadResult.url) {
+                    imageUrls[i] = uploadResult.url;
+                  } else {
+                    console.log(chalk.yellow(`\n  ⚠ Failed to upload image ${i + 1}: ${uploadResult.error}`));
+                    imageUrls[i] = undefined;
+                  }
+                } catch {
+                  imageUrls[i] = undefined;
+                }
+              } else {
+                imageUrls[i] = undefined;
+              }
+            }
+            const uploadedCount = imageUrls.filter((u) => u).length;
+            if (uploadedCount > 0) {
+              videoSpinner.text = `🎬 Uploaded ${uploadedCount}/${imagePaths.length} images to ImgBB`;
+            }
+          }
+
           // Submit all video generation tasks with retry logic
-          // Use image2video when images are available (base64 supported via v1.5 fallback)
           const tasks: Array<{ taskId: string; index: number; segment: StoryboardSegment; type: "text2video" | "image2video" }> = [];
 
           for (let i = 0; i < segments.length; i++) {
@@ -3111,16 +3181,8 @@ aiCommand
             // Use 10s video if narration > 5s to avoid video ending before narration
             const videoDuration = (segment.duration > 5 ? 10 : 5) as 5 | 10;
 
-            // Read generated image as base64 for image-to-video
-            let referenceImage: string | undefined;
-            if (imagePaths[i] && imagePaths[i] !== "") {
-              try {
-                const imageBuffer = await readFile(imagePaths[i]);
-                referenceImage = imageBuffer.toString("base64");
-              } catch {
-                // Fall back to text2video if image read fails
-              }
-            }
+            // Use image URL if available for image-to-video
+            const referenceImage = imageUrls[i];
 
             const result = await generateVideoWithRetryKling(
               kling,
@@ -3128,7 +3190,7 @@ aiCommand
               {
                 duration: videoDuration,
                 aspectRatio: options.aspectRatio as "16:9" | "9:16" | "1:1",
-                referenceImage, // Pass base64 image for image-to-video
+                referenceImage, // Pass URL for image-to-video (Kling v2.x)
               },
               maxRetries,
               (msg) => {
@@ -3180,16 +3242,8 @@ aiCommand
 
                   const videoDuration = (task.segment.duration > 5 ? 10 : 5) as 5 | 10;
 
-                  // Re-read reference image for retry
-                  let retryReferenceImage: string | undefined;
-                  if (imagePaths[task.index] && imagePaths[task.index] !== "") {
-                    try {
-                      const imageBuffer = await readFile(imagePaths[task.index]);
-                      retryReferenceImage = imageBuffer.toString("base64");
-                    } catch {
-                      // Fall back to text2video if image read fails
-                    }
-                  }
+                  // Use already uploaded image URL for retry
+                  const retryReferenceImage = imageUrls[task.index];
 
                   const retryResult = await generateVideoWithRetryKling(
                     kling,
