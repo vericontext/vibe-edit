@@ -21,8 +21,7 @@ vibe ai highlights podcast.mp4 -d 60 -p highlights.vibe.json
 vibe ai viral project.vibe.json -p tiktok,youtube-shorts,instagram-reels
 ```
 
-<!-- TODO: Add demo GIF here -->
-<!-- ![Demo](docs/demo.gif) -->
+![Demo](docs/demo.gif)
 
 ---
 
