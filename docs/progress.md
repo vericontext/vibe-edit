@@ -6,6 +6,37 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-06
 
+### Fix: Viral Optimizer Audio Source Priority
+
+Fixed bug where `vibe ai viral` failed when the first source was a video without an audio track.
+
+**Problem:**
+- Viral optimizer used `sources.find((s) => s.type === "video" || s.type === "audio")` to find media for transcription
+- This prioritized video files over audio files
+- If the first video had no audio track (e.g., silent B-roll), FFmpeg extraction failed
+
+**Solution:**
+- Changed to prioritize audio sources: `audioSource || videoSource`
+- Now uses narration audio directly instead of trying to extract from video
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` - Lines 5122-5127: Prioritize audio sources for transcription
+
+**Verification:**
+```bash
+pnpm vibe ai viral ./test-broll/filled.vibe.json --analyze-only
+# ✅ Transcribed 8 segments, Analysis complete
+
+pnpm vibe ai viral ./test-broll/filled.vibe.json -p tiktok,youtube-shorts -o ./test-broll/viral-output
+# ✅ tiktok.vibe.json (0:22.2, 9:16)
+# ✅ youtube-shorts.vibe.json (0:22.2, 9:16)
+
+pnpm vibe export ./test-broll/viral-output/tiktok.vibe.json -o ./test-broll/viral-output/tiktok.mp4 -y
+# ✅ Exported 720x1280 (9:16) vertical video
+```
+
+---
+
 ### Feature: AI Video Generation to Fill Timeline Gaps
 
 Added `vibe ai fill-gaps` command to fill unfillable timeline gaps with AI-generated video using Kling image-to-video.
