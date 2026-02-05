@@ -150,12 +150,14 @@ export async function startAgent(options: StartAgentOptions = {}): Promise<void>
   const cwd = process.cwd().replace(process.env.HOME || "", "~");
 
   console.log();
-  console.log(chalk.cyan("  ██╗   ██╗██╗██████╗ ███████╗"));
-  console.log(chalk.cyan("  ██║   ██║██║██╔══██╗██╔════╝"));
-  console.log(chalk.cyan("  ██║   ██║██║██████╔╝█████╗  ") + chalk.dim(`  VibeFrame v${version}`));
-  console.log(chalk.cyan("  ╚██╗ ██╔╝██║██╔══██╗██╔══╝  ") + chalk.dim(`  ${provider}${options.model ? ` · ${options.model}` : ""}`));
-  console.log(chalk.cyan("   ╚████╔╝ ██║██████╔╝███████╗") + chalk.dim(`  ${cwd}`));
-  console.log(chalk.cyan("    ╚═══╝  ╚═╝╚═════╝ ╚══════╝"));
+  console.log(chalk.cyan("██╗   ██╗██╗██████╗ ███████╗███████╗██████╗  █████╗ ███╗   ███╗███████╗"));
+  console.log(chalk.cyan("██║   ██║██║██╔══██╗██╔════╝██╔════╝██╔══██╗██╔══██╗████╗ ████║██╔════╝"));
+  console.log(chalk.cyan("██║   ██║██║██████╔╝█████╗  █████╗  ██████╔╝███████║██╔████╔██║█████╗"));
+  console.log(chalk.cyan("╚██╗ ██╔╝██║██╔══██╗██╔══╝  ██╔══╝  ██╔══██╗██╔══██║██║╚██╔╝██║██╔══╝"));
+  console.log(chalk.cyan(" ╚████╔╝ ██║██████╔╝███████╗██║     ██║  ██║██║  ██║██║ ╚═╝ ██║███████╗"));
+  console.log(chalk.cyan("  ╚═══╝  ╚═╝╚═════╝ ╚══════╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝"));
+  console.log();
+  console.log(chalk.dim(`  v${version} · ${provider}${options.model ? ` · ${options.model}` : ""} · ${cwd}`));
   console.log();
 
   // Show status line

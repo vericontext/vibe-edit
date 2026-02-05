@@ -54,17 +54,17 @@ const imageDef: ToolDefinition = {
 
 const videoDef: ToolDefinition = {
   name: "ai_video",
-  description: "Generate a video using AI (Runway). Note: Video generation is async and may take time.",
+  description: "Generate video from an image using Runway Gen-4 (image-to-video). REQUIRES an input image. For text-to-video without an image, use ai_kling instead.",
   parameters: {
     type: "object",
     properties: {
       prompt: {
         type: "string",
-        description: "Video generation prompt",
+        description: "Video generation prompt describing the motion/animation",
       },
       image: {
         type: "string",
-        description: "Input image path for image-to-video",
+        description: "Input image path (REQUIRED - Runway only supports image-to-video)",
       },
       output: {
         type: "string",
@@ -75,13 +75,13 @@ const videoDef: ToolDefinition = {
         description: "Video duration in seconds (5 or 10)",
       },
     },
-    required: ["prompt"],
+    required: ["prompt", "image"],
   },
 };
 
 const klingDef: ToolDefinition = {
   name: "ai_kling",
-  description: "Generate a video using Kling AI. Note: Video generation is async and may take time.",
+  description: "Generate video using Kling AI. Supports both text-to-video (no image required) and image-to-video. Recommended for text-only video generation when you don't have an input image.",
   parameters: {
     type: "object",
     properties: {
@@ -91,7 +91,7 @@ const klingDef: ToolDefinition = {
       },
       image: {
         type: "string",
-        description: "Input image path for image-to-video",
+        description: "Optional input image path for image-to-video (not required for text-to-video)",
       },
       output: {
         type: "string",
