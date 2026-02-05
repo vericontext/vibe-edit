@@ -53,6 +53,20 @@ export async function getMediaDuration(
 }
 
 /**
+ * Check if a media file has an audio stream
+ */
+export async function checkHasAudio(filePath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `ffprobe -v error -select_streams a -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+    );
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Export result for programmatic usage
  */
 export interface ExportResult {
@@ -115,12 +129,17 @@ export async function runExport(
     const clips = project.getClips().sort((a, b) => a.startTime - b.startTime);
     const sources = project.getSources();
 
-    // Verify source files exist
+    // Verify source files exist and check for audio streams
+    const sourceAudioMap = new Map<string, boolean>();
     for (const clip of clips) {
       const source = sources.find((s) => s.id === clip.sourceId);
       if (source) {
         try {
           await access(source.url);
+          // Check if video source has audio
+          if (source.type === "video" && !sourceAudioMap.has(source.id)) {
+            sourceAudioMap.set(source.id, await checkHasAudio(source.url));
+          }
         } catch {
           return {
             success: false,
@@ -131,7 +150,7 @@ export async function runExport(
     }
 
     // Build FFmpeg command
-    const ffmpegArgs = buildFFmpegArgs(clips, sources, presetSettings, finalOutputPath, { overwrite, format });
+    const ffmpegArgs = buildFFmpegArgs(clips, sources, presetSettings, finalOutputPath, { overwrite, format }, sourceAudioMap);
 
     // Run FFmpeg
     await runFFmpegProcess(ffmpegPath, ffmpegArgs, () => {});
@@ -206,13 +225,18 @@ export const exportCommand = new Command("export")
       const clips = project.getClips().sort((a, b) => a.startTime - b.startTime);
       const sources = project.getSources();
 
-      // Verify source files exist
+      // Verify source files exist and check for audio streams
       spinner.text = "Verifying source files...";
+      const sourceAudioMap = new Map<string, boolean>();
       for (const clip of clips) {
         const source = sources.find((s) => s.id === clip.sourceId);
         if (source) {
           try {
             await access(source.url);
+            // Check if video source has audio
+            if (source.type === "video" && !sourceAudioMap.has(source.id)) {
+              sourceAudioMap.set(source.id, await checkHasAudio(source.url));
+            }
           } catch {
             spinner.fail(chalk.red(`Source file not found: ${source.url}`));
             process.exit(1);
@@ -222,7 +246,7 @@ export const exportCommand = new Command("export")
 
       // Build FFmpeg command
       spinner.text = "Building export command...";
-      const ffmpegArgs = buildFFmpegArgs(clips, sources, presetSettings, outputPath, options);
+      const ffmpegArgs = buildFFmpegArgs(clips, sources, presetSettings, outputPath, options, sourceAudioMap);
 
       if (process.env.DEBUG) {
         console.log("\nFFmpeg command:");
@@ -282,7 +306,8 @@ function buildFFmpegArgs(
   sources: ReturnType<Project["getSources"]>,
   presetSettings: PresetSettings,
   outputPath: string,
-  options: { overwrite?: boolean; format?: string }
+  options: { overwrite?: boolean; format?: string },
+  sourceAudioMap: Map<string, boolean> = new Map()
 ): string[] {
   const args: string[] = [];
 
@@ -385,9 +410,19 @@ function buildFFmpegArgs(
     const srcIdx = sourceMap.get(source.id);
     if (srcIdx === undefined) return;
 
-    const audioTrimStart = clip.sourceStartOffset;
-    const audioTrimEnd = clip.sourceStartOffset + clip.duration;
-    let audioFilter = `[${srcIdx}:a]atrim=start=${audioTrimStart}:end=${audioTrimEnd},asetpts=PTS-STARTPTS`;
+    // Check if source has audio (audio sources always have audio, video sources need to be checked)
+    const hasAudio = source.type === "audio" || sourceAudioMap.get(source.id) === true;
+
+    let audioFilter: string;
+    if (hasAudio) {
+      // Source has audio - extract and trim it
+      const audioTrimStart = clip.sourceStartOffset;
+      const audioTrimEnd = clip.sourceStartOffset + clip.duration;
+      audioFilter = `[${srcIdx}:a]atrim=start=${audioTrimStart}:end=${audioTrimEnd},asetpts=PTS-STARTPTS`;
+    } else {
+      // Source has no audio - generate silence for the clip duration
+      audioFilter = `anullsrc=r=48000:cl=stereo,atrim=0:${clip.duration},asetpts=PTS-STARTPTS`;
+    }
 
     // Apply audio effects
     for (const effect of clip.effects || []) {
