@@ -54,6 +54,7 @@ import { Project, type ProjectFile } from "../engine/index.js";
 import type { EffectType } from "@vibeframe/core/timeline";
 import { detectFormat, formatTranscript } from "../utils/subtitle.js";
 import { getApiKey, loadEnv } from "../utils/api-key.js";
+import { getApiKeyFromConfig } from "../config/index.js";
 import { getAudioDuration } from "../utils/audio.js";
 
 const execAsync = promisify(exec);
@@ -3838,8 +3839,8 @@ aiCommand
             process.exit(1);
           }
 
-          // Check for ImgBB API key for image-to-video support
-          const imgbbApiKey = process.env.IMGBB_API_KEY;
+          // Check for ImgBB API key for image-to-video support (from config or env)
+          const imgbbApiKey = await getApiKeyFromConfig("imgbb") || process.env.IMGBB_API_KEY;
           const useImageToVideo = !!imgbbApiKey;
 
           if (useImageToVideo) {

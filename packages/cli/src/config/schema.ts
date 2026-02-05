@@ -23,6 +23,7 @@ export interface VibeConfig {
     elevenlabs?: string;
     runway?: string;
     kling?: string;
+    imgbb?: string;
     stability?: string;
     replicate?: string;
     xai?: string;
@@ -58,6 +59,7 @@ export const PROVIDER_ENV_VARS: Record<string, string> = {
   elevenlabs: "ELEVENLABS_API_KEY",
   runway: "RUNWAY_API_KEY",
   kling: "KLING_API_KEY",
+  imgbb: "IMGBB_API_KEY",
   stability: "STABILITY_API_KEY",
   replicate: "REPLICATE_API_TOKEN",
   xai: "XAI_API_KEY",

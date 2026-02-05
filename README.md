@@ -12,7 +12,7 @@
 curl -fsSL https://raw.githubusercontent.com/vericontext/vibeframe/main/scripts/install.sh | bash
 
 # Create a TikTok video from a script
-vibe ai script-to-video "A day in the life of a developer..." -a 9:16 -o ./tiktok/
+vibe ai script-to-video "A day in the life of a developer with 5 scenes..." -a 9:16 -o ./tiktok/
 
 # Extract highlights from a podcast
 vibe ai highlights podcast.mp4 -d 60 -p highlights.vibe.json

@@ -170,6 +170,7 @@ async function runSetupWizard(fullSetup = false): Promise<void> {
       { key: "elevenlabs", name: "ElevenLabs", desc: "TTS & Voice" },
       { key: "runway", name: "Runway", desc: "Video Gen" },
       { key: "kling", name: "Kling", desc: "Video Gen" },
+      { key: "imgbb", name: "ImgBB", desc: "Image Hosting (for Kling)" },
       { key: "stability", name: "Stability AI", desc: "Images" },
       { key: "replicate", name: "Replicate", desc: "Various" },
     ];
@@ -298,6 +299,7 @@ async function showConfig(): Promise<void> {
     { key: "elevenlabs", name: "ElevenLabs", env: "ELEVENLABS_API_KEY" },
     { key: "runway", name: "Runway", env: "RUNWAY_API_SECRET" },
     { key: "kling", name: "Kling", env: "KLING_API_KEY" },
+    { key: "imgbb", name: "ImgBB", env: "IMGBB_API_KEY" },
     { key: "stability", name: "Stability", env: "STABILITY_API_KEY" },
     { key: "replicate", name: "Replicate", env: "REPLICATE_API_TOKEN" },
   ];
