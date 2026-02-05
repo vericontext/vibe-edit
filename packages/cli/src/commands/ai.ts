@@ -5301,9 +5301,18 @@ aiCommand
           // Add clips based on platform cuts
           let currentTime = 0;
           let platformDuration = 0;
+          let audioStartOffset = 0; // Track where in original timeline the cut starts
 
           if (platformCut.segments.length > 0) {
             // Use AI-suggested segments
+            // Determine audio start offset from first segment's original timeline position
+            const firstSegment = platformCut.segments[0];
+            const firstOriginalClip = clips.find((c) => c.id === firstSegment.sourceClipId);
+            if (firstOriginalClip) {
+              // Calculate timeline position: clip start + offset within source
+              audioStartOffset = firstOriginalClip.startTime + (firstSegment.startTime - firstOriginalClip.sourceStartOffset);
+            }
+
             for (const segment of platformCut.segments) {
               // Find the original clip
               const originalClip = clips.find((c) => c.id === segment.sourceClipId);
@@ -5326,6 +5335,11 @@ aiCommand
             }
           } else {
             // Fallback: use original clips, trimmed to fit duration
+            // Audio starts from first clip's timeline position
+            if (clips.length > 0) {
+              audioStartOffset = clips[0].startTime;
+            }
+
             for (const clip of clips) {
               const sourceId = sourceMap.get(clip.sourceId);
               if (!sourceId) continue;
@@ -5357,6 +5371,24 @@ aiCommand
                 }
                 break;
               }
+            }
+          }
+
+          // Add audio clip if original project has audio
+          const originalAudioSource = sources.find((s) => s.type === "audio");
+          const audioTrack = platformProject.getTracks().find((t) => t.type === "audio");
+          if (originalAudioSource && audioTrack && platformDuration > 0) {
+            const audioSourceId = sourceMap.get(originalAudioSource.id);
+            if (audioSourceId) {
+              // Add audio clip synced with the video cut
+              platformProject.addClip({
+                sourceId: audioSourceId,
+                trackId: audioTrack.id,
+                startTime: 0,
+                duration: platformDuration,
+                sourceStartOffset: audioStartOffset,
+                sourceEndOffset: audioStartOffset + platformDuration,
+              });
             }
           }
 
