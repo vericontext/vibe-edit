@@ -5120,8 +5120,10 @@ aiCommand
       console.log(`✔ Loaded project: ${chalk.bold(projectInfo)}`);
 
       // Step 1: Extract audio and transcribe
-      // Find first video/audio source
-      const mediaSource = sources.find((s) => s.type === "video" || s.type === "audio");
+      // Find audio source first (narration), fall back to video
+      const audioSource = sources.find((s) => s.type === "audio");
+      const videoSource = sources.find((s) => s.type === "video");
+      const mediaSource = audioSource || videoSource;
       if (!mediaSource) {
         console.error(chalk.red("No video or audio source found in project"));
         process.exit(1);
