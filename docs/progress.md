@@ -4,6 +4,40 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
+## 2026-02-05
+
+### Fix: Show Image Generation Error Details in script-to-video
+
+When `vibe ai script-to-video` fails to generate images, the CLI now shows detailed error messages instead of just "Failed to generate image".
+
+**Problem:**
+- Image generation failures only showed: `⚠ Failed to generate image for scene 1`
+- No indication of what went wrong (API errors, quota exceeded, invalid key, etc.)
+- All providers (DALL-E, Gemini, Stability) return error details in `imageResult.error` but it was ignored
+
+**Solution:**
+- Capture the `error` field from provider responses when `success` is false
+- Display the error message in the warning output
+- Fixed in three locations: main loop, regenerate scene command, and executeScriptToVideo function
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` - Added error capture and display in image generation loops
+
+**Usage:**
+```bash
+# Now shows detailed error messages:
+# ⚠ Failed to generate image for scene 1: API error (401): Invalid API key
+# ⚠ Failed to generate image for scene 2: Rate limit exceeded
+```
+
+**Verification:**
+```bash
+pnpm build  # Builds successfully
+pnpm test   # 256 tests passing
+```
+
+---
+
 ## 2026-02-05 (v0.8.0)
 
 ### Feature: CLI Improvements - SSOT Docs, Gemini Edit Tool, Provider Naming

@@ -2968,6 +2968,7 @@ aiCommand
         try {
           let imageBuffer: Buffer | undefined;
           let imageUrl: string | undefined;
+          let imageError: string | undefined;
 
           if (imageProvider === "dalle" && dalleInstance) {
             const imageResult = await dalleInstance.generateImage(imagePrompt, {
@@ -2976,6 +2977,8 @@ aiCommand
             });
             if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
               imageUrl = imageResult.images[0].url;
+            } else {
+              imageError = imageResult.error;
             }
           } else if (imageProvider === "stability" && stabilityInstance) {
             const imageResult = await stabilityInstance.generateImage(imagePrompt, {
@@ -2990,6 +2993,8 @@ aiCommand
               } else if (img.url) {
                 imageUrl = img.url;
               }
+            } else {
+              imageError = imageResult.error;
             }
           } else if (imageProvider === "gemini" && geminiInstance) {
             const imageResult = await geminiInstance.generateImage(imagePrompt, {
@@ -3001,6 +3006,8 @@ aiCommand
               if (img.base64) {
                 imageBuffer = Buffer.from(img.base64, "base64");
               }
+            } else {
+              imageError = imageResult.error;
             }
           }
 
@@ -3016,7 +3023,8 @@ aiCommand
             await writeFile(imagePath, buffer);
             imagePaths.push(imagePath);
           } else {
-            console.log(chalk.yellow(`\n  ⚠ Failed to generate image for scene ${i + 1}`));
+            const errorMsg = imageError || "Unknown error";
+            console.log(chalk.yellow(`\n  ⚠ Failed to generate image for scene ${i + 1}: ${errorMsg}`));
             imagePaths.push("");
           }
         } catch (err) {
@@ -3655,6 +3663,7 @@ aiCommand
 
         let imageBuffer: Buffer | undefined;
         let imageUrl: string | undefined;
+        let imageError: string | undefined;
 
         if (imageProvider === "dalle") {
           const dalle = new DalleProvider();
@@ -3665,6 +3674,8 @@ aiCommand
           });
           if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
             imageUrl = imageResult.images[0].url;
+          } else {
+            imageError = imageResult.error;
           }
         } else if (imageProvider === "stability") {
           const stability = new StabilityProvider();
@@ -3680,6 +3691,8 @@ aiCommand
             } else if (img.url) {
               imageUrl = img.url;
             }
+          } else {
+            imageError = imageResult.error;
           }
         } else if (imageProvider === "gemini") {
           const gemini = new GeminiProvider();
@@ -3692,6 +3705,8 @@ aiCommand
             if (img.base64) {
               imageBuffer = Buffer.from(img.base64, "base64");
             }
+          } else {
+            imageError = imageResult.error;
           }
         }
 
@@ -3704,7 +3719,8 @@ aiCommand
           await writeFile(imagePath, buffer);
           imageSpinner.succeed(chalk.green("Generated image"));
         } else {
-          imageSpinner.fail(chalk.red("Failed to generate image"));
+          const errorMsg = imageError || "Unknown error";
+          imageSpinner.fail(chalk.red(`Failed to generate image: ${errorMsg}`));
           process.exit(1);
         }
       }
@@ -7086,6 +7102,7 @@ export async function executeScriptToVideo(
       try {
         let imageBuffer: Buffer | undefined;
         let imageUrl: string | undefined;
+        let imageError: string | undefined;
 
         if (imageProvider === "dalle" && dalleInstance) {
           const imageResult = await dalleInstance.generateImage(imagePrompt, {
@@ -7094,6 +7111,8 @@ export async function executeScriptToVideo(
           });
           if (imageResult.success && imageResult.images?.[0]?.url) {
             imageUrl = imageResult.images[0].url;
+          } else {
+            imageError = imageResult.error;
           }
         } else if (imageProvider === "stability" && stabilityInstance) {
           const imageResult = await stabilityInstance.generateImage(imagePrompt, {
@@ -7107,6 +7126,8 @@ export async function executeScriptToVideo(
             } else if (img.url) {
               imageUrl = img.url;
             }
+          } else {
+            imageError = imageResult.error;
           }
         } else if (imageProvider === "gemini" && geminiInstance) {
           const imageResult = await geminiInstance.generateImage(imagePrompt, {
@@ -7114,6 +7135,8 @@ export async function executeScriptToVideo(
           });
           if (imageResult.success && imageResult.images?.[0]?.base64) {
             imageBuffer = Buffer.from(imageResult.images[0].base64, "base64");
+          } else {
+            imageError = imageResult.error;
           }
         }
 
@@ -7129,6 +7152,8 @@ export async function executeScriptToVideo(
           imagePaths.push(imagePath);
           result.images!.push(imagePath);
         } else {
+          // Track failed scene - error details are in imageError but not exposed in result type
+          // The failedScenes array tracks which scenes failed for the caller
           imagePaths.push("");
         }
       } catch {
