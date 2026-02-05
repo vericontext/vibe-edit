@@ -6,6 +6,64 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ## 2026-02-06
 
+### Feature: Auto-Narrate for Videos Without Narration
+
+Added `vibe ai narrate` command and `--auto-narrate` flag to automatically generate AI-powered narration for videos without voiceover.
+
+**Problem:**
+- Many videos (stock footage, B-roll compilations, silent recordings) lack narration
+- Without narration, commands like `vibe ai viral` cannot perform transcript-based analysis
+- Users had to manually create narration scripts and TTS separately
+
+**Solution:**
+- New `autoNarrate` core function that orchestrates a 3-step pipeline:
+  1. **Gemini Video Understanding**: Analyzes video content (visual elements, actions, text, mood)
+  2. **Claude Script Generation**: Creates narration script with proper timing and style
+  3. **ElevenLabs TTS**: Converts script to natural speech
+- `vibe ai narrate` standalone command for direct narration generation
+- `--auto-narrate` flag for `vibe ai viral` to auto-generate narration when no audio source exists
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts`:
+  - Added `AutoNarrateOptions` and `AutoNarrateResult` types
+  - Added `autoNarrate()` function
+  - Added `vibe ai narrate` command
+  - Added `--auto-narrate`, `--narrate-voice`, `--narrate-style` flags to `viral` command
+- `packages/ai-providers/src/claude/ClaudeProvider.ts`:
+  - Added `generateNarrationScript()` method
+
+**Usage:**
+```bash
+# Generate narration for a video file
+vibe ai narrate ./video.mp4 -o ./output/
+
+# Generate narration with style and voice options
+vibe ai narrate ./video.mp4 -v charlotte -s energetic -l en
+
+# Generate narration for a project and add to timeline
+vibe ai narrate ./project.vibe.json --add-to-project
+
+# Auto-narrate during viral optimization (if no audio source)
+vibe ai viral ./silent-video.vibe.json --auto-narrate --narrate-voice josh --narrate-style dramatic
+```
+
+**Narration Styles:**
+- `informative` (default): Clear, educational, professional
+- `energetic`: Enthusiastic, dynamic, engaging
+- `calm`: Soothing, gentle, measured pace
+- `dramatic`: Cinematic, emotional, impactful
+
+**Available Voices:**
+rachel, adam, antoni, bella, josh, charlotte, callum, emily, ethan, dorothy, and more (see `vibe ai voices`)
+
+**Estimated API Cost (30s video):**
+- Gemini Flash analysis: ~$0.01
+- Claude Sonnet script: ~$0.02
+- ElevenLabs TTS: ~$0.05
+- **Total: ~$0.08/video**
+
+---
+
 ### Fix: Viral Optimizer Audio Source Priority
 
 Fixed bug where `vibe ai viral` failed when the first source was a video without an audio track.

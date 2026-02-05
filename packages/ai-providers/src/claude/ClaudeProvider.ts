@@ -1787,6 +1787,132 @@ Respond with JSON only:
       };
     }
   }
+
+  /**
+   * Generate a narration script from video analysis
+   * @param videoAnalysis - Detailed description of video content (from Gemini)
+   * @param duration - Target duration in seconds
+   * @param style - Narration style
+   * @param language - Target language code
+   */
+  async generateNarrationScript(
+    videoAnalysis: string,
+    duration: number,
+    style: "informative" | "energetic" | "calm" | "dramatic" = "informative",
+    language: string = "en"
+  ): Promise<{
+    success: boolean;
+    script?: string;
+    segments?: Array<{ startTime: number; endTime: number; text: string }>;
+    error?: string;
+  }> {
+    if (!this.apiKey) {
+      return { success: false, error: "Claude API key not configured" };
+    }
+
+    const styleGuides: Record<string, string> = {
+      informative: "Clear, educational, and objective. Focus on facts and explanations. Professional but accessible tone.",
+      energetic: "Enthusiastic, dynamic, and engaging. Use active language and build excitement. Great for action content.",
+      calm: "Soothing, gentle, and peaceful. Measured pace with thoughtful pauses. Ideal for nature or meditation content.",
+      dramatic: "Cinematic and emotional. Build tension and create impact. Use powerful language and evocative descriptions.",
+    };
+
+    const languageInstructions = language === "en"
+      ? ""
+      : `IMPORTANT: Write the narration script in ${language} language.`;
+
+    const systemPrompt = `You are an expert video narrator creating voiceover scripts.
+
+Target duration: ${duration} seconds (approximately ${Math.round(duration * 2.5)} words at normal speaking pace)
+Style: ${style} - ${styleGuides[style]}
+${languageInstructions}
+
+Based on the video analysis provided, write a narration script that:
+1. Matches the visual content timing
+2. Enhances viewer understanding without being redundant
+3. Maintains the specified style throughout
+4. Is the right length for the duration (2-3 words per second)
+5. Has natural flow and rhythm for voiceover delivery
+
+IMPORTANT: Respond with JSON only:
+{
+  "script": "The complete narration script as a single string...",
+  "segments": [
+    {"startTime": 0, "endTime": 5.5, "text": "First segment of narration..."},
+    {"startTime": 5.5, "endTime": 12.0, "text": "Second segment..."}
+  ]
+}
+
+The segments should divide the script into natural phrases that align with video scenes.
+Each segment should be 3-10 seconds long.`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: `Create a narration script for this video:\n\n${videoAnalysis}`,
+            },
+          ],
+          system: systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("Claude API error:", error);
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      const data = (await response.json()) as {
+        content?: Array<{ type: string; text?: string }>;
+      };
+
+      const textContent = data.content?.find((c) => c.type === "text");
+      if (!textContent?.text) {
+        return { success: false, error: "No response from Claude" };
+      }
+
+      // Extract JSON from response
+      let jsonText = textContent.text;
+      const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+      }
+
+      // Try to find JSON object
+      const objectMatch = jsonText.match(/\{[\s\S]*"script"[\s\S]*\}/);
+      if (objectMatch) {
+        jsonText = objectMatch[0];
+      }
+
+      const result = JSON.parse(jsonText) as {
+        script: string;
+        segments?: Array<{ startTime: number; endTime: number; text: string }>;
+      };
+
+      return {
+        success: true,
+        script: result.script,
+        segments: result.segments || [],
+      };
+    } catch (error) {
+      console.error("Claude generateNarrationScript error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to generate narration script",
+      };
+    }
+  }
 }
 
 export const claudeProvider = new ClaudeProvider();

@@ -58,6 +58,161 @@ import { getAudioDuration } from "../utils/audio.js";
 
 const execAsync = promisify(exec);
 
+// ==========================================
+// Auto-Narrate Feature Types and Functions
+// ==========================================
+
+/**
+ * Options for auto-narrate feature
+ */
+export interface AutoNarrateOptions {
+  /** Path to video file */
+  videoPath: string;
+  /** Duration of the video in seconds */
+  duration: number;
+  /** Output directory for generated files */
+  outputDir: string;
+  /** ElevenLabs voice name or ID (default: "rachel") */
+  voice?: string;
+  /** Narration style */
+  style?: "informative" | "energetic" | "calm" | "dramatic";
+  /** Language for narration (default: "en") */
+  language?: string;
+}
+
+/**
+ * Result from auto-narrate
+ */
+export interface AutoNarrateResult {
+  success: boolean;
+  /** Path to generated audio file */
+  audioPath?: string;
+  /** Generated narration script */
+  script?: string;
+  /** Transcript segments for timeline sync */
+  segments?: Array<{
+    startTime: number;
+    endTime: number;
+    text: string;
+  }>;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Generate narration for a video that doesn't have one.
+ *
+ * Pipeline:
+ * 1. Analyze video with Gemini Video Understanding
+ * 2. Generate narration script with Claude
+ * 3. Convert to speech with ElevenLabs TTS
+ */
+export async function autoNarrate(options: AutoNarrateOptions): Promise<AutoNarrateResult> {
+  const {
+    videoPath,
+    duration,
+    outputDir,
+    voice = "rachel",
+    style = "informative",
+    language = "en",
+  } = options;
+
+  // Validate API keys
+  const geminiApiKey = await getApiKey("GOOGLE_API_KEY", "Google");
+  if (!geminiApiKey) {
+    return { success: false, error: "GOOGLE_API_KEY required for video analysis" };
+  }
+
+  const claudeApiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic");
+  if (!claudeApiKey) {
+    return { success: false, error: "ANTHROPIC_API_KEY required for script generation" };
+  }
+
+  const elevenlabsApiKey = await getApiKey("ELEVENLABS_API_KEY", "ElevenLabs");
+  if (!elevenlabsApiKey) {
+    return { success: false, error: "ELEVENLABS_API_KEY required for TTS" };
+  }
+
+  try {
+    // Step 1: Analyze video with Gemini
+    const gemini = new GeminiProvider();
+    await gemini.initialize({ apiKey: geminiApiKey });
+
+    const videoBuffer = await readFile(videoPath);
+
+    const analysisPrompt = `Analyze this video in detail for narration purposes. Describe:
+1. What is happening visually (actions, movements, subjects)
+2. The setting and environment
+3. Any text or graphics visible
+4. The mood and tone of the content
+5. Key moments and their approximate timestamps
+
+Provide a detailed description that could be used to write a voiceover narration.
+Focus on what viewers need to know to understand and appreciate the video.`;
+
+    const analysisResult = await gemini.analyzeVideo(videoBuffer, analysisPrompt, {
+      fps: 0.5, // Lower FPS for cost optimization
+      lowResolution: duration > 60, // Use low res for longer videos
+    });
+
+    if (!analysisResult.success || !analysisResult.response) {
+      return { success: false, error: `Video analysis failed: ${analysisResult.error}` };
+    }
+
+    // Step 2: Generate narration script with Claude
+    const claude = new ClaudeProvider();
+    await claude.initialize({ apiKey: claudeApiKey });
+
+    const scriptResult = await claude.generateNarrationScript(
+      analysisResult.response,
+      duration,
+      style,
+      language
+    );
+
+    if (!scriptResult.success || !scriptResult.script) {
+      return { success: false, error: `Script generation failed: ${scriptResult.error}` };
+    }
+
+    // Step 3: Convert to speech with ElevenLabs
+    const elevenlabs = new ElevenLabsProvider();
+    await elevenlabs.initialize({ apiKey: elevenlabsApiKey });
+
+    const ttsResult = await elevenlabs.textToSpeech(scriptResult.script, {
+      voiceId: voice,
+    });
+
+    if (!ttsResult.success || !ttsResult.audioBuffer) {
+      return { success: false, error: `TTS generation failed: ${ttsResult.error}` };
+    }
+
+    // Ensure output directory exists
+    if (!existsSync(outputDir)) {
+      await mkdir(outputDir, { recursive: true });
+    }
+
+    // Save audio file
+    const audioPath = resolve(outputDir, "auto-narration.mp3");
+    await writeFile(audioPath, ttsResult.audioBuffer);
+
+    // Save script for reference
+    const scriptPath = resolve(outputDir, "narration-script.txt");
+    await writeFile(scriptPath, scriptResult.script, "utf-8");
+
+    return {
+      success: true,
+      audioPath,
+      script: scriptResult.script,
+      segments: scriptResult.segments,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error in autoNarrate",
+    };
+  }
+}
+
 export const aiCommand = new Command("ai")
   .description("AI provider commands");
 
@@ -5054,6 +5209,9 @@ aiCommand
   .option("--caption-style <style>", "Caption style: minimal, bold, animated", "bold")
   .option("--hook-duration <sec>", "Hook duration in seconds", "3")
   .option("-l, --language <lang>", "Language code for transcription")
+  .option("--auto-narrate", "Auto-generate narration if no audio source found")
+  .option("--narrate-voice <voice>", "Voice for auto-narration (default: rachel)", "rachel")
+  .option("--narrate-style <style>", "Style for auto-narration: informative, energetic, calm, dramatic", "informative")
   .action(async (projectPath: string, options) => {
     try {
       // Validate API keys
@@ -5121,8 +5279,64 @@ aiCommand
 
       // Step 1: Extract audio and transcribe
       // Find audio source first (narration), fall back to video
-      const audioSource = sources.find((s) => s.type === "audio");
+      let audioSource = sources.find((s) => s.type === "audio");
       const videoSource = sources.find((s) => s.type === "video");
+
+      // Check if auto-narrate is needed
+      if (!audioSource && videoSource && options.autoNarrate) {
+        console.log();
+        console.log(chalk.yellow("📝 No narration found, generating with AI..."));
+
+        const outputDir = resolve(process.cwd(), options.outputDir);
+        const videoPath = resolve(dirname(filePath), videoSource.url);
+
+        const narrateResult = await autoNarrate({
+          videoPath,
+          duration: totalDuration,
+          outputDir,
+          voice: options.narrateVoice,
+          style: options.narrateStyle as "informative" | "energetic" | "calm" | "dramatic",
+          language: options.language || "en",
+        });
+
+        if (!narrateResult.success) {
+          console.error(chalk.red(`Auto-narrate failed: ${narrateResult.error}`));
+          process.exit(1);
+        }
+
+        console.log(chalk.green(`✔ Generated narration: ${narrateResult.audioPath}`));
+
+        // Add the generated narration as a source
+        const newAudioSource = project.addSource({
+          name: "Auto-generated narration",
+          url: basename(narrateResult.audioPath!),
+          type: "audio",
+          duration: totalDuration,
+        });
+
+        // Add audio clip to timeline
+        const audioTrack = project.getTracks().find((t) => t.type === "audio");
+        if (audioTrack) {
+          project.addClip({
+            sourceId: newAudioSource.id,
+            trackId: audioTrack.id,
+            startTime: 0,
+            duration: totalDuration,
+            sourceStartOffset: 0,
+            sourceEndOffset: totalDuration,
+          });
+        }
+
+        // Save updated project
+        await writeFile(filePath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
+
+        // Use the generated segments as transcript
+        if (narrateResult.segments && narrateResult.segments.length > 0) {
+          // Continue with viral analysis using auto-narrate segments
+          audioSource = newAudioSource;
+        }
+      }
+
       const mediaSource = audioSource || videoSource;
       if (!mediaSource) {
         console.error(chalk.red("No video or audio source found in project"));
@@ -5139,7 +5353,7 @@ aiCommand
 
       const transcribeSpinner = ora("📝 Transcribing content with Whisper...").start();
 
-      let audioPath = resolve(process.cwd(), mediaSource.url);
+      let audioPath = resolve(dirname(filePath), mediaSource.url);
       let tempAudioPath: string | null = null;
 
       // Extract audio if video
@@ -8790,6 +9004,178 @@ aiCommand
     }
 
     console.log();
+  });
+
+// Auto-Narrate command
+aiCommand
+  .command("narrate")
+  .description("Generate AI narration for a video file or project")
+  .argument("<input>", "Video file or project file (.vibe.json)")
+  .option("-o, --output <dir>", "Output directory for generated files", ".")
+  .option("-v, --voice <name>", "ElevenLabs voice name (rachel, adam, josh, etc.)", "rachel")
+  .option("-s, --style <style>", "Narration style: informative, energetic, calm, dramatic", "informative")
+  .option("-l, --language <lang>", "Language code (e.g., en, ko)", "en")
+  .option("--add-to-project", "Add narration to project (only for .vibe.json input)")
+  .action(async (inputPath: string, options) => {
+    try {
+      const absPath = resolve(process.cwd(), inputPath);
+      if (!existsSync(absPath)) {
+        console.error(chalk.red(`File not found: ${absPath}`));
+        process.exit(1);
+      }
+
+      console.log();
+      console.log(chalk.bold.cyan("🎙️ Auto-Narrate Pipeline"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log();
+
+      const isProject = inputPath.endsWith(".vibe.json");
+      let videoPath: string;
+      let project: Project | null = null;
+      let outputDir = resolve(process.cwd(), options.output);
+
+      if (isProject) {
+        // Load project to find video source
+        const content = await readFile(absPath, "utf-8");
+        const data: ProjectFile = JSON.parse(content);
+        project = Project.fromJSON(data);
+        const sources = project.getSources();
+        const videoSource = sources.find((s) => s.type === "video");
+
+        if (!videoSource) {
+          console.error(chalk.red("No video source found in project"));
+          process.exit(1);
+        }
+
+        videoPath = resolve(dirname(absPath), videoSource.url);
+        if (!existsSync(videoPath)) {
+          console.error(chalk.red(`Video file not found: ${videoPath}`));
+          process.exit(1);
+        }
+
+        // Use project directory as output if not specified
+        if (options.output === ".") {
+          outputDir = dirname(absPath);
+        }
+
+        console.log(`📁 Project: ${chalk.bold(project.getMeta().name)}`);
+      } else {
+        videoPath = absPath;
+        console.log(`🎬 Video: ${chalk.bold(basename(videoPath))}`);
+      }
+
+      // Get video duration
+      const durationSpinner = ora("📊 Analyzing video...").start();
+      let duration: number;
+      try {
+        const durationCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+        const { stdout } = await execAsync(durationCmd);
+        duration = parseFloat(stdout.trim());
+        durationSpinner.succeed(chalk.green(`Duration: ${formatTime(duration)}`));
+      } catch {
+        durationSpinner.fail(chalk.red("Failed to get video duration"));
+        process.exit(1);
+      }
+
+      // Validate style option
+      const validStyles = ["informative", "energetic", "calm", "dramatic"];
+      if (!validStyles.includes(options.style)) {
+        console.error(chalk.red(`Invalid style: ${options.style}`));
+        console.error(chalk.dim(`Valid styles: ${validStyles.join(", ")}`));
+        process.exit(1);
+      }
+
+      // Generate narration
+      const generateSpinner = ora("🤖 Generating narration...").start();
+
+      generateSpinner.text = "📹 Analyzing video with Gemini...";
+      const result = await autoNarrate({
+        videoPath,
+        duration,
+        outputDir,
+        voice: options.voice,
+        style: options.style as "informative" | "energetic" | "calm" | "dramatic",
+        language: options.language,
+      });
+
+      if (!result.success) {
+        generateSpinner.fail(chalk.red(`Failed: ${result.error}`));
+        process.exit(1);
+      }
+
+      generateSpinner.succeed(chalk.green("Narration generated successfully"));
+
+      // Display result
+      console.log();
+      console.log(chalk.bold.cyan("Generated Files"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`  🎵 Audio: ${chalk.green(result.audioPath)}`);
+      console.log(`  📝 Script: ${chalk.green(resolve(outputDir, "narration-script.txt"))}`);
+
+      if (result.segments && result.segments.length > 0) {
+        console.log();
+        console.log(chalk.bold.cyan("Narration Segments"));
+        console.log(chalk.dim("─".repeat(60)));
+        for (const seg of result.segments.slice(0, 5)) {
+          console.log(`  [${formatTime(seg.startTime)} - ${formatTime(seg.endTime)}] ${chalk.dim(seg.text.substring(0, 50))}${seg.text.length > 50 ? "..." : ""}`);
+        }
+        if (result.segments.length > 5) {
+          console.log(chalk.dim(`  ... and ${result.segments.length - 5} more segments`));
+        }
+      }
+
+      // Add to project if requested
+      if (options.addToProject && project && isProject) {
+        const addSpinner = ora("Adding narration to project...").start();
+
+        // Get audio duration
+        let audioDuration: number;
+        try {
+          audioDuration = await getAudioDuration(result.audioPath!);
+        } catch {
+          audioDuration = duration; // Fallback to video duration
+        }
+
+        // Add audio source
+        const audioSource = project.addSource({
+          name: "Auto-generated narration",
+          url: basename(result.audioPath!),
+          type: "audio",
+          duration: audioDuration,
+        });
+
+        // Add audio clip to audio track
+        const audioTrack = project.getTracks().find((t) => t.type === "audio");
+        if (audioTrack) {
+          project.addClip({
+            sourceId: audioSource.id,
+            trackId: audioTrack.id,
+            startTime: 0,
+            duration: Math.min(audioDuration, duration),
+            sourceStartOffset: 0,
+            sourceEndOffset: Math.min(audioDuration, duration),
+          });
+        }
+
+        // Save updated project
+        await writeFile(absPath, JSON.stringify(project.toJSON(), null, 2), "utf-8");
+        addSpinner.succeed(chalk.green("Narration added to project"));
+      }
+
+      console.log();
+      console.log(chalk.bold.green("✅ Auto-narrate complete!"));
+
+      if (!options.addToProject && isProject) {
+        console.log();
+        console.log(chalk.dim("Tip: Use --add-to-project to automatically add the narration to your project"));
+      }
+
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Auto-narrate failed"));
+      console.error(error);
+      process.exit(1);
+    }
   });
 
 function formatTime(seconds: number): string {
