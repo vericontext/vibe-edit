@@ -199,6 +199,11 @@ const storyboardDef: ToolDefinition = {
         type: "string",
         description: "Output JSON file path",
       },
+      creativity: {
+        type: "string",
+        description: "Creativity level: 'low' (default, consistent scenes) or 'high' (varied, unexpected scenes)",
+        enum: ["low", "high"],
+      },
     },
     required: ["script"],
   },
@@ -283,6 +288,11 @@ const scriptToVideoDef: ToolDefinition = {
       retries: {
         type: "number",
         description: "Number of retries for video generation failures (default: 2)",
+      },
+      creativity: {
+        type: "string",
+        description: "Creativity level for storyboard: 'low' (default, consistent scenes) or 'high' (varied, unexpected scenes)",
+        enum: ["low", "high"],
       },
     },
     required: ["script"],
@@ -996,6 +1006,7 @@ const generateStoryboard: ToolHandler = async (args, context): Promise<ToolResul
   const script = args.script as string;
   const targetDuration = args.targetDuration as number | undefined;
   const output = (args.output as string) || `storyboard-${getTimestamp()}.json`;
+  const creativity = args.creativity as "low" | "high" | undefined;
 
   try {
     const apiKey = await getApiKeyFromConfig("anthropic");
@@ -1012,7 +1023,7 @@ const generateStoryboard: ToolHandler = async (args, context): Promise<ToolResul
     const claude = new ClaudeProvider();
     await claude.initialize({ apiKey });
 
-    const result = await claude.analyzeContent(script, targetDuration);
+    const result = await claude.analyzeContent(script, targetDuration, { creativity });
 
     if (!result || result.length === 0) {
       return {
@@ -1077,6 +1088,7 @@ const scriptToVideoHandler: ToolHandler = async (args, context): Promise<ToolRes
       imagesOnly: args.imagesOnly as boolean | undefined,
       noVoiceover: args.noVoiceover as boolean | undefined,
       retries: args.retries as number | undefined,
+      creativity: args.creativity as "low" | "high" | undefined,
     });
 
     if (!result.success) {
@@ -1439,7 +1451,14 @@ const geminiEditHandler: ToolHandler = async (args, context): Promise<ToolResult
 // Regenerate Scene Tool
 const regenerateSceneDef: ToolDefinition = {
   name: "ai_regenerate_scene",
-  description: "Regenerate specific scene(s) in a script-to-video project. Use this to re-create videos for failed scenes using image-to-video (if ImgBB key available) or text-to-video. When regenerating images, uses reference-based generation for character consistency.",
+  description: `Regenerate specific scene(s) in a script-to-video project.
+
+RECOMMENDED WORKFLOW:
+1. FIRST use fs_read to read storyboard.json in the project directory
+2. Tell the user what scene(s) they're about to regenerate (show visuals, narration, duration)
+3. THEN use this tool to regenerate
+
+This tool re-creates videos for failed scenes using image-to-video (if ImgBB key available) or text-to-video. When regenerating images, uses reference-based generation for character consistency.`,
   parameters: {
     type: "object",
     properties: {

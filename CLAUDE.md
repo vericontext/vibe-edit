@@ -67,7 +67,7 @@ Agent (vibe)              Natural language → LLM tool calling → autonomous e
 - Claude Code-like agentic loop architecture
 - Multi-turn: LLM reasoning → tool call → result → repeat until complete
 - 5 LLM providers: OpenAI, Claude, Gemini, Ollama, xAI Grok
-- 47 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
+- 48 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
 - `--confirm` flag: prompts before each tool execution
 - Example: "create project and add video" → multiple tool calls autonomously
 
@@ -94,7 +94,7 @@ packages/cli/src/agent/
 │   ├── timeline.ts          # 11 timeline tools
 │   ├── filesystem.ts        # 4 filesystem tools
 │   ├── media.ts             # 8 media tools
-│   ├── ai.ts                # 13 AI generation tools (basic + pipeline)
+│   ├── ai.ts                # 14 AI generation tools (basic + pipeline)
 │   ├── export.ts            # 3 export tools
 │   └── batch.ts             # 3 batch tools
 ├── memory/
@@ -254,7 +254,7 @@ When adding new AI CLI commands:
 - `docs/roadmap.md` - Update Agent tools section
 - `docs/progress.md` - Document the change
 
-### Current Agent AI Tools (13)
+### Current Agent AI Tools (14)
 
 | Tool | CLI Command | Description |
 |------|-------------|-------------|
@@ -271,6 +271,7 @@ When adding new AI CLI commands:
 | `ai_auto_shorts` | `vibe ai auto-shorts` | Generate shorts |
 | `ai_gemini_video` | `vibe ai gemini-video` | Video analysis (Gemini) |
 | `ai_gemini_edit` | `vibe ai gemini-edit` | Multi-image editing (Gemini) |
+| `ai_regenerate_scene` | `vibe ai regenerate-scene` | Regenerate specific scene(s) |
 
 Format for progress.md entries:
 ```markdown

@@ -87,9 +87,9 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
   });
 
   describe("Tool Registration", () => {
-    it("should register all 47 tools", () => {
+    it("should register all 48 tools", () => {
       const tools = registry.getAll();
-      expect(tools.length).toBe(47);
+      expect(tools.length).toBe(48);
     });
 
     it("should register all project tools (5)", () => {
@@ -571,11 +571,11 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
       expect(timelineTools.length).toBe(11);  // Added timeline_clear
       expect(fsTools.length).toBe(4);
       expect(mediaTools.length).toBe(8);  // Added media_compress, media_convert, media_concat
-      expect(aiTools.length).toBe(13);  // Added ai_gemini_edit
+      expect(aiTools.length).toBe(14);  // Added ai_gemini_edit, ai_regenerate_scene
       expect(exportTools.length).toBe(3);
       expect(batchTools.length).toBe(3);  // New batch tools
 
-      // Total should be 47
+      // Total should be 48
       expect(
         projectTools.length +
           timelineTools.length +
@@ -584,7 +584,7 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
           aiTools.length +
           exportTools.length +
           batchTools.length
-      ).toBe(47);
+      ).toBe(48);
     });
   });
 });

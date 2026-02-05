@@ -386,18 +386,39 @@ Respond with JSON only:
 
   /**
    * Analyze long-form content and generate storyboard
+   * @param content - The content/script to analyze
+   * @param targetDuration - Target video duration in seconds
+   * @param options - Additional options including creativity level
    */
   async analyzeContent(
     content: string,
-    targetDuration?: number
+    targetDuration?: number,
+    options?: { creativity?: "low" | "high" }
   ): Promise<StoryboardSegment[]> {
     if (!this.apiKey) {
       return [];
     }
 
+    const creativity = options?.creativity || "low";
+
+    // Creative direction for high creativity mode
+    const creativityPrompt = creativity === "high"
+      ? `
+CREATIVE DIRECTION (HIGH CREATIVITY MODE):
+- Surprise the viewer with unexpected scene transitions and compositions
+- AVOID cliche patterns like "wake up → coffee → work → lunch → evening" for day-in-life content
+- Create unique visual metaphors and unconventional compositions
+- Each scene should have a distinct mood, color palette, and emotional texture
+- Think cinematically: use interesting angles, lighting contrasts, and visual storytelling
+- Introduce unexpected elements that still fit the narrative
+- Vary the pacing: some scenes intimate and slow, others dynamic and energetic
+`
+      : "";
+
     const systemPrompt = `You are a video editor analyzing content to create a storyboard.
 Break down the content into visual segments suitable for a video.
 ${targetDuration ? `Target total duration: ${targetDuration} seconds` : ""}
+${creativityPrompt}
 
 IMPORTANT GUIDELINES:
 
@@ -448,6 +469,9 @@ Example of BAD character description (too vague):
 CRITICAL: Copy the EXACT same characterDescription to ALL segments. The character must look identical in every scene.`;
 
     try {
+      // Use higher temperature for creative mode
+      const temperature = creativity === "high" ? 1.0 : 0.7;
+
       const response = await fetch(`${this.baseUrl}/messages`, {
         method: "POST",
         headers: {
@@ -458,6 +482,7 @@ CRITICAL: Copy the EXACT same characterDescription to ALL segments. The characte
         body: JSON.stringify({
           model: this.model,
           max_tokens: 4096,
+          temperature,
           messages: [
             {
               role: "user",

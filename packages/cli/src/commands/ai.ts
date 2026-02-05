@@ -705,11 +705,19 @@ aiCommand
   .option("-o, --output <path>", "Output JSON file path")
   .option("-d, --duration <sec>", "Target total duration in seconds")
   .option("-f, --file", "Treat content argument as file path")
+  .option("-c, --creativity <level>", "Creativity level: low (default, consistent) or high (varied, unexpected)", "low")
   .action(async (content: string, options) => {
     try {
       const apiKey = await getApiKey("ANTHROPIC_API_KEY", "Anthropic", options.apiKey);
       if (!apiKey) {
         console.error(chalk.red("Anthropic API key required. Use --api-key or set ANTHROPIC_API_KEY"));
+        process.exit(1);
+      }
+
+      // Validate creativity level
+      const creativity = options.creativity?.toLowerCase();
+      if (creativity && creativity !== "low" && creativity !== "high") {
+        console.error(chalk.red("Invalid creativity level. Use 'low' or 'high'."));
         process.exit(1);
       }
 
@@ -719,14 +727,18 @@ aiCommand
         textContent = await readFile(filePath, "utf-8");
       }
 
-      const spinner = ora("Analyzing content...").start();
+      const spinnerText = creativity === "high"
+        ? "Analyzing content with high creativity..."
+        : "Analyzing content...";
+      const spinner = ora(spinnerText).start();
 
       const claude = new ClaudeProvider();
       await claude.initialize({ apiKey });
 
       const segments = await claude.analyzeContent(
         textContent,
-        options.duration ? parseFloat(options.duration) : undefined
+        options.duration ? parseFloat(options.duration) : undefined,
+        { creativity: creativity as "low" | "high" | undefined }
       );
 
       if (segments.length === 0) {
@@ -3453,6 +3465,7 @@ aiCommand
   .option("--output-dir <dir>", "Directory for generated assets", "script-video-output")
   .option("--retries <count>", "Number of retries for video generation failures", String(DEFAULT_VIDEO_RETRIES))
   .option("--sequential", "Generate videos one at a time (slower but more reliable)")
+  .option("-c, --creativity <level>", "Creativity level: low (default, consistent) or high (varied, unexpected)", "low")
   .action(async (script: string, options) => {
     try {
       // Load environment variables from .env file
@@ -3546,20 +3559,34 @@ aiCommand
         await mkdir(outputDir, { recursive: true });
       }
 
+      // Validate creativity level
+      const creativity = options.creativity?.toLowerCase();
+      if (creativity && creativity !== "low" && creativity !== "high") {
+        console.error(chalk.red("Invalid creativity level. Use 'low' or 'high'."));
+        process.exit(1);
+      }
+
       console.log();
       console.log(chalk.bold.cyan("🎬 Script-to-Video Pipeline"));
       console.log(chalk.dim("─".repeat(60)));
+      if (creativity === "high") {
+        console.log(chalk.yellow("🎨 High creativity mode: Generating varied, unexpected scenes"));
+      }
       console.log();
 
       // Step 1: Generate storyboard with Claude
-      const storyboardSpinner = ora("📝 Analyzing script with Claude...").start();
+      const storyboardSpinnerText = creativity === "high"
+        ? "📝 Analyzing script with Claude (high creativity)..."
+        : "📝 Analyzing script with Claude...";
+      const storyboardSpinner = ora(storyboardSpinnerText).start();
 
       const claude = new ClaudeProvider();
       await claude.initialize({ apiKey: claudeApiKey });
 
       const segments = await claude.analyzeContent(
         scriptContent,
-        options.duration ? parseFloat(options.duration) : undefined
+        options.duration ? parseFloat(options.duration) : undefined,
+        { creativity: creativity as "low" | "high" | undefined }
       );
 
       if (segments.length === 0) {
@@ -7967,6 +7994,8 @@ export interface ScriptToVideoOptions {
   imagesOnly?: boolean;
   noVoiceover?: boolean;
   retries?: number;
+  /** Creativity level for storyboard generation: low (default, consistent) or high (varied, unexpected) */
+  creativity?: "low" | "high";
 }
 
 /**
@@ -8076,7 +8105,11 @@ export async function executeScriptToVideo(
     const claude = new ClaudeProvider();
     await claude.initialize({ apiKey: claudeApiKey });
 
-    const segments = await claude.analyzeContent(options.script, options.duration);
+    const segments = await claude.analyzeContent(
+      options.script,
+      options.duration,
+      { creativity: options.creativity }
+    );
     if (segments.length === 0) {
       return { success: false, outputDir, scenes: 0, error: "Failed to generate storyboard" };
     }
