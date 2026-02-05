@@ -603,33 +603,40 @@ aiCommand
   .command("image")
   .description("Generate image using AI (Gemini, DALL-E, or Stability)")
   .argument("<prompt>", "Image description prompt")
-  .option("-p, --provider <provider>", "Provider: gemini, dalle, stability, runway", "gemini")
+  .option("-p, --provider <provider>", "Provider: gemini, openai, stability, runway (dalle is deprecated)", "gemini")
   .option("-k, --api-key <key>", "API key (or set env: OPENAI_API_KEY, GOOGLE_API_KEY, STABILITY_API_KEY)")
   .option("-o, --output <path>", "Output file path (downloads image)")
-  .option("-s, --size <size>", "Image size (dalle: 1024x1024, 1792x1024, 1024x1792)", "1024x1024")
+  .option("-s, --size <size>", "Image size (openai: 1024x1024, 1792x1024, 1024x1792)", "1024x1024")
   .option("-r, --ratio <ratio>", "Aspect ratio (gemini: 1:1, 16:9, 9:16, 3:4, 4:3)", "1:1")
-  .option("-q, --quality <quality>", "Quality: standard, hd (dalle only)", "standard")
-  .option("--style <style>", "Style: vivid, natural (dalle only)", "vivid")
+  .option("-q, --quality <quality>", "Quality: standard, hd (openai only)", "standard")
+  .option("--style <style>", "Style: vivid, natural (openai only)", "vivid")
   .option("-n, --count <n>", "Number of images to generate", "1")
   .action(async (prompt: string, options) => {
     try {
-      const provider = options.provider.toLowerCase();
-      const validProviders = ["dalle", "gemini", "stability", "runway"];
+      let provider = options.provider.toLowerCase();
+      const validProviders = ["openai", "dalle", "gemini", "stability", "runway"];
       if (!validProviders.includes(provider)) {
         console.error(chalk.red(`Invalid provider: ${provider}`));
-        console.error(chalk.dim(`Available providers: ${validProviders.join(", ")}`));
+        console.error(chalk.dim(`Available providers: openai, gemini, stability, runway`));
         process.exit(1);
+      }
+
+      // Show deprecation warning for "dalle"
+      if (provider === "dalle") {
+        console.log(chalk.yellow('Warning: "dalle" is deprecated. Use "openai" instead.'));
       }
 
       // Get API key based on provider
       const envKeyMap: Record<string, string> = {
-        dalle: "OPENAI_API_KEY",
+        openai: "OPENAI_API_KEY",
+        dalle: "OPENAI_API_KEY", // backward compatibility
         gemini: "GOOGLE_API_KEY",
         stability: "STABILITY_API_KEY",
         runway: "RUNWAY_API_SECRET",
       };
       const providerNameMap: Record<string, string> = {
-        dalle: "OpenAI",
+        openai: "OpenAI",
+        dalle: "OpenAI", // backward compatibility
         gemini: "Google",
         stability: "Stability",
         runway: "Runway",
@@ -646,7 +653,7 @@ aiCommand
 
       const spinner = ora(`Generating image with ${providerName}...`).start();
 
-      if (provider === "dalle") {
+      if (provider === "dalle" || provider === "openai") {
         const dalle = new DalleProvider();
         await dalle.initialize({ apiKey });
 
@@ -662,7 +669,7 @@ aiCommand
           process.exit(1);
         }
 
-        spinner.succeed(chalk.green(`Generated ${result.images.length} image(s) with DALL-E`));
+        spinner.succeed(chalk.green(`Generated ${result.images.length} image(s) with OpenAI GPT Image 1.5`));
 
         console.log();
         console.log(chalk.bold.cyan("Generated Images"));

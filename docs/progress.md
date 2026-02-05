@@ -4,6 +4,77 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
+## 2026-02-05 (v0.7.1)
+
+### Feature: CLI Improvements - SSOT Docs, Gemini Edit Tool, Provider Naming
+
+Three improvements to the CLI and documentation structure.
+
+#### 1. SSOT Documentation Structure
+
+**Changes:**
+- Created `docs/models.md` as single source of truth for AI model information
+- Moved AI Provider Models section from CLAUDE.md to reference models.md
+- Added models.md to documentation update checklist
+
+**Files Created:**
+- `docs/models.md` - Complete model reference (Agent LLM, Text-to-Image, Text-to-Video, Audio)
+
+**Files Modified:**
+- `CLAUDE.md` - Replaced AI models section with reference to models.md
+
+#### 2. Gemini Multi-Image Edit Agent Tool
+
+**Changes:**
+- Added `ai_gemini_edit` tool to Agent (tool #47)
+- Wraps existing `vibe ai gemini-edit` CLI command
+- Supports up to 14 input images with Pro model
+
+**Files Modified:**
+- `packages/cli/src/agent/tools/ai.ts` - Added geminiEditDef and geminiEditHandler
+
+**Usage:**
+```bash
+# CLI
+vibe ai gemini-edit photo.png "convert to watercolor" -o output.png
+vibe ai gemini-edit img1.png img2.png "combine as collage" -m pro -o collage.png
+
+# Agent mode
+you> edit photo.png to look like a watercolor painting
+you> combine person1.png and person2.png into a group photo
+```
+
+#### 3. Image Provider Naming: dalle → openai
+
+**Changes:**
+- Primary provider name changed from `dalle` to `openai`
+- `dalle` still works with deprecation warning
+- Updated all documentation to use `openai`
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` - Added openai provider, deprecation warning
+- `packages/cli/src/agent/tools/ai.ts` - Updated ai_image tool
+- `docs/cli-guide.md` - Updated examples and tables
+
+**Usage:**
+```bash
+# New (recommended)
+vibe ai image "prompt" -p openai
+
+# Old (deprecated but still works)
+vibe ai image "prompt" -p dalle
+# Warning: "dalle" is deprecated. Use "openai" instead.
+```
+
+**Verification:**
+```bash
+pnpm build
+pnpm -F @vibeframe/cli test
+vibe ai image --help  # Shows "openai" option
+```
+
+---
+
 ## 2026-02-05 (v0.6.2)
 
 ### Feature: xAI Grok LLM Provider + Documentation Update

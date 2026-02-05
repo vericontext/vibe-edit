@@ -67,7 +67,7 @@ Agent (vibe)              Natural language → LLM tool calling → autonomous e
 - Claude Code-like agentic loop architecture
 - Multi-turn: LLM reasoning → tool call → result → repeat until complete
 - 5 LLM providers: OpenAI, Claude, Gemini, Ollama, xAI Grok
-- 46 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
+- 47 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
 - `--confirm` flag: prompts before each tool execution
 - Example: "create project and add video" → multiple tool calls autonomously
 
@@ -151,6 +151,11 @@ After completing any feature, fix, or significant change, **always update**:
 
 2. **docs/roadmap.md** - Mark completed items with `[x]` and update CLI status section if new commands were added.
 
+3. **docs/models.md** - Update when adding/changing AI providers or models:
+   - Keep this as the SSOT for model information
+   - Update provider tables, env keys, CLI options
+   - Update Quick Reference section
+
 ## Documentation Consistency Rules
 
 When writing or updating documentation (especially `docs/cli-guide.md`):
@@ -223,11 +228,11 @@ When adding new AI CLI commands:
 - `docs/roadmap.md` - Update Agent tools section
 - `docs/progress.md` - Document the change
 
-### Current Agent AI Tools (12)
+### Current Agent AI Tools (13)
 
 | Tool | CLI Command | Description |
 |------|-------------|-------------|
-| `ai_image` | `vibe ai image` | Generate images (DALL-E/Stability/Gemini) |
+| `ai_image` | `vibe ai image` | Generate images (OpenAI/Gemini/Stability) |
 | `ai_video` | `vibe ai video` | Generate video (Runway) |
 | `ai_kling` | `vibe ai kling` | Generate video (Kling) |
 | `ai_tts` | `vibe ai tts` | Text-to-speech (ElevenLabs) |
@@ -239,6 +244,7 @@ When adding new AI CLI commands:
 | `ai_highlights` | `vibe ai highlights` | Extract highlights |
 | `ai_auto_shorts` | `vibe ai auto-shorts` | Generate shorts |
 | `ai_gemini_video` | `vibe ai gemini-video` | Video analysis (Gemini) |
+| `ai_gemini_edit` | `vibe ai gemini-edit` | Multi-image editing (Gemini) |
 
 Format for progress.md entries:
 ```markdown
@@ -310,35 +316,10 @@ Copy `.env.example` to `.env`. Each AI provider has its own API key:
 
 ## AI Provider Models
 
-### Text-to-Image
+See **[docs/models.md](docs/models.md)** for the complete SSOT (Single Source of Truth) on all AI models.
 
-| Provider | Model | Notes |
-|----------|-------|-------|
-| **OpenAI** | `gpt-image-1.5` | Default. Quality tiers: low ($0.009), medium ($0.035), high ($0.133) |
-| **Gemini** | `gemini-2.5-flash-image` | Nano Banana Flash - fast |
-| **Gemini** | `gemini-3-pro-image-preview` | Nano Banana Pro - higher quality |
-| **Stability** | `stable-diffusion-xl` | For image editing (upscale, remove-bg, outpaint) |
-
-### Text-to-Video
-
-| Provider | Model | Duration | Notes |
-|----------|-------|----------|-------|
-| **Runway** | `gen4.5` | 5-10 sec | Top-ranked quality |
-| **Google Veo** | `veo-3.0-generate-preview` | 5-8 sec | Native audio support |
-| **Google Veo** | `veo-3.1-generate-preview` | 5-8 sec | Latest version |
-| **Google Veo** | `veo-3.1-fast-generate-preview` | 5-8 sec | Faster generation |
-| **xAI Grok** | `grok-imagine-video` | 1-15 sec | Native audio, $4.20/min |
-| **Kling** | `kling-v2-5-turbo` | 5-10 sec | Default, fast (~36s) |
-| **Kling** | `kling-v2-6` | 5-10 sec | Higher quality |
-
-### Image-to-Video
-
-Same providers as text-to-video. Note: Kling uses text2video mode internally (API requires URL, not base64 for image2video).
-
-### Audio
-
-| Provider | Capability | Notes |
-|----------|------------|-------|
-| **ElevenLabs** | TTS, SFX, Voice Clone | Default voice: Rachel |
-| **Whisper** | Transcription | OpenAI API |
-| **Replicate** | Music generation, Audio restoration | Various models |
+Quick summary:
+- **Agent LLM**: OpenAI GPT-4o, Claude Sonnet 4, Gemini 2.0 Flash, xAI Grok-3, Ollama
+- **Text-to-Image**: OpenAI GPT Image 1.5, Gemini Nano Banana (Flash/Pro), Stability SDXL
+- **Text-to-Video**: Kling v2.5/v2.6, Veo 3.0/3.1, Runway Gen-4, xAI Grok Imagine
+- **Audio**: ElevenLabs (TTS, SFX), Whisper (transcription), Replicate (music)

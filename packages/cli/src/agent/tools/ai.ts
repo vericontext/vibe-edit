@@ -19,7 +19,7 @@ import {
 // Tool Definitions
 const imageDef: ToolDefinition = {
   name: "ai_image",
-  description: "Generate an image using AI (DALL-E, Gemini, or Stability)",
+  description: "Generate an image using AI (OpenAI GPT Image 1.5, Gemini, or Stability)",
   parameters: {
     type: "object",
     properties: {
@@ -33,8 +33,8 @@ const imageDef: ToolDefinition = {
       },
       provider: {
         type: "string",
-        description: "Provider to use (dalle, gemini, stability)",
-        enum: ["dalle", "gemini", "stability"],
+        description: "Provider to use: openai (GPT Image 1.5), gemini (Nano Banana), stability (SDXL). 'dalle' is deprecated, use 'openai' instead.",
+        enum: ["openai", "dalle", "gemini", "stability"],
       },
       size: {
         type: "string",
@@ -434,6 +434,46 @@ const geminiVideoDef: ToolDefinition = {
   },
 };
 
+const geminiEditDef: ToolDefinition = {
+  name: "ai_gemini_edit",
+  description:
+    "Edit or compose multiple images using Gemini. Flash model supports up to 3 images, Pro model supports up to 14 images. Use for image editing, style transfer, or multi-image composition.",
+  parameters: {
+    type: "object",
+    properties: {
+      images: {
+        type: "array",
+        items: { type: "string", description: "Image file path" },
+        description: "Input image file paths (1-14 images depending on model)",
+      },
+      prompt: {
+        type: "string",
+        description: "Edit instruction (e.g., 'change background to sunset', 'combine these images into a collage')",
+      },
+      output: {
+        type: "string",
+        description: "Output file path (default: edited-{timestamp}.png)",
+      },
+      model: {
+        type: "string",
+        description: "Model to use: flash (max 3 images, fast) or pro (max 14 images, higher quality)",
+        enum: ["flash", "pro"],
+      },
+      aspectRatio: {
+        type: "string",
+        description: "Output aspect ratio",
+        enum: ["1:1", "16:9", "9:16", "3:4", "4:3", "3:2", "2:3", "21:9"],
+      },
+      resolution: {
+        type: "string",
+        description: "Output resolution (Pro model only): 1K, 2K, 4K",
+        enum: ["1K", "2K", "4K"],
+      },
+    },
+    required: ["images", "prompt"],
+  },
+};
+
 // Helper to get timestamp for filenames
 function getTimestamp(): string {
   return Date.now().toString();
@@ -442,7 +482,7 @@ function getTimestamp(): string {
 // Tool Handlers
 const generateImage: ToolHandler = async (args, context): Promise<ToolResult> => {
   const prompt = args.prompt as string;
-  const provider = (args.provider as string) || "dalle";
+  let provider = (args.provider as string) || "gemini";
   const output = (args.output as string) || `generated-${getTimestamp()}.png`;
   const size = (args.size as string) || "1024x1024";
 
@@ -456,6 +496,10 @@ const generateImage: ToolHandler = async (args, context): Promise<ToolResult> =>
         break;
       case "stability":
         providerKey = "stability";
+        break;
+      case "openai":
+      case "dalle": // backward compatibility
+        providerKey = "openai";
         break;
       default:
         providerKey = "openai";
@@ -473,7 +517,7 @@ const generateImage: ToolHandler = async (args, context): Promise<ToolResult> =>
 
     const outputPath = resolve(context.workingDirectory, output);
 
-    if (provider === "dalle") {
+    if (provider === "dalle" || provider === "openai") {
       const { DalleProvider } = await import("@vibeframe/ai-providers");
       const dalle = new DalleProvider();
       await dalle.initialize({ apiKey });
@@ -1305,6 +1349,86 @@ const geminiVideoHandler: ToolHandler = async (args, context): Promise<ToolResul
   }
 };
 
+const geminiEditHandler: ToolHandler = async (args, context): Promise<ToolResult> => {
+  const images = args.images as string[];
+  const prompt = args.prompt as string;
+  const output = (args.output as string) || `edited-${getTimestamp()}.png`;
+  const model = (args.model as "flash" | "pro") || "flash";
+  const aspectRatio = args.aspectRatio as string | undefined;
+  const resolution = args.resolution as string | undefined;
+
+  try {
+    const apiKey = await getApiKeyFromConfig("google");
+    if (!apiKey) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: "Google API key required. Configure via 'vibe setup'.",
+      };
+    }
+
+    // Validate image count
+    const maxImages = model === "pro" ? 14 : 3;
+    if (images.length > maxImages) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: `Too many images. ${model} model supports up to ${maxImages} images.`,
+      };
+    }
+
+    // Load all images
+    const imageBuffers: Buffer[] = [];
+    for (const imagePath of images) {
+      const absPath = resolve(context.workingDirectory, imagePath);
+      const buffer = await readFile(absPath);
+      imageBuffers.push(buffer);
+    }
+
+    const { GeminiProvider } = await import("@vibeframe/ai-providers");
+    const gemini = new GeminiProvider();
+    await gemini.initialize({ apiKey });
+
+    const result = await gemini.editImage(imageBuffers, prompt, {
+      model,
+      aspectRatio: aspectRatio as "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2" | "2:3" | "21:9" | undefined,
+      resolution: resolution as "1K" | "2K" | "4K" | undefined,
+    });
+
+    if (!result.success || !result.images || result.images.length === 0) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: `Image editing failed: ${result.error || "No image generated"}`,
+      };
+    }
+
+    // Save the edited image
+    const img = result.images[0];
+    if (img.base64) {
+      const outputPath = resolve(context.workingDirectory, output);
+      const buffer = Buffer.from(img.base64, "base64");
+      await writeFile(outputPath, buffer);
+    }
+
+    return {
+      toolCallId: "",
+      success: true,
+      output: `Image edited: ${output}\nInput images: ${images.length}\nModel: ${model}\nPrompt: ${prompt}`,
+    };
+  } catch (error) {
+    return {
+      toolCallId: "",
+      success: false,
+      output: "",
+      error: `Failed to edit image: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
 // Registration function
 export function registerAITools(registry: ToolRegistry): void {
   // Basic AI generation tools
@@ -1322,4 +1446,5 @@ export function registerAITools(registry: ToolRegistry): void {
   registry.register(highlightsDef, highlightsHandler);
   registry.register(autoShortsDef, autoShortsHandler);
   registry.register(geminiVideoDef, geminiVideoHandler);
+  registry.register(geminiEditDef, geminiEditHandler);
 }

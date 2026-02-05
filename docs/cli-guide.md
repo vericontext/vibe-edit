@@ -21,6 +21,8 @@ curl -fsSL https://vibeframe.ai/install.sh | bash
 
 ## Supported Capabilities
 
+> For detailed model information, see **[models.md](models.md)** (SSOT).
+
 ### Agent LLM Providers (5)
 | Provider | Model | Notes |
 |----------|-------|-------|
@@ -34,16 +36,16 @@ curl -fsSL https://vibeframe.ai/install.sh | bash
 | Provider | Model | Notes |
 |----------|-------|-------|
 | Gemini | Nano Banana | Default, fast |
-| OpenAI | GPT Image 1.5 | Quality tiers |
+| OpenAI | GPT Image 1.5 | Quality tiers (`-p openai`) |
 | Stability | SDXL | Image editing |
 
 ### Video Generation (4 providers)
 | Provider | Model | Duration | Notes |
 |----------|-------|----------|-------|
-| Runway | Gen-4.5 | 5-10 sec | Top quality |
+| Kling | v2.5/v2.6 | 5-10 sec | Default, fast |
+| Runway | Gen-4 Turbo | 5-10 sec | Top quality |
 | Google Veo | Veo 3.0/3.1 | 5-8 sec | Native audio |
 | xAI Grok | Grok Imagine | 1-15 sec | Native audio |
-| Kling | v2.5/v2.6 | 5-10 sec | Fast generation |
 
 ### Audio (2 providers)
 | Provider | Capabilities |
@@ -116,7 +118,7 @@ Agent mode shows a welcome banner and waits for your input:
    ╚████╔╝ ██║██████╔╝███████╗  ~/vibeframe-test
     ╚═══╝  ╚═╝╚═════╝ ╚══════╝
 
-  46 tools
+  47 tools
 
   Commands: exit · reset · tools · context
 
@@ -192,7 +194,8 @@ export XAI_API_KEY="..."                 # xAI Grok (Agent LLM + Grok Imagine)
 | `vibe -p xai` | `XAI_API_KEY` | Grok-3 (Agent LLM) |
 | `vibe -p ollama` | (none) | Local models (Agent LLM) |
 | `vibe ai image` (default) | `GOOGLE_API_KEY` | Gemini Nano Banana |
-| `vibe ai image -p dalle` | `OPENAI_API_KEY` | GPT Image 1.5 |
+| `vibe ai image -p openai` | `OPENAI_API_KEY` | GPT Image 1.5 |
+| `vibe ai gemini-edit` | `GOOGLE_API_KEY` | Gemini Nano Banana |
 | `vibe ai image -p stability` | `STABILITY_API_KEY` | Stable Diffusion XL |
 | `vibe ai tts`, `sfx`, `voices` | `ELEVENLABS_API_KEY` | ElevenLabs |
 | `vibe ai transcribe` | `OPENAI_API_KEY` | Whisper |
@@ -303,7 +306,7 @@ $ vibe -p claude
    ╚████╔╝ ██║██████╔╝███████╗  ~/vibeframe-test
     ╚═══╝  ╚═╝╚═════╝ ╚══════╝
 
-  46 tools
+  47 tools
 
   Commands: exit · reset · tools · context
 
@@ -319,7 +322,7 @@ Done:
 - Fade out effect applied
 ```
 
-**Available Tools (46 total):**
+**Available Tools (47 total):**
 
 | Category | Count | Tools |
 |----------|-------|-------|
@@ -327,7 +330,7 @@ Done:
 | Timeline | 11 | timeline_add_source, timeline_add_clip, timeline_add_track, timeline_add_effect, timeline_trim, timeline_split, timeline_move, timeline_delete, timeline_duplicate, timeline_list, timeline_clear |
 | Filesystem | 4 | fs_list, fs_read, fs_write, fs_exists |
 | Media | 8 | media_info, detect_scenes, detect_silence, detect_beats, ai_transcribe, media_compress, media_convert, media_concat |
-| AI | 12 | ai_image, ai_video, ai_kling, ai_tts, ai_sfx, ai_music, ai_storyboard, ai_motion, ai_script_to_video, ai_highlights, ai_auto_shorts, ai_gemini_video |
+| AI | 13 | ai_image, ai_video, ai_kling, ai_tts, ai_sfx, ai_music, ai_storyboard, ai_motion, ai_script_to_video, ai_highlights, ai_auto_shorts, ai_gemini_video, ai_gemini_edit |
 | Export | 3 | export_video, export_audio, export_subtitles |
 | Batch | 3 | batch_import, batch_concat, batch_apply_effect |
 
@@ -339,13 +342,15 @@ Done:
 
 ### Image Generation
 
-**Available Models:**
+**Available Providers:**
 
-| Provider | Model | Notes |
-|----------|-------|-------|
-| `gemini` (default) | Nano Banana Flash/Pro | Fast, high quality |
-| `dalle` | GPT Image 1.5 | Quality tiers: low/medium/high |
-| `stability` | Stable Diffusion XL | Best for editing workflows |
+| Provider | Model | CLI Option | Notes |
+|----------|-------|------------|-------|
+| `gemini` (default) | Nano Banana Flash/Pro | `-p gemini` | Fast, high quality |
+| `openai` | GPT Image 1.5 | `-p openai` | Quality tiers: low/medium/high |
+| `stability` | Stable Diffusion XL | `-p stability` | Best for editing workflows |
+
+> Note: `dalle` is deprecated, use `openai` instead.
 
 ```bash
 # Gemini (default) - fast and high quality
@@ -358,10 +363,10 @@ vibe ai image "aurora borealis, night sky" -o wallpaper.png -r 9:16
 vibe ai image "cinematic mountain landscape" -o background.png -r 16:9
 
 # Use GPT Image 1.5 (OpenAI)
-vibe ai image "abstract digital art" -o art.png -p dalle
+vibe ai image "abstract digital art" -o art.png -p openai
 
 # GPT Image 1.5 with quality tier
-vibe ai image "professional photo" -o photo.png -p dalle --quality high
+vibe ai image "professional photo" -o photo.png -p openai --quality high
 
 # Use Stability AI (realistic images)
 vibe ai image "professional headshot, studio lighting" -o headshot.png -p stability
@@ -379,7 +384,46 @@ you> make a 16:9 mountain landscape image for video background
 |--------|---------|
 | `--provider` | `gemini` |
 | `--ratio` | `1:1` |
-| `--quality` (DALL-E) | `medium` |
+| `--quality` (OpenAI) | `medium` |
+
+---
+
+### Image Editing (Gemini)
+
+Edit or compose multiple images using Gemini's multimodal capabilities.
+
+**Models:**
+| Model | Max Images | Best For |
+|-------|------------|----------|
+| `flash` (default) | 3 | Fast editing, 1K output |
+| `pro` | 14 | Multi-image composition, up to 4K |
+
+```bash
+# Single image editing
+vibe ai gemini-edit photo.png "convert to watercolor painting style" -o watercolor.png
+
+# Change specific elements
+vibe ai gemini-edit room.png "change the sofa to red leather" -o red-sofa.png
+
+# Multi-image composition (Pro model)
+vibe ai gemini-edit person1.png person2.png "create a group photo of these people in an office" -m pro -o group.png
+
+# With specific output ratio
+vibe ai gemini-edit product.png "add professional studio background" -o product-final.png -r 16:9
+```
+
+**Agent Mode:**
+```
+you> edit photo.png to look like a watercolor painting
+you> combine person1.png and person2.png into a group photo
+you> change the background of product.png to a studio setting
+```
+
+**Defaults:**
+| Option | Default |
+|--------|---------|
+| `--model` | `flash` |
+| `--output` | `edited.png` |
 
 ---
 
