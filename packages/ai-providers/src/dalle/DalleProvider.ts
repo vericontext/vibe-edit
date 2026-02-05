@@ -146,11 +146,26 @@ export class DalleProvider implements AIProvider {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error("OpenAI Image API error:", error);
+        const errorText = await response.text();
+        console.error("OpenAI Image API error:", errorText);
+
+        // Parse error to get detailed message
+        let errorMessage = `API error: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorMessage = errorJson.error.message;
+          }
+        } catch {
+          // If not JSON, use the raw text
+          if (errorText) {
+            errorMessage = errorText.substring(0, 200);
+          }
+        }
+
         return {
           success: false,
-          error: `API error: ${response.status}`,
+          error: errorMessage,
         };
       }
 
