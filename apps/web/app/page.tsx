@@ -62,7 +62,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-sm text-primary mb-8 animate-fade-in">
             <Sparkles className="w-4 h-4" />
             <span>AI-native video editing</span>
-            <span className="px-2 py-0.5 rounded-full bg-primary/20 text-xs font-medium">v0.8</span>
+            <span className="px-2 py-0.5 rounded-full bg-primary/20 text-xs font-medium">v0.13.2</span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in-up">
@@ -119,7 +119,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Just type <code className="text-primary bg-primary/10 px-2 py-0.5 rounded">vibe</code> and
-              let the AI agent handle multi-step tasks autonomously. 47 tools at your command.
+              let the AI agent handle multi-step tasks autonomously. 48 tools at your command.
             </p>
           </div>
 
@@ -256,7 +256,7 @@ export default function LandingPage() {
             <FeatureCard
               icon={<Terminal className="w-6 h-6" />}
               title="CLI-First"
-              description="Full video editing from the command line. 281 tests. Zero GUI required."
+              description="Full video editing from the command line. 256 tests. Zero GUI required."
               gradient="from-blue-500 to-cyan-500"
             />
             <FeatureCard
@@ -317,7 +317,7 @@ export default function LandingPage() {
                   </span>
                 ))}
                 <span className="text-xs bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full text-primary">
-                  +43 more tools
+                  +44 more tools
                 </span>
               </div>
             </div>
@@ -451,7 +451,7 @@ function TerminalAnimation() {
   ╚═══╝  ╚═╝╚═════╝ ╚══════╝  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝`}
       </div>
       <div className="text-muted-foreground text-xs mb-4">
-        47 tools · openai<br/>
+        48 tools · openai<br/>
         Commands: exit · reset · tools · context
       </div>
 

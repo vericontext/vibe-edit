@@ -162,6 +162,12 @@ After completing any feature, fix, or significant change, **always update**:
    - Feature highlights and CLI examples
    - Project structure description
 
+5. **apps/web/app/page.tsx** (Landing page) - Keep in sync on every version bump or feature change:
+   - Version badge (e.g., `v0.13.2`) — must match `package.json` version
+   - Tool counts (total tools, "+N more tools")
+   - Test counts
+   - Feature descriptions and provider counts
+
 ## CRITICAL: AI Model Information Rules
 
 **`docs/models.md` is the Single Source of Truth (SSOT) for all AI model information.**
