@@ -473,7 +473,12 @@ Example of GOOD character description:
 Example of BAD character description (too vague):
 "A woman" or "developer" or "person working"
 
-CRITICAL: Copy the EXACT same characterDescription to ALL segments. The character must look identical in every scene.`;
+CRITICAL: Copy the EXACT same characterDescription to ALL segments. The character must look identical in every scene.
+
+IMPORTANT: ALWAYS respond with a valid JSON array, even if the input is brief or vague.
+- If the input is a short topic or concept, creatively expand it into a full storyboard.
+- NEVER ask follow-up questions. NEVER refuse. Just generate the best storyboard you can.
+- Your response must contain ONLY the JSON array (optionally wrapped in markdown code block).`;
 
     try {
       // Use higher temperature for creative mode
@@ -501,6 +506,9 @@ CRITICAL: Copy the EXACT same characterDescription to ALL segments. The characte
       });
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        console.error(`[Claude API] Storyboard request failed: ${response.status} ${response.statusText}`);
+        if (errorBody) console.error(`[Claude API] ${errorBody}`);
         return [];
       }
 
@@ -509,13 +517,21 @@ CRITICAL: Copy the EXACT same characterDescription to ALL segments. The characte
       };
 
       const text = data.content.find((c) => c.type === "text")?.text;
-      if (!text) return [];
+      if (!text) {
+        console.error("[Claude API] No text content in response");
+        return [];
+      }
 
       const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) return [];
+      if (!jsonMatch) {
+        console.error("[Claude API] No JSON array found in response. Response text:");
+        console.error(text.slice(0, 500));
+        return [];
+      }
 
       return JSON.parse(jsonMatch[0]) as StoryboardSegment[];
-    } catch {
+    } catch (err) {
+      console.error(`[Claude API] Storyboard error: ${err instanceof Error ? err.message : err}`);
       return [];
     }
   }

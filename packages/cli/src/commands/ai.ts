@@ -3675,7 +3675,7 @@ aiCommand
       );
 
       if (segments.length === 0) {
-        storyboardSpinner.fail(chalk.red("Failed to generate storyboard"));
+        storyboardSpinner.fail(chalk.red("Failed to generate storyboard (check API key and error above)"));
         process.exit(1);
       }
 
