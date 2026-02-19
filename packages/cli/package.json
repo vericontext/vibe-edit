@@ -1,6 +1,6 @@
 {
   "name": "@vibeframe/cli",
-  "version": "0.13.5",
+  "version": "0.13.6",
   "private": true,
   "type": "module",
   "bin": {
