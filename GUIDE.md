@@ -171,6 +171,7 @@ export XAI_API_KEY="..."                 # xAI Grok (Agent LLM + Grok Imagine)
 | `vibe ai image` (default) | `GOOGLE_API_KEY` | Gemini Nano Banana |
 | `vibe ai image -p openai` | `OPENAI_API_KEY` | GPT Image 1.5 |
 | `vibe ai gemini-edit` | `GOOGLE_API_KEY` | Gemini Nano Banana |
+| `vibe ai analyze` | `GOOGLE_API_KEY` | Gemini Flash (vision + video) |
 | `vibe ai image -p stability` | `STABILITY_API_KEY` | Stable Diffusion XL |
 | `vibe ai tts`, `sfx`, `voices` | `ELEVENLABS_API_KEY` | ElevenLabs |
 | `vibe ai transcribe` | `OPENAI_API_KEY` | Whisper |
@@ -776,6 +777,62 @@ you> summarize video.mp4
 you> extract timestamps from the tutorial video
 you> tell me what this YouTube video is about
 ```
+
+---
+
+### Unified Media Analysis
+
+Analyze any media source — images, videos, or YouTube URLs — with a single command. Auto-detects the source type.
+
+**Prerequisites:** You need an image file, video file, image URL, or YouTube URL.
+
+```bash
+# Analyze a local image
+vibe ai analyze photo.png "describe this image in detail"
+
+# Analyze a local video
+vibe ai analyze demo.mp4 "summarize what happens in this video"
+
+# Analyze a YouTube video
+vibe ai analyze "https://youtube.com/watch?v=xxx" "what are the key topics covered?"
+
+# Analyze an image from URL
+vibe ai analyze "https://example.com/photo.jpg" "what objects are in this image?"
+
+# Use Pro model for higher quality analysis
+vibe ai analyze photo.png "describe the composition and lighting" -m pro
+
+# Low-res mode for large files (fewer tokens)
+vibe ai analyze long-video.mp4 "summarize this" --low-res
+
+# Verbose mode (show token usage)
+vibe ai analyze image.png "describe this" -v
+```
+
+**Supported Sources:**
+| Source | Detection |
+|--------|-----------|
+| YouTube URL | `youtube.com` or `youtu.be` in URL |
+| Image URL | URL ending in `.png`, `.jpg`, `.webp`, `.gif` |
+| Local image | File with `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` extension |
+| Local video | File with `.mp4`, `.mov`, `.webm`, `.avi`, `.mkv` extension |
+
+**Agent Mode:**
+```
+you> analyze photo.png and describe what you see
+you> what's happening in this video?
+you> summarize this YouTube video
+```
+
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-m, --model` | `flash` | Gemini model: `flash`, `flash-2.5`, `pro` |
+| `--low-res` | off | Low resolution mode (fewer tokens) |
+| `--fps` | 1 | Frames per second for video sampling |
+| `--start` | - | Start offset in seconds (video only) |
+| `--end` | - | End offset in seconds (video only) |
+| `-v, --verbose` | off | Show token usage |
 
 ---
 
