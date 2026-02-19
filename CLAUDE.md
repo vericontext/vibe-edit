@@ -98,7 +98,7 @@ Agent (vibe)              Natural language → LLM tool calling → autonomous e
 - Claude Code-like agentic loop architecture
 - Multi-turn: LLM reasoning → tool call → result → repeat until complete
 - 5 LLM providers: OpenAI, Claude, Gemini, Ollama, xAI Grok
-- 51 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
+- 54 tools across 7 categories (project, timeline, filesystem, media, AI, export, batch)
 - `--confirm` flag: prompts before each tool execution
 - Example: "create project and add video" → multiple tool calls autonomously
 
@@ -125,7 +125,7 @@ packages/cli/src/agent/
 │   ├── timeline.ts          # 11 timeline tools
 │   ├── filesystem.ts        # 4 filesystem tools
 │   ├── media.ts             # 8 media tools
-│   ├── ai.ts                # 17 AI generation tools (basic + pipeline)
+│   ├── ai.ts                # 19 AI generation tools (basic + pipeline)
 │   ├── export.ts            # 3 export tools
 │   └── batch.ts             # 3 batch tools
 ├── memory/
@@ -236,7 +236,7 @@ When adding new AI CLI commands:
 - `CLAUDE.md` - Update tool counts
 - `ROADMAP.md` - Mark `[x]` and update CLI status section
 
-### Current Agent AI Tools (17)
+### Current Agent AI Tools (20)
 
 | Tool | CLI Command | Description |
 |------|-------------|-------------|
@@ -257,6 +257,9 @@ When adding new AI CLI commands:
 | `ai_regenerate_scene` | `vibe ai regenerate-scene` | Regenerate specific scene(s) |
 | `ai_text_overlay` | `vibe ai text-overlay` | Apply text overlays (FFmpeg drawtext) |
 | `ai_review` | `vibe ai review` | AI video review & auto-fix (Gemini) |
+| `ai_silence_cut` | `vibe ai silence-cut` | Remove silent segments (FFmpeg only) |
+| `ai_jump_cut` | `vibe ai jump-cut` | Remove filler words (Whisper + FFmpeg) |
+| `ai_caption` | `vibe ai caption` | Transcribe + burn styled captions (Whisper + FFmpeg) |
 
 ## Version Management
 

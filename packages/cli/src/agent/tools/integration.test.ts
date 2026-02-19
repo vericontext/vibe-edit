@@ -70,6 +70,33 @@ vi.mock("../../commands/ai.js", () => ({
     model: "gemini-3-flash-preview",
     totalTokens: 1000,
   }),
+  executeSilenceCut: vi.fn().mockResolvedValue({
+    success: true,
+    outputPath: "/test/video-cut.mp4",
+    totalDuration: 120,
+    silentPeriods: [
+      { start: 10, end: 15, duration: 5 },
+      { start: 60, end: 63, duration: 3 },
+    ],
+    silentDuration: 8,
+  }),
+  executeJumpCut: vi.fn().mockResolvedValue({
+    success: true,
+    outputPath: "/test/video-jumpcut.mp4",
+    totalDuration: 120,
+    fillerCount: 5,
+    fillerDuration: 3.2,
+    fillers: [
+      { word: "um", start: 5.1, end: 5.6 },
+      { word: "like", start: 12.3, end: 12.8 },
+    ],
+  }),
+  executeCaption: vi.fn().mockResolvedValue({
+    success: true,
+    outputPath: "/test/video-captioned.mp4",
+    srtPath: "/test/video-captioned.srt",
+    segmentCount: 12,
+  }),
 }));
 
 describe("CLI ↔ Agent Tool Synchronization", () => {
@@ -87,9 +114,9 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
   });
 
   describe("Tool Registration", () => {
-    it("should register all 51 tools", () => {
+    it("should register all 54 tools", () => {
       const tools = registry.getAll();
-      expect(tools.length).toBe(51);
+      expect(tools.length).toBe(54);
     });
 
     it("should register all project tools (5)", () => {
@@ -158,7 +185,7 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
       }
     });
 
-    it("should register all AI tools (12)", () => {
+    it("should register all AI tools (14)", () => {
       const aiTools = [
         // Basic AI tools (8)
         "ai_image",
@@ -169,11 +196,14 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
         "ai_music",
         "ai_storyboard",
         "ai_motion",
-        // Pipeline tools (4)
+        // Pipeline tools (6)
         "ai_script_to_video",
         "ai_highlights",
         "ai_auto_shorts",
         "ai_gemini_video",
+        "ai_silence_cut",
+        "ai_jump_cut",
+        "ai_caption",
       ];
       for (const name of aiTools) {
         expect(registry.get(name)).toBeDefined();
@@ -571,11 +601,11 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
       expect(timelineTools.length).toBe(11);  // Added timeline_clear
       expect(fsTools.length).toBe(4);
       expect(mediaTools.length).toBe(8);  // Added media_compress, media_convert, media_concat
-      expect(aiTools.length).toBe(17);  // Added ai_gemini_edit, ai_regenerate_scene, ai_text_overlay, ai_review, ai_analyze
+      expect(aiTools.length).toBe(20);  // Added ai_silence_cut, ai_jump_cut, ai_caption
       expect(exportTools.length).toBe(3);
       expect(batchTools.length).toBe(3);  // New batch tools
 
-      // Total should be 48
+      // Total should be 54
       expect(
         projectTools.length +
           timelineTools.length +
@@ -584,7 +614,7 @@ describe("CLI ↔ Agent Tool Synchronization", () => {
           aiTools.length +
           exportTools.length +
           batchTools.length
-      ).toBe(51);
+      ).toBe(54);
     });
   });
 });

@@ -146,6 +146,9 @@ Intelligence built into every interaction.
 - [x] Object Tracking - SAM-2/co-tracker tracking (`vibe ai track-object`)
 - [x] Text Overlay - Auto-compose text overlays on video (`vibe ai text-overlay`)
 - [x] AI Video Review - Gemini-powered quality review & auto-fix (`vibe ai review`)
+- [x] Silence Cut - Remove silent segments from video (`vibe ai silence-cut`)
+- [x] Jump Cut - Remove filler words using Whisper word-level timestamps (`vibe ai jump-cut`)
+- [x] Auto Caption - Transcribe + burn styled captions (`vibe ai caption`)
 
 ### Installation & Interactive Mode
 - [x] **Install Script** - One-line installation: `curl -fsSL https://vibeframe.ai/install.sh | bash`
@@ -161,7 +164,7 @@ Intelligence built into every interaction.
 - [x] **Agent Mode (Default)** - Claude Code-like autonomous agent (`vibe` or `vibe agent`)
   - Default entry point: `vibe` starts Agent mode
   - Multi-turn agentic loop: LLM reasoning → tool call → result → repeat
-  - **51 tools** across 7 categories (project, timeline, filesystem, media, AI, export, batch)
+  - **54 tools** across 7 categories (project, timeline, filesystem, media, AI, export, batch)
   - Multi-provider support: OpenAI, Claude, Gemini, xAI, Ollama
   - Verbose mode for tool call visibility (`-v`)
   - Confirm mode: `--confirm` prompts before each tool execution
@@ -220,7 +223,7 @@ Local-first editing with offline support.
 
 ## CLI Status
 
-**264 unit tests passing** | **85 E2E tests** (48 Agent tools)
+**264 unit tests passing** | **85 E2E tests** (53 Agent tools)
 
 ```
 vibe                      Start Agent mode (default: OpenAI)
@@ -244,7 +247,7 @@ vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | i
                 script-to-video | regenerate-scene | highlights | b-roll | viral
                 voice-clone | music | music-status | audio-restore | dub
                 duck | grade | speed-ramp | reframe | auto-shorts
-                style-transfer | track-object
+                style-transfer | track-object | silence-cut | jump-cut | caption
 ```
 
 ### Agent Mode (Default)

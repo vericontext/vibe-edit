@@ -24,7 +24,11 @@ import {
   executeRegenerateScene,
   executeTextOverlay,
   executeReview,
+  executeSilenceCut,
+  executeJumpCut,
+  executeCaption,
   type TextOverlayStyle,
+  type CaptionStyle,
 } from "../../commands/ai.js";
 
 // Tool Definitions
@@ -1860,6 +1864,283 @@ const reviewHandler: ToolHandler = async (args) => {
   };
 };
 
+// Silence Cut Tool
+const silenceCutDef: ToolDefinition = {
+  name: "ai_silence_cut",
+  description: "Remove silent segments from a video using FFmpeg. No API key needed. Detects silence and concatenates non-silent parts with stream copy (fast, no re-encode). Use --analyze-only to just detect silence without cutting.",
+  parameters: {
+    type: "object",
+    properties: {
+      videoPath: {
+        type: "string",
+        description: "Path to input video file",
+      },
+      outputPath: {
+        type: "string",
+        description: "Output file path (default: <name>-cut.<ext>)",
+      },
+      noiseThreshold: {
+        type: "number",
+        description: "Silence threshold in dB (default: -30). Lower = more sensitive",
+      },
+      minDuration: {
+        type: "number",
+        description: "Minimum silence duration in seconds to cut (default: 0.5)",
+      },
+      padding: {
+        type: "number",
+        description: "Padding around non-silent segments in seconds (default: 0.1)",
+      },
+      analyzeOnly: {
+        type: "boolean",
+        description: "Only detect silence without cutting (default: false)",
+      },
+    },
+    required: ["videoPath"],
+  },
+};
+
+const silenceCutHandler: ToolHandler = async (args, context): Promise<ToolResult> => {
+  const videoPath = resolve(context.workingDirectory, args.videoPath as string);
+  const ext = videoPath.split(".").pop() || "mp4";
+  const name = videoPath.replace(/\.[^.]+$/, "");
+  const outputPath = args.outputPath
+    ? resolve(context.workingDirectory, args.outputPath as string)
+    : `${name}-cut.${ext}`;
+
+  try {
+    const result = await executeSilenceCut({
+      videoPath,
+      outputPath,
+      noiseThreshold: args.noiseThreshold as number | undefined,
+      minDuration: args.minDuration as number | undefined,
+      padding: args.padding as number | undefined,
+      analyzeOnly: args.analyzeOnly as boolean | undefined,
+    });
+
+    if (!result.success) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: result.error || "Silence cut failed",
+      };
+    }
+
+    const lines: string[] = [];
+    lines.push(`Total duration: ${result.totalDuration!.toFixed(1)}s`);
+    lines.push(`Silent periods: ${result.silentPeriods!.length}`);
+    lines.push(`Silent duration: ${result.silentDuration!.toFixed(1)}s`);
+    lines.push(`Non-silent duration: ${(result.totalDuration! - result.silentDuration!).toFixed(1)}s`);
+
+    if (result.outputPath) {
+      lines.push(`Output: ${result.outputPath}`);
+    }
+
+    return {
+      toolCallId: "",
+      success: true,
+      output: lines.join("\n"),
+    };
+  } catch (error) {
+    return {
+      toolCallId: "",
+      success: false,
+      output: "",
+      error: `Silence cut failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
+// Jump Cut Tool
+const jumpCutDef: ToolDefinition = {
+  name: "ai_jump_cut",
+  description: "Remove filler words (um, uh, like, etc.) from video using Whisper word-level timestamps + FFmpeg concat. Requires OpenAI API key. Detects filler words, cuts them out, and stitches remaining segments with stream copy (fast, no re-encode).",
+  parameters: {
+    type: "object",
+    properties: {
+      videoPath: {
+        type: "string",
+        description: "Path to input video file",
+      },
+      outputPath: {
+        type: "string",
+        description: "Output file path (default: <name>-jumpcut.<ext>)",
+      },
+      fillers: {
+        type: "array",
+        items: { type: "string", description: "A filler word to detect" },
+        description: "Custom filler words to detect (default: um, uh, like, you know, etc.)",
+      },
+      padding: {
+        type: "number",
+        description: "Padding around cuts in seconds (default: 0.05)",
+      },
+      language: {
+        type: "string",
+        description: "Language code for transcription (e.g., en, ko)",
+      },
+      analyzeOnly: {
+        type: "boolean",
+        description: "Only detect fillers without cutting (default: false)",
+      },
+    },
+    required: ["videoPath"],
+  },
+};
+
+const jumpCutHandler: ToolHandler = async (args, context): Promise<ToolResult> => {
+  const videoPath = resolve(context.workingDirectory, args.videoPath as string);
+  const ext = videoPath.split(".").pop() || "mp4";
+  const name = videoPath.replace(/\.[^.]+$/, "");
+  const outputPath = args.outputPath
+    ? resolve(context.workingDirectory, args.outputPath as string)
+    : `${name}-jumpcut.${ext}`;
+
+  try {
+    const result = await executeJumpCut({
+      videoPath,
+      outputPath,
+      fillers: args.fillers as string[] | undefined,
+      padding: args.padding as number | undefined,
+      language: args.language as string | undefined,
+      analyzeOnly: args.analyzeOnly as boolean | undefined,
+    });
+
+    if (!result.success) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: result.error || "Jump cut failed",
+      };
+    }
+
+    const lines: string[] = [];
+    lines.push(`Total duration: ${result.totalDuration!.toFixed(1)}s`);
+    lines.push(`Filler words found: ${result.fillerCount}`);
+    lines.push(`Filler duration: ${result.fillerDuration!.toFixed(1)}s`);
+    lines.push(`Clean duration: ${(result.totalDuration! - result.fillerDuration!).toFixed(1)}s`);
+
+    if (result.fillers && result.fillers.length > 0) {
+      lines.push("");
+      lines.push("Detected fillers:");
+      for (const filler of result.fillers) {
+        lines.push(`  "${filler.word}" at ${filler.start.toFixed(2)}s - ${filler.end.toFixed(2)}s`);
+      }
+    }
+
+    if (result.outputPath) {
+      lines.push(`Output: ${result.outputPath}`);
+    }
+
+    return {
+      toolCallId: "",
+      success: true,
+      output: lines.join("\n"),
+    };
+  } catch (error) {
+    return {
+      toolCallId: "",
+      success: false,
+      output: "",
+      error: `Jump cut failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
+// Caption Tool
+const captionDef: ToolDefinition = {
+  name: "ai_caption",
+  description: "Transcribe video with Whisper and burn styled captions using FFmpeg. Requires OpenAI API key. 4 style presets: minimal, bold (default), outline, karaoke. Auto-sizes font based on video resolution.",
+  parameters: {
+    type: "object",
+    properties: {
+      videoPath: {
+        type: "string",
+        description: "Path to input video file",
+      },
+      outputPath: {
+        type: "string",
+        description: "Output file path (default: <name>-captioned.<ext>)",
+      },
+      style: {
+        type: "string",
+        description: "Caption style preset",
+        enum: ["minimal", "bold", "outline", "karaoke"],
+      },
+      fontSize: {
+        type: "number",
+        description: "Font size in pixels (auto-calculated based on resolution if omitted)",
+      },
+      fontColor: {
+        type: "string",
+        description: "Font color (default: white)",
+      },
+      language: {
+        type: "string",
+        description: "Language code for transcription (e.g., en, ko)",
+      },
+      position: {
+        type: "string",
+        description: "Caption position",
+        enum: ["top", "center", "bottom"],
+      },
+    },
+    required: ["videoPath"],
+  },
+};
+
+const captionHandler: ToolHandler = async (args, context): Promise<ToolResult> => {
+  const videoPath = resolve(context.workingDirectory, args.videoPath as string);
+  const ext = videoPath.split(".").pop() || "mp4";
+  const name = videoPath.replace(/\.[^.]+$/, "");
+  const outputPath = args.outputPath
+    ? resolve(context.workingDirectory, args.outputPath as string)
+    : `${name}-captioned.${ext}`;
+
+  try {
+    const result = await executeCaption({
+      videoPath,
+      outputPath,
+      style: args.style as CaptionStyle | undefined,
+      fontSize: args.fontSize as number | undefined,
+      fontColor: args.fontColor as string | undefined,
+      language: args.language as string | undefined,
+      position: args.position as "top" | "center" | "bottom" | undefined,
+    });
+
+    if (!result.success) {
+      return {
+        toolCallId: "",
+        success: false,
+        output: "",
+        error: result.error || "Caption failed",
+      };
+    }
+
+    const lines: string[] = [];
+    lines.push(`Captions applied: ${result.outputPath}`);
+    lines.push(`Segments transcribed: ${result.segmentCount}`);
+    if (result.srtPath) {
+      lines.push(`SRT file: ${result.srtPath}`);
+    }
+
+    return {
+      toolCallId: "",
+      success: true,
+      output: lines.join("\n"),
+    };
+  } catch (error) {
+    return {
+      toolCallId: "",
+      success: false,
+      output: "",
+      error: `Caption failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
 // Registration function
 export function registerAITools(registry: ToolRegistry): void {
   // Basic AI generation tools
@@ -1882,4 +2163,7 @@ export function registerAITools(registry: ToolRegistry): void {
   registry.register(regenerateSceneDef, regenerateSceneHandler);
   registry.register(textOverlayDef, textOverlayHandler);
   registry.register(reviewDef, reviewHandler);
+  registry.register(silenceCutDef, silenceCutHandler);
+  registry.register(jumpCutDef, jumpCutHandler);
+  registry.register(captionDef, captionHandler);
 }

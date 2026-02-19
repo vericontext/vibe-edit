@@ -66,7 +66,7 @@ for cmd in analyze audio-restore auto-shorts b-roll background dub duck edit fil
   motion music music-status narrate providers reframe regenerate-scene review \
   script-to-video sd sd-img2img sd-outpaint sd-remove-bg sd-replace sd-upscale \
   sfx speed-ramp storyboard style-transfer suggest text-overlay thumbnail \
-  track-object transcribe tts video video-cancel video-extend video-inpaint \
+  silence-cut jump-cut caption track-object transcribe tts video video-cancel video-extend video-inpaint \
   video-interpolate video-status video-upscale viral voice-clone voices; do
   pnpm vibe ai $cmd --help 2>&1 | head -1
 done
@@ -222,6 +222,9 @@ pnpm vibe ai track-object --help  # Requires URL
 ```bash
 pnpm vibe ai grade test-output/video-kling.mp4 --preset cinematic-warm -o test-output/graded.mp4
 pnpm vibe ai text-overlay test-output/video-kling.mp4 --text "Hello World" -o test-output/overlay.mp4
+pnpm vibe ai silence-cut test-output/video-kling.mp4 --analyze-only
+pnpm vibe ai jump-cut test-output/video-kling.mp4 --analyze-only
+pnpm vibe ai caption test-output/video-kling.mp4 -o test-output/captioned.mp4
 pnpm vibe ai review test-output/video-kling.mp4
 pnpm vibe ai gemini-video test-output/video-kling.mp4 "what is happening?"
 pnpm vibe ai analyze test-output/video-kling.mp4 "what is happening?"

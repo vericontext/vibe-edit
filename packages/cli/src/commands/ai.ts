@@ -52,7 +52,7 @@ import {
 } from "@vibeframe/ai-providers";
 import { Project, type ProjectFile } from "../engine/index.js";
 import type { EffectType } from "@vibeframe/core/timeline";
-import { detectFormat, formatTranscript } from "../utils/subtitle.js";
+import { detectFormat, formatTranscript, formatSRT } from "../utils/subtitle.js";
 import { getApiKey, loadEnv } from "../utils/api-key.js";
 import { getApiKeyFromConfig } from "../config/index.js";
 import { getAudioDuration, getVideoDuration, extendVideoNaturally } from "../utils/audio.js";
@@ -8633,8 +8633,843 @@ aiCommand
   });
 
 // ============================================================================
+// Silence Cut Command
+// ============================================================================
+
+aiCommand
+  .command("silence-cut")
+  .description("Remove silent segments from video (FFmpeg only, no API key needed)")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file path (default: <name>-cut.<ext>)")
+  .option("-n, --noise <dB>", "Silence threshold in dB (default: -30)", "-30")
+  .option("-d, --min-duration <seconds>", "Minimum silence duration to cut (default: 0.5)", "0.5")
+  .option("-p, --padding <seconds>", "Padding around non-silent segments (default: 0.1)", "0.1")
+  .option("--analyze-only", "Only detect silence, don't cut")
+  .action(async (videoPath: string, options) => {
+    try {
+      const absVideoPath = resolve(process.cwd(), videoPath);
+      if (!existsSync(absVideoPath)) {
+        console.error(chalk.red(`Video not found: ${absVideoPath}`));
+        process.exit(1);
+      }
+
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const ext = extname(videoPath);
+      const name = basename(videoPath, ext);
+      const outputPath = options.output || `${name}-cut${ext}`;
+
+      const spinner = ora("Detecting silence...").start();
+
+      const result = await executeSilenceCut({
+        videoPath: absVideoPath,
+        outputPath: resolve(process.cwd(), outputPath),
+        noiseThreshold: parseFloat(options.noise),
+        minDuration: parseFloat(options.minDuration),
+        padding: parseFloat(options.padding),
+        analyzeOnly: options.analyzeOnly || false,
+      });
+
+      if (!result.success) {
+        spinner.fail(chalk.red(result.error || "Silence cut failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Silence detection complete"));
+
+      console.log();
+      console.log(chalk.bold.cyan("Silence Analysis"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Total duration: ${chalk.bold(result.totalDuration!.toFixed(1))}s`);
+      console.log(`Silent periods: ${chalk.bold(String(result.silentPeriods!.length))}`);
+      console.log(`Silent duration: ${chalk.bold(result.silentDuration!.toFixed(1))}s`);
+      console.log(`Non-silent duration: ${chalk.bold((result.totalDuration! - result.silentDuration!).toFixed(1))}s`);
+
+      if (result.silentPeriods!.length > 0) {
+        console.log();
+        console.log(chalk.dim("Silent periods:"));
+        for (const period of result.silentPeriods!) {
+          console.log(chalk.dim(`  ${period.start.toFixed(2)}s - ${period.end.toFixed(2)}s (${period.duration.toFixed(2)}s)`));
+        }
+      }
+
+      if (!options.analyzeOnly && result.outputPath) {
+        console.log();
+        console.log(chalk.green(`Output: ${result.outputPath}`));
+        console.log(chalk.dim(`Removed ${result.silentDuration!.toFixed(1)}s of silence`));
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Silence cut failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// ============================================================================
+// Caption Command
+// ============================================================================
+
+aiCommand
+  .command("caption")
+  .description("Transcribe and burn styled captions onto video (Whisper + FFmpeg)")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file path (default: <name>-captioned.<ext>)")
+  .option("-s, --style <style>", "Caption style: minimal, bold, outline, karaoke (default: bold)", "bold")
+  .option("--font-size <pixels>", "Override auto-calculated font size")
+  .option("--color <color>", "Font color (default: white)", "white")
+  .option("-l, --language <lang>", "Language code for transcription (e.g., en, ko)")
+  .option("--position <pos>", "Caption position: top, center, bottom (default: bottom)", "bottom")
+  .option("-k, --api-key <key>", "OpenAI API key (or set OPENAI_API_KEY env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      const absVideoPath = resolve(process.cwd(), videoPath);
+      if (!existsSync(absVideoPath)) {
+        console.error(chalk.red(`Video not found: ${absVideoPath}`));
+        process.exit(1);
+      }
+
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const apiKey = await getApiKey("OPENAI_API_KEY", "OpenAI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("OpenAI API key required for Whisper transcription."));
+        console.error(chalk.dim("Use --api-key or set OPENAI_API_KEY"));
+        process.exit(1);
+      }
+
+      const ext = extname(videoPath);
+      const name = basename(videoPath, ext);
+      const outputPath = options.output || `${name}-captioned${ext}`;
+
+      const spinner = ora("Starting caption process...").start();
+
+      const result = await executeCaption({
+        videoPath: absVideoPath,
+        outputPath: resolve(process.cwd(), outputPath),
+        style: options.style as CaptionStyle,
+        fontSize: options.fontSize ? parseInt(options.fontSize) : undefined,
+        fontColor: options.color,
+        language: options.language,
+        position: options.position as "top" | "center" | "bottom",
+        apiKey,
+      });
+
+      if (!result.success) {
+        spinner.fail(chalk.red(result.error || "Caption failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Captions applied"));
+
+      console.log();
+      console.log(chalk.bold.cyan("Caption Result"));
+      console.log(chalk.dim("─".repeat(60)));
+      console.log(`Segments transcribed: ${chalk.bold(String(result.segmentCount))}`);
+      console.log(`Style: ${chalk.bold(options.style || "bold")}`);
+      console.log(`Output: ${chalk.green(result.outputPath!)}`);
+      if (result.srtPath) {
+        console.log(`SRT file: ${chalk.dim(result.srtPath)}`);
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Caption failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// ============================================================================
 // Exported Pipeline Functions for Agent Tools
 // ============================================================================
+
+// ============================================================================
+// Silence Cut
+// ============================================================================
+
+export interface SilencePeriod {
+  start: number;
+  end: number;
+  duration: number;
+}
+
+export interface SilenceCutOptions {
+  videoPath: string;
+  outputPath: string;
+  noiseThreshold?: number;
+  minDuration?: number;
+  padding?: number;
+  analyzeOnly?: boolean;
+}
+
+export interface SilenceCutResult {
+  success: boolean;
+  outputPath?: string;
+  totalDuration?: number;
+  silentPeriods?: SilencePeriod[];
+  silentDuration?: number;
+  error?: string;
+}
+
+/**
+ * Detect silent periods in a media file using FFmpeg silencedetect
+ */
+async function detectSilencePeriods(
+  videoPath: string,
+  noiseThreshold: number,
+  minDuration: number,
+): Promise<{ periods: SilencePeriod[]; totalDuration: number }> {
+  // Get total duration
+  const totalDuration = await getVideoDuration(videoPath);
+
+  // Run silence detection
+  const cmd = `ffmpeg -i "${videoPath}" -af "silencedetect=noise=${noiseThreshold}dB:d=${minDuration}" -f null - 2>&1`;
+  const { stdout } = await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024 });
+
+  const periods: SilencePeriod[] = [];
+  const startRegex = /silence_start: (\d+\.?\d*)/g;
+  const endRegex = /silence_end: (\d+\.?\d*) \| silence_duration: (\d+\.?\d*)/g;
+
+  const starts: number[] = [];
+  let match;
+  while ((match = startRegex.exec(stdout)) !== null) {
+    starts.push(parseFloat(match[1]));
+  }
+
+  let i = 0;
+  while ((match = endRegex.exec(stdout)) !== null) {
+    const end = parseFloat(match[1]);
+    const duration = parseFloat(match[2]);
+    const start = i < starts.length ? starts[i] : end - duration;
+    periods.push({ start, end, duration });
+    i++;
+  }
+
+  return { periods, totalDuration };
+}
+
+/**
+ * Remove silent segments from a video using FFmpeg
+ */
+export async function executeSilenceCut(options: SilenceCutOptions): Promise<SilenceCutResult> {
+  const {
+    videoPath,
+    outputPath,
+    noiseThreshold = -30,
+    minDuration = 0.5,
+    padding = 0.1,
+    analyzeOnly = false,
+  } = options;
+
+  if (!existsSync(videoPath)) {
+    return { success: false, error: `Video not found: ${videoPath}` };
+  }
+
+  try {
+    execSync("ffmpeg -version", { stdio: "ignore" });
+  } catch {
+    return { success: false, error: "FFmpeg not found. Please install FFmpeg." };
+  }
+
+  try {
+    const { periods, totalDuration } = await detectSilencePeriods(videoPath, noiseThreshold, minDuration);
+    const silentDuration = periods.reduce((sum, p) => sum + p.duration, 0);
+
+    if (analyzeOnly || periods.length === 0) {
+      return {
+        success: true,
+        totalDuration,
+        silentPeriods: periods,
+        silentDuration,
+      };
+    }
+
+    // Compute non-silent segments with padding
+    const segments: { start: number; end: number }[] = [];
+    let cursor = 0;
+
+    for (const period of periods) {
+      const segEnd = Math.min(period.start + padding, totalDuration);
+      if (segEnd > cursor) {
+        segments.push({ start: Math.max(0, cursor - padding), end: segEnd });
+      }
+      cursor = period.end;
+    }
+    // Add final segment after last silence
+    if (cursor < totalDuration) {
+      segments.push({ start: Math.max(0, cursor - padding), end: totalDuration });
+    }
+
+    if (segments.length === 0) {
+      return { success: false, error: "No non-silent segments found" };
+    }
+
+    // Extract segments and concat using FFmpeg concat demuxer
+    const tmpDir = `/tmp/vibe_silence_${Date.now()}`;
+    await mkdir(tmpDir, { recursive: true });
+
+    try {
+      // Extract each non-silent segment with stream copy (no re-encode)
+      const segmentPaths: string[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segPath = join(tmpDir, `seg-${i.toString().padStart(4, "0")}.ts`);
+        const duration = seg.end - seg.start;
+        await execAsync(
+          `ffmpeg -i "${videoPath}" -ss ${seg.start} -t ${duration} -c copy -avoid_negative_ts make_zero "${segPath}" -y`,
+          { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+        );
+        segmentPaths.push(segPath);
+      }
+
+      // Create concat list
+      const concatList = segmentPaths.map((p) => `file '${p}'`).join("\n");
+      const listPath = join(tmpDir, "concat.txt");
+      await writeFile(listPath, concatList);
+
+      // Concat segments
+      await execAsync(
+        `ffmpeg -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}" -y`,
+        { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+      );
+
+      return {
+        success: true,
+        outputPath,
+        totalDuration,
+        silentPeriods: periods,
+        silentDuration,
+      };
+    } finally {
+      // Cleanup temp files
+      try {
+        const files = await readdir(tmpDir);
+        for (const f of files) {
+          await unlink(join(tmpDir, f));
+        }
+        await execAsync(`rmdir "${tmpDir}"`);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Silence cut failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+// ============================================================================
+// Jump Cut Command
+// ============================================================================
+
+aiCommand
+  .command("jump-cut")
+  .description("Remove filler words (um, uh, like, etc.) from video using Whisper word-level timestamps")
+  .argument("<video>", "Video file path")
+  .option("-o, --output <path>", "Output file path (default: <name>-jumpcut.<ext>)")
+  .option("--fillers <words>", "Comma-separated filler words to detect")
+  .option("-p, --padding <seconds>", "Padding around cuts in seconds (default: 0.05)", "0.05")
+  .option("-l, --language <lang>", "Language code for transcription (e.g., en, ko)")
+  .option("--analyze-only", "Only detect fillers, don't cut")
+  .option("-k, --api-key <key>", "OpenAI API key (or set OPENAI_API_KEY env)")
+  .action(async (videoPath: string, options) => {
+    try {
+      const absVideoPath = resolve(process.cwd(), videoPath);
+      if (!existsSync(absVideoPath)) {
+        console.error(chalk.red(`Video not found: ${absVideoPath}`));
+        process.exit(1);
+      }
+
+      // Check FFmpeg
+      try {
+        execSync("ffmpeg -version", { stdio: "ignore" });
+      } catch {
+        console.error(chalk.red("FFmpeg not found. Please install FFmpeg."));
+        process.exit(1);
+      }
+
+      const apiKey = await getApiKey("OPENAI_API_KEY", "OpenAI", options.apiKey);
+      if (!apiKey) {
+        console.error(chalk.red("OpenAI API key required for Whisper transcription."));
+        console.error(chalk.dim("Use --api-key or set OPENAI_API_KEY"));
+        process.exit(1);
+      }
+
+      const ext = extname(videoPath);
+      const name = basename(videoPath, ext);
+      const outputPath = options.output || `${name}-jumpcut${ext}`;
+
+      const fillers = options.fillers
+        ? options.fillers.split(",").map((f: string) => f.trim())
+        : undefined;
+
+      const spinner = ora("Transcribing with word-level timestamps...").start();
+
+      const result = await executeJumpCut({
+        videoPath: absVideoPath,
+        outputPath: resolve(process.cwd(), outputPath),
+        fillers,
+        padding: parseFloat(options.padding),
+        language: options.language,
+        analyzeOnly: options.analyzeOnly || false,
+        apiKey,
+      });
+
+      if (!result.success) {
+        spinner.fail(chalk.red(result.error || "Jump cut failed"));
+        process.exit(1);
+      }
+
+      spinner.succeed(chalk.green("Filler detection complete"));
+
+      console.log();
+      console.log(chalk.bold.cyan("Filler Word Analysis"));
+      console.log(chalk.dim("-".repeat(60)));
+      console.log(`Total duration: ${chalk.bold(result.totalDuration!.toFixed(1))}s`);
+      console.log(`Filler words found: ${chalk.bold(String(result.fillerCount))}`);
+      console.log(`Filler duration: ${chalk.bold(result.fillerDuration!.toFixed(1))}s`);
+      console.log(`Clean duration: ${chalk.bold((result.totalDuration! - result.fillerDuration!).toFixed(1))}s`);
+
+      if (result.fillers && result.fillers.length > 0) {
+        console.log();
+        console.log(chalk.dim("Detected fillers:"));
+        for (const filler of result.fillers) {
+          console.log(chalk.dim(`  "${filler.word}" at ${filler.start.toFixed(2)}s - ${filler.end.toFixed(2)}s`));
+        }
+      }
+
+      if (!options.analyzeOnly && result.outputPath) {
+        console.log();
+        console.log(chalk.green(`Output: ${result.outputPath}`));
+        console.log(chalk.dim(`Removed ${result.fillerDuration!.toFixed(1)}s of filler words`));
+      }
+      console.log();
+    } catch (error) {
+      console.error(chalk.red("Jump cut failed"));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// ============================================================================
+// Jump Cut (Filler Word Removal)
+// ============================================================================
+
+export interface FillerWord {
+  word: string;
+  start: number;
+  end: number;
+}
+
+export interface JumpCutOptions {
+  videoPath: string;
+  outputPath: string;
+  fillers?: string[];
+  padding?: number;
+  language?: string;
+  analyzeOnly?: boolean;
+  apiKey?: string;
+}
+
+export interface JumpCutResult {
+  success: boolean;
+  outputPath?: string;
+  totalDuration?: number;
+  fillerCount?: number;
+  fillerDuration?: number;
+  fillers?: FillerWord[];
+  error?: string;
+}
+
+export const DEFAULT_FILLER_WORDS = [
+  "um", "uh", "uh-huh", "hmm", "like", "you know", "so",
+  "basically", "literally", "right", "okay", "well", "i mean", "actually",
+];
+
+/**
+ * Transcribe audio with word-level timestamps using Whisper API directly.
+ * Uses timestamp_granularities[]=word for filler detection.
+ */
+async function transcribeWithWords(
+  audioPath: string,
+  apiKey: string,
+  language?: string,
+): Promise<{ words: { word: string; start: number; end: number }[]; text: string }> {
+  const audioBuffer = await readFile(audioPath);
+  const audioBlob = new Blob([audioBuffer]);
+
+  const formData = new FormData();
+  formData.append("file", audioBlob, "audio.wav");
+  formData.append("model", "whisper-1");
+  formData.append("response_format", "verbose_json");
+  formData.append("timestamp_granularities[]", "word");
+
+  if (language) {
+    formData.append("language", language);
+  }
+
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Whisper transcription failed: ${error}`);
+  }
+
+  const data = await response.json() as {
+    text: string;
+    words?: Array<{ word: string; start: number; end: number }>;
+  };
+
+  return {
+    words: data.words || [],
+    text: data.text,
+  };
+}
+
+/**
+ * Detect filler word ranges and merge adjacent ones with padding.
+ */
+function detectFillerRanges(
+  words: { word: string; start: number; end: number }[],
+  fillers: string[],
+  padding: number,
+): FillerWord[] {
+  const fillerSet = new Set(fillers.map((f) => f.toLowerCase().trim()));
+
+  // Find individual filler words
+  const matches: FillerWord[] = [];
+  for (const w of words) {
+    const cleaned = w.word.toLowerCase().replace(/[^a-z\s-]/g, "").trim();
+    if (fillerSet.has(cleaned)) {
+      matches.push({ word: w.word, start: w.start, end: w.end });
+    }
+  }
+
+  if (matches.length === 0) return [];
+
+  // Merge adjacent filler ranges (within padding distance)
+  const merged: FillerWord[] = [{ ...matches[0] }];
+  for (let i = 1; i < matches.length; i++) {
+    const last = merged[merged.length - 1];
+    if (matches[i].start - last.end <= padding * 2) {
+      last.end = matches[i].end;
+      last.word += ` ${matches[i].word}`;
+    } else {
+      merged.push({ ...matches[i] });
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Remove filler words from video using Whisper word-level timestamps + FFmpeg concat.
+ */
+export async function executeJumpCut(options: JumpCutOptions): Promise<JumpCutResult> {
+  const {
+    videoPath,
+    outputPath,
+    fillers = DEFAULT_FILLER_WORDS,
+    padding = 0.05,
+    language,
+    analyzeOnly = false,
+    apiKey,
+  } = options;
+
+  if (!existsSync(videoPath)) {
+    return { success: false, error: `Video not found: ${videoPath}` };
+  }
+
+  try {
+    execSync("ffmpeg -version", { stdio: "ignore" });
+  } catch {
+    return { success: false, error: "FFmpeg not found. Please install FFmpeg." };
+  }
+
+  const openaiKey = apiKey || process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    return { success: false, error: "OpenAI API key required for Whisper transcription." };
+  }
+
+  try {
+    const tmpDir = `/tmp/vibe_jumpcut_${Date.now()}`;
+    await mkdir(tmpDir, { recursive: true });
+    const audioPath = join(tmpDir, "audio.wav");
+
+    try {
+      // Step 1: Extract audio
+      await execAsync(
+        `ffmpeg -i "${videoPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${audioPath}" -y`,
+        { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+      );
+
+      // Step 2: Transcribe with word-level timestamps
+      const { words } = await transcribeWithWords(audioPath, openaiKey, language);
+
+      if (words.length === 0) {
+        return { success: false, error: "No words detected in audio" };
+      }
+
+      // Step 3: Detect filler ranges
+      const fillerRanges = detectFillerRanges(words, fillers, padding);
+      const totalDuration = await getVideoDuration(videoPath);
+      const fillerDuration = fillerRanges.reduce((sum, f) => sum + (f.end - f.start), 0);
+
+      if (analyzeOnly || fillerRanges.length === 0) {
+        return {
+          success: true,
+          totalDuration,
+          fillerCount: fillerRanges.length,
+          fillerDuration,
+          fillers: fillerRanges,
+        };
+      }
+
+      // Step 4: Compute keep-segments (invert filler ranges)
+      const segments: { start: number; end: number }[] = [];
+      let cursor = 0;
+
+      for (const filler of fillerRanges) {
+        const segStart = Math.max(0, cursor);
+        const segEnd = Math.max(segStart, filler.start - padding);
+        if (segEnd > segStart) {
+          segments.push({ start: segStart, end: segEnd });
+        }
+        cursor = filler.end + padding;
+      }
+      // Add final segment after last filler
+      if (cursor < totalDuration) {
+        segments.push({ start: cursor, end: totalDuration });
+      }
+
+      if (segments.length === 0) {
+        return { success: false, error: "No non-filler segments found" };
+      }
+
+      // Step 5: Extract segments and concat with FFmpeg (stream copy)
+      const segmentPaths: string[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segPath = join(tmpDir, `seg-${i.toString().padStart(4, "0")}.ts`);
+        const duration = seg.end - seg.start;
+        await execAsync(
+          `ffmpeg -i "${videoPath}" -ss ${seg.start} -t ${duration} -c copy -avoid_negative_ts make_zero "${segPath}" -y`,
+          { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+        );
+        segmentPaths.push(segPath);
+      }
+
+      // Create concat list
+      const concatList = segmentPaths.map((p) => `file '${p}'`).join("\n");
+      const listPath = join(tmpDir, "concat.txt");
+      await writeFile(listPath, concatList);
+
+      // Concat segments
+      await execAsync(
+        `ffmpeg -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}" -y`,
+        { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+      );
+
+      return {
+        success: true,
+        outputPath,
+        totalDuration,
+        fillerCount: fillerRanges.length,
+        fillerDuration,
+        fillers: fillerRanges,
+      };
+    } finally {
+      // Cleanup temp files
+      try {
+        const files = await readdir(tmpDir);
+        for (const f of files) {
+          await unlink(join(tmpDir, f));
+        }
+        await execAsync(`rmdir "${tmpDir}"`);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Jump cut failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+// ============================================================================
+// Caption
+// ============================================================================
+
+export type CaptionStyle = "minimal" | "bold" | "outline" | "karaoke";
+
+export interface CaptionOptions {
+  videoPath: string;
+  outputPath: string;
+  style?: CaptionStyle;
+  fontSize?: number;
+  fontColor?: string;
+  language?: string;
+  position?: "top" | "center" | "bottom";
+  apiKey?: string;
+}
+
+export interface CaptionResult {
+  success: boolean;
+  outputPath?: string;
+  srtPath?: string;
+  segmentCount?: number;
+  error?: string;
+}
+
+/**
+ * Get ASS force_style string for caption preset
+ */
+function getCaptionForceStyle(
+  style: CaptionStyle,
+  fontSize: number,
+  fontColor: string,
+  position: "top" | "center" | "bottom",
+): string {
+  // ASS alignment: 1-3 bottom, 4-6 middle, 7-9 top (left/center/right)
+  const alignment = position === "top" ? 8 : position === "center" ? 5 : 2;
+  const marginV = position === "center" ? 0 : 30;
+
+  switch (style) {
+    case "minimal":
+      return `FontSize=${fontSize},FontName=Arial,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=0,Alignment=${alignment},MarginV=${marginV}`;
+    case "bold":
+      return `FontSize=${fontSize},FontName=Arial,Bold=1,PrimaryColour=&H00${fontColor === "yellow" ? "00FFFF" : "FFFFFF"},OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=${alignment},MarginV=${marginV}`;
+    case "outline":
+      return `FontSize=${fontSize},FontName=Arial,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H000000FF,Outline=4,Shadow=0,Alignment=${alignment},MarginV=${marginV}`;
+    case "karaoke":
+      return `FontSize=${fontSize},FontName=Arial,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=${alignment},MarginV=${marginV}`;
+    default:
+      return `FontSize=${fontSize},FontName=Arial,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=${alignment},MarginV=${marginV}`;
+  }
+}
+
+/**
+ * Transcribe video and burn styled captions using Whisper + FFmpeg
+ */
+export async function executeCaption(options: CaptionOptions): Promise<CaptionResult> {
+  const {
+    videoPath,
+    outputPath,
+    style = "bold",
+    fontSize: customFontSize,
+    fontColor = "white",
+    language,
+    position = "bottom",
+    apiKey,
+  } = options;
+
+  if (!existsSync(videoPath)) {
+    return { success: false, error: `Video not found: ${videoPath}` };
+  }
+
+  try {
+    execSync("ffmpeg -version", { stdio: "ignore" });
+  } catch {
+    return { success: false, error: "FFmpeg not found. Please install FFmpeg." };
+  }
+
+  const openaiKey = apiKey || process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    return { success: false, error: "OpenAI API key required for Whisper transcription." };
+  }
+
+  try {
+    // Step 1: Extract audio from video
+    const tmpDir = `/tmp/vibe_caption_${Date.now()}`;
+    await mkdir(tmpDir, { recursive: true });
+    const audioPath = join(tmpDir, "audio.wav");
+    const srtPath = join(tmpDir, "captions.srt");
+
+    try {
+      await execAsync(
+        `ffmpeg -i "${videoPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${audioPath}" -y`,
+        { timeout: 300000, maxBuffer: 50 * 1024 * 1024 },
+      );
+
+      // Step 2: Transcribe with Whisper
+      const whisper = new WhisperProvider();
+      await whisper.initialize({ apiKey: openaiKey });
+
+      const audioBuffer = await readFile(audioPath);
+      const audioBlob = new Blob([audioBuffer]);
+      const transcriptResult = await whisper.transcribe(audioBlob, language);
+
+      if (transcriptResult.status === "failed" || !transcriptResult.segments || transcriptResult.segments.length === 0) {
+        return { success: false, error: `Transcription failed: ${transcriptResult.error || "No segments detected"}` };
+      }
+
+      // Step 3: Generate SRT
+      const srtContent = formatSRT(transcriptResult.segments);
+      await writeFile(srtPath, srtContent);
+
+      // Step 4: Get video resolution for auto font size
+      const { height } = await getVideoResolution(videoPath);
+      const fontSize = customFontSize || Math.round(height / 18);
+
+      // Step 5: Burn captions with FFmpeg subtitles filter + force_style
+      const forceStyle = getCaptionForceStyle(style, fontSize, fontColor, position);
+      // Escape colons and backslashes in srtPath for FFmpeg filter syntax
+      const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+      const cmd = `ffmpeg -i "${videoPath}" -vf "subtitles='${escapedSrtPath}':force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
+      await execAsync(cmd, { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
+
+      // Copy SRT to output directory for user reference
+      const outputDir = dirname(outputPath);
+      const outputSrtPath = join(outputDir, basename(outputPath, extname(outputPath)) + ".srt");
+      await writeFile(outputSrtPath, srtContent);
+
+      return {
+        success: true,
+        outputPath,
+        srtPath: outputSrtPath,
+        segmentCount: transcriptResult.segments.length,
+      };
+    } finally {
+      // Cleanup temp files
+      try {
+        const files = await readdir(tmpDir);
+        for (const f of files) {
+          await unlink(join(tmpDir, f));
+        }
+        await execAsync(`rmdir "${tmpDir}"`);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Caption failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
 
 // ============================================================================
 // Text Overlay

@@ -247,7 +247,7 @@ vibeframe/
 ├── MODELS.md              # AI models reference (SSOT)
 ├── apps/web/              # Next.js web app (preview UI)
 ├── packages/
-│   ├── cli/               # Command-line interface (256 tests, 51 tools)
+│   ├── cli/               # Command-line interface (256 tests, 54 tools)
 │   ├── core/              # Timeline data structures
 │   ├── ai-providers/      # AI provider plugins
 │   ├── mcp-server/        # MCP server (npm: @vibeframe/mcp-server)
