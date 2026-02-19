@@ -258,25 +258,6 @@ When adding new AI CLI commands:
 | `ai_text_overlay` | `vibe ai text-overlay` | Apply text overlays (FFmpeg drawtext) |
 | `ai_review` | `vibe ai review` | AI video review & auto-fix (Gemini) |
 
-Format for progress.md entries:
-```markdown
-## YYYY-MM-DD
-
-### Feature/Fix: Title
-Description of what was done.
-
-**Problem:** (if fix)
-**Solution:** (if fix)
-
-**Files Modified:**
-- `path/to/file.ts` - What changed
-
-**Usage:**
-```bash
-vibe command example
-```
-```
-
 ## Version Management
 
 All packages share the same version number. Update versions when making significant changes:
