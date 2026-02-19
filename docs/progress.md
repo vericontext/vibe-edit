@@ -4,6 +4,60 @@ Detailed changelog of development progress. Updated after each significant chang
 
 ---
 
+## 2026-02-19
+
+### Fix: Full E2E Test Pass — 7 Bugs Fixed Across CLI
+
+Comprehensive E2E testing of all 85 CLI test cases (35 AI subcommands, project, timeline, export, batch, detect, media, agent). Found and fixed 7 bugs.
+
+**Bugs Fixed:**
+
+1. **`project create` ignored path argument** — `vibe project create output/my-project` created `./project.vibe.json` instead of `output/my-project/project.vibe.json`. Added path detection and recursive directory creation.
+
+2. **`ai video` default provider was kling** — Changed default to `runway` to match documentation.
+
+3. **`ai highlights` crashed on video without audio** — FFmpeg `-vn` fails when no audio stream exists. Added `ffprobe` pre-check with helpful error message suggesting `--use-gemini`.
+
+4. **`ai auto-shorts` same no-audio crash** — Same `ffprobe` pre-check fix.
+
+5. **`ai speed-ramp` same no-audio crash** — Same `ffprobe` pre-check fix.
+
+6. **Veo API schema mismatch** — Changed endpoint from `generateContent` to `predictLongRunning`, auth from `?key=` query param to `x-goog-api-key` header, duration clamped to 6/8s (Veo 3.1 constraint).
+
+7. **`ai viral` crashed on directory path** — Added auto-resolution: if given a directory, searches for `project.vibe.json` or any `.vibe.json` file inside.
+
+**Files Modified:**
+- `packages/cli/src/commands/ai.ts` — Bugs 2-5, 7: video default, audio pre-checks, viral directory handling
+- `packages/cli/src/commands/project.ts` — Bug 1: path argument handling with mkdir
+- `packages/ai-providers/src/gemini/GeminiProvider.ts` — Bug 6: Veo endpoint, auth, duration
+- `CLAUDE.md` — Updated test count (264), CLI usage format, added gemini-video skill, ESM note, Claude model version
+
+**Also Added:**
+- `.claude/agents/e2e-tester.md` — E2E test agent for automated testing
+- `.claude/agents/feature-tester.md` — Individual feature test agent
+- `.claude/skills/test-ai/SKILL.md` — AI generation test skill
+- `.claude/skills/test-pipeline/SKILL.md` — Pipeline test skill
+- `.claude/skills/test-agent/SKILL.md` — Agent mode test skill
+- `.claude/skills/test-project/SKILL.md` — Project/timeline test skill
+
+**Test Results:**
+- 85 total tests, 74 PASS, 7 FIXED, 3 SKIP (Replicate URL-only), 1 SKIP (Ollama)
+- Unit tests: 264 passing (CLI 256 + Core 8)
+- Full report: `test-output/e2e-report.md`
+
+**Usage:**
+```bash
+# All commands tested and working:
+vibe project create output/my-project     # Now creates directory
+vibe ai video "prompt"                     # Default: runway (was kling)
+vibe ai highlights video.mp4              # Graceful error if no audio
+vibe ai speed-ramp video.mp4              # Graceful error if no audio
+vibe ai viral ./my-project-dir            # Accepts directory path
+vibe ai video "prompt" --provider veo     # Fixed Veo API
+```
+
+---
+
 ## 2026-02-06
 
 ### Fix: Narration-Video Sync Improvements (5 fixes)
