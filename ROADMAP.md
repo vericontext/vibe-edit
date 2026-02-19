@@ -120,6 +120,7 @@ Intelligence built into every interaction.
 
 ### Video Understanding & Generation
 - [x] **Gemini Video Analysis** - Summarize, Q&A, extract info (`vibe ai gemini-video`)
+- [x] **Unified Analyze** - Image/video/YouTube analysis in one command (`vibe ai analyze`)
 - [x] **Gemini Image Edit** - Multi-image editing (`vibe ai gemini-edit`)
 - [x] **Auto Narrate** - AI narration for videos (`vibe ai narrate`)
 - [x] Video Extend - AI-powered clip extension (`vibe ai video-extend`)
@@ -160,7 +161,7 @@ Intelligence built into every interaction.
 - [x] **Agent Mode (Default)** - Claude Code-like autonomous agent (`vibe` or `vibe agent`)
   - Default entry point: `vibe` starts Agent mode
   - Multi-turn agentic loop: LLM reasoning → tool call → result → repeat
-  - **50 tools** across 7 categories (project, timeline, filesystem, media, AI, export, batch)
+  - **51 tools** across 7 categories (project, timeline, filesystem, media, AI, export, batch)
   - Multi-provider support: OpenAI, Claude, Gemini, xAI, Ollama
   - Verbose mode for tool call visibility (`-v`)
   - Confirm mode: `--confirm` prompts before each tool execution
@@ -171,6 +172,7 @@ Intelligence built into every interaction.
     - `ai_highlights` - Extract highlights from long-form content
     - `ai_auto_shorts` - Auto-generate vertical shorts
     - `ai_gemini_video` - Analyze video with Gemini
+    - `ai_analyze` - Unified media analysis (image/video/YouTube)
 - [x] **Config System** - YAML config at `~/.vibeframe/config.yaml`
 - [x] **CLI Guide** - Comprehensive documentation at `GUIDE.md`
 
@@ -234,7 +236,7 @@ vibe export     <project> -o <output> -p <preset>
 vibe detect     scenes | silence | beats
 vibe ai         providers | transcribe | suggest | edit | tts | voices | sfx | isolate
                 motion | storyboard | image | thumbnail | background
-                gemini | gemini-edit | gemini-video | narrate
+                gemini | gemini-edit | gemini-video | analyze | narrate
                 video | video-status | video-cancel
                 kling | kling-status
                 video-extend | video-upscale | video-interpolate | video-inpaint | fill-gaps
