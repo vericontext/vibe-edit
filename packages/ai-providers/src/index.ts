@@ -1,12 +1,12 @@
 /**
  * AI Providers - Pluggable AI provider system for VibeFrame
  *
- * IMPORTANT: See docs/models.md for the Single Source of Truth (SSOT) on:
+ * IMPORTANT: See MODELS.md for the Single Source of Truth (SSOT) on:
  * - Supported AI providers and models
  * - Environment variables and API keys
  * - Model capabilities and limitations
  *
- * When adding new providers, update docs/models.md FIRST.
+ * When adding new providers, update MODELS.md FIRST.
  */
 
 // Interface and registry

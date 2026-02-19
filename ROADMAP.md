@@ -170,7 +170,7 @@ Intelligence built into every interaction.
     - `ai_auto_shorts` - Auto-generate vertical shorts
     - `ai_gemini_video` - Analyze video with Gemini
 - [x] **Config System** - YAML config at `~/.vibeframe/config.yaml`
-- [x] **CLI Guide** - Comprehensive documentation at `docs/guide.md`
+- [x] **CLI Guide** - Comprehensive documentation at `GUIDE.md`
 
 ---
 

@@ -21,7 +21,7 @@ curl -fsSL https://vibeframe.ai/install.sh | bash
 
 ## Supported Capabilities
 
-> **See [models.md](models.md) for detailed model information** (SSOT - Single Source of Truth)
+> **See [models.md](MODELS.md) for detailed model information** (SSOT - Single Source of Truth)
 
 | Category | Providers | Default |
 |----------|-----------|---------|
@@ -31,7 +31,7 @@ curl -fsSL https://vibeframe.ai/install.sh | bash
 | **Audio** | ElevenLabs (TTS/SFX), Whisper (transcription) | - |
 | **Video Analysis** | Gemini | Gemini Flash |
 
-For model IDs, environment variables, and CLI options → **[models.md](models.md)**
+For model IDs, environment variables, and CLI options → **[models.md](MODELS.md)**
 
 ---
 
@@ -317,7 +317,7 @@ Done:
 
 ### Image Generation
 
-**Providers:** `gemini` (default), `openai`, `stability` → See [models.md](models.md) for details
+**Providers:** `gemini` (default), `openai`, `stability` → See [models.md](MODELS.md) for details
 
 > Note: `dalle` is deprecated, use `openai` instead.
 
@@ -502,7 +502,7 @@ you> create subtitles for Korean audio
 
 ### Video Generation (Image-to-Video / Text-to-Video)
 
-**Providers:** `runway` (default), `veo`, `grok`, `kling` → See [models.md](models.md) for details
+**Providers:** `runway` (default), `veo`, `grok`, `kling` → See [models.md](MODELS.md) for details
 
 > **Note:** Video generation requires an image for image-to-video. Generate one first if you don't have one.
 

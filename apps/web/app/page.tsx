@@ -362,7 +362,7 @@ export default function LandingPage() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="https://github.com/vericontext/vibeframe/blob/main/docs/mcp.md"
+              href="https://www.npmjs.com/package/@vibeframe/mcp-server"
               target="_blank"
               className="flex items-center gap-2 rounded-lg border border-border px-6 py-3 font-medium hover:bg-secondary hover:border-primary/30 transition-all"
             >
@@ -386,7 +386,7 @@ export default function LandingPage() {
             <Link href="https://github.com/vericontext/vibeframe" target="_blank" className="hover:text-foreground transition-colors">
               GitHub
             </Link>
-            <Link href="https://github.com/vericontext/vibeframe/blob/main/docs/roadmap.md" target="_blank" className="hover:text-foreground transition-colors">
+            <Link href="https://github.com/vericontext/vibeframe/blob/main/ROADMAP.md" target="_blank" className="hover:text-foreground transition-colors">
               Roadmap
             </Link>
             <Link href="https://github.com/vericontext/vibeframe/blob/main/LICENSE" target="_blank" className="hover:text-foreground transition-colors">

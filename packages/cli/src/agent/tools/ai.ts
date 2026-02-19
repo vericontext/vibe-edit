@@ -1,7 +1,7 @@
 /**
  * AI Generation Tools - Image, video, TTS, SFX, music generation
  *
- * IMPORTANT: See docs/models.md for the Single Source of Truth (SSOT) on:
+ * IMPORTANT: See MODELS.md for the Single Source of Truth (SSOT) on:
  * - Supported AI providers and models
  * - Environment variables and API keys
  * - Model capabilities and limitations

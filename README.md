@@ -46,31 +46,44 @@ Traditional video editors are built for **clicking buttons**. VibeFrame is built
 
 ## Quick Start
 
-### Prerequisites
-- Node.js 18+
-- FFmpeg (for video processing)
+### Option 1: CLI (for video creation & editing)
 
-### Installation
+**Prerequisites:** Node.js 18+, FFmpeg
 
 ```bash
+# Install VibeFrame CLI
 curl -fsSL https://raw.githubusercontent.com/vericontext/vibeframe/main/scripts/install.sh | bash
-```
 
-### Try It
+# Start Agent mode — talk to it in natural language
+vibe
 
-```bash
-# Create a project
+# Or run commands directly
 vibe project create "My First Video" -o my-video.vibe.json
-
-# Add a video source
 vibe timeline add-source my-video.vibe.json ./intro.mp4
-
-# List what's in the project
-vibe timeline list my-video.vibe.json
-
-# Export to MP4
 vibe export my-video.vibe.json -o output.mp4
 ```
+
+### Option 2: MCP Server (for Claude Desktop / Cursor)
+
+**Prerequisites:** Node.js 18+
+
+No installation needed. Just add to your MCP config and restart:
+
+```json
+{
+  "mcpServers": {
+    "vibeframe": {
+      "command": "npx",
+      "args": ["-y", "@vibeframe/mcp-server"]
+    }
+  }
+}
+```
+
+Config file locations:
+- **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Cursor:** `.cursor/mcp.json` in your workspace
 
 ### Development Setup
 
@@ -90,7 +103,7 @@ Generate complete videos from text using Claude + ElevenLabs + Gemini + Kling/Ru
 
 ```bash
 # Generate 60-second vertical video for TikTok using Kling AI
-vibe ai script-to-video "A morning routine of a startup founder..." \
+vibe ai script-to-video "A morning routine of a startup founder with 3 scenes..." \
   -d 60 -a 9:16 -g kling -o startup.vibe.json
 ```
 
@@ -150,28 +163,48 @@ Viral Potential Summary
 
 ## MCP Integration
 
-VibeFrame works with Claude Desktop and Cursor via MCP (Model Context Protocol):
+VibeFrame works with Claude Desktop and Cursor via MCP (Model Context Protocol). No clone or build required — just add the config and start using it.
 
-```bash
-pnpm mcp  # Start MCP server
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "vibeframe": {
+      "command": "npx",
+      "args": ["-y", "@vibeframe/mcp-server"]
+    }
+  }
+}
 ```
 
-Then in Claude Desktop:
+### Cursor
+
+Add to `.cursor/mcp.json` in your workspace:
+
+```json
+{
+  "mcpServers": {
+    "vibeframe": {
+      "command": "npx",
+      "args": ["-y", "@vibeframe/mcp-server"]
+    }
+  }
+}
+```
+
+Then just ask your AI assistant:
 > "Create a new video project called 'Demo', add the intro.mp4 file, and trim it to 10 seconds"
 
-**Available Tools:**
-- `project_create`, `project_info`
-- `timeline_add_source`, `timeline_add_clip`
-- `timeline_split_clip`, `timeline_trim_clip`
-- `timeline_move_clip`, `timeline_delete_clip`
-- `timeline_duplicate_clip`, `timeline_add_effect`
-- `timeline_add_track`, `timeline_list`
+**13 Tools:** `project_create`, `project_info`, `timeline_add_source`, `timeline_add_clip`, `timeline_split_clip`, `timeline_trim_clip`, `timeline_move_clip`, `timeline_delete_clip`, `timeline_duplicate_clip`, `timeline_add_effect`, `timeline_add_track`, `timeline_list`
 
-**Resources:**
-- `vibe://project/current` - Full project state
-- `vibe://project/clips` - All clips
-- `vibe://project/sources` - Media sources
-- `vibe://project/tracks` - Track list
+**5 Resources:** `vibe://project/current`, `vibe://project/clips`, `vibe://project/sources`, `vibe://project/tracks`, `vibe://project/settings`
+
+**7 Prompts:** `edit_video`, `create_montage`, `add_transitions`, `color_grade`, `generate_subtitles`, `create_shorts`, `sync_to_music`
+
+> See [packages/mcp-server/README.md](packages/mcp-server/README.md) for full tool reference and examples.
 
 ---
 
@@ -227,7 +260,7 @@ vibe ai viral <project>              # Platform optimization
 
 ## AI Providers
 
-> See [docs/models.md](docs/models.md) for detailed model information (SSOT).
+> See [MODELS.md](MODELS.md) for detailed model information (SSOT).
 
 | Category | Providers | Default |
 |----------|-----------|---------|
@@ -244,18 +277,18 @@ vibe ai viral <project>              # Platform optimization
 
 ```
 vibeframe/
+├── README.md              # Quick start (CLI + MCP)
+├── GUIDE.md               # CLI usage guide
+├── ROADMAP.md             # Development roadmap
+├── MODELS.md              # AI models reference (SSOT)
 ├── apps/web/              # Next.js web app (preview UI)
 ├── packages/
 │   ├── cli/               # Command-line interface (281 tests, 48 tools)
 │   ├── core/              # Timeline data structures
 │   ├── ai-providers/      # AI provider plugins
-│   ├── mcp-server/        # MCP server for AI assistants
+│   ├── mcp-server/        # MCP server (npm: @vibeframe/mcp-server)
 │   └── ui/                # Shared UI components
-└── docs/
-    ├── guide.md           # CLI usage guide
-    ├── models.md          # AI models reference (SSOT)
-    ├── roadmap.md         # Development roadmap
-    └── progress.md        # Changelog
+└── docs/                  # Media assets (demo.gif)
 ```
 
 ---
@@ -271,7 +304,7 @@ vibeframe/
 | 5. Server Infrastructure | 📋 | Hybrid rendering, chunked uploads |
 | 6. Collaboration | 📋 | CRDT-based local-first sync |
 
-See [docs/roadmap.md](docs/roadmap.md) for details.
+See [ROADMAP.md](ROADMAP.md) for details.
 
 ---
 

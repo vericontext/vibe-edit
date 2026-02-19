@@ -1,12 +1,12 @@
 /**
  * AI Commands - Image, video, audio generation and analysis
  *
- * IMPORTANT: See docs/models.md for the Single Source of Truth (SSOT) on:
+ * IMPORTANT: See MODELS.md for the Single Source of Truth (SSOT) on:
  * - Supported AI providers and models
  * - Environment variables and API keys
  * - Model capabilities and limitations
  *
- * When adding new providers or models, update docs/models.md FIRST.
+ * When adding new providers or models, update MODELS.md FIRST.
  */
 
 import { Command } from "commander";

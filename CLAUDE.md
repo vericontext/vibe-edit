@@ -20,12 +20,42 @@ pnpm vibe             # Start Agent mode (default, no-args only)
 pnpm vibe agent       # Start Agent mode with options (e.g., -p gemini)
 pnpm vibe --help      # Show CLI commands
 
-# Run MCP server
+# Run MCP server (development)
 pnpm mcp
 
 # Single package commands
 pnpm -F @vibeframe/cli test       # Test CLI package only
 pnpm -F @vibeframe/core build     # Build core package only
+```
+
+## MCP Server (npm package)
+
+Published as [`@vibeframe/mcp-server`](https://www.npmjs.com/package/@vibeframe/mcp-server) on npm.
+
+**End-user setup** (no clone/build needed):
+```json
+{
+  "mcpServers": {
+    "vibeframe": {
+      "command": "npx",
+      "args": ["-y", "@vibeframe/mcp-server"]
+    }
+  }
+}
+```
+
+Config file locations:
+- **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Cursor:** `.cursor/mcp.json` in workspace
+
+**Bundling:** esbuild bundles workspace deps (`@vibeframe/cli`, `@vibeframe/core`) into a single `dist/index.js` (37KB). External deps: `@modelcontextprotocol/sdk`, `zod`.
+
+**Publishing:**
+```bash
+cd packages/mcp-server
+node build.js                    # Bundle
+npm publish --access public      # Publish to npm
 ```
 
 ## Architecture
@@ -121,7 +151,7 @@ vibe agent -i "query" -v       # Non-interactive mode with verbose output
 - **packages/cli** - Main CLI interface. Entry: `src/index.ts`. Commands in `src/commands/`. Agent in `src/agent/`. REPL in `src/repl/` (deprecated). Config schema in `src/config/schema.ts`.
 - **packages/core** - Timeline data structures (`src/timeline/`), effects (`src/effects/`), FFmpeg export (`src/export/`). State managed with Zustand + Immer.
 - **packages/ai-providers** - Pluggable AI providers. Abstract interface in `src/interface/`. Registry for capability matching. Each provider in its own directory.
-- **packages/mcp-server** - MCP server for Claude Desktop/Cursor. Tools, resources, and prompts in respective directories.
+- **packages/mcp-server** - MCP server for Claude Desktop/Cursor. Published as `@vibeframe/mcp-server` on npm. Bundled with esbuild (single file, workspace deps inlined). Tools, resources, and prompts in respective directories.
 - **packages/ui** - Shared React components (Radix UI + Tailwind).
 - **apps/web** - Next.js 14 preview UI.
 
@@ -138,85 +168,26 @@ vibe agent -i "query" -v       # Non-interactive mode with verbose output
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`
 
-## Documentation Updates
+## Documentation
 
-After completing any feature, fix, or significant change, **always update**:
+Root-level docs:
 
-1. **docs/progress.md** - Add a dated entry with:
-   - Feature/fix name and description
-   - Problem solved (if applicable)
-   - Files modified/created
-   - Usage examples with CLI commands
-   - Verification steps
+| File | Purpose |
+|------|---------|
+| `README.md` | Public-facing intro, quick start, MCP setup |
+| `CLAUDE.md` | Developer guidance for Claude Code |
+| `ROADMAP.md` | Feature roadmap with `[x]` completion tracking |
+| `GUIDE.md` | CLI usage guide with examples |
+| `MODELS.md` | AI model SSOT (Single Source of Truth) |
 
-2. **docs/roadmap.md** - Mark completed items with `[x]` and update CLI status section if new commands were added.
+### Update Rules
 
-3. **docs/models.md** - Update when adding/changing AI providers or models:
-   - Keep this as the SSOT for model information
-   - Update provider tables, env keys, CLI options
-   - Update Quick Reference section
+After completing any feature or fix, update:
 
-4. **README.md** - Keep in sync with CLAUDE.md for public-facing info:
-   - Tool counts (total tools, per-category counts)
-   - Test counts (run `pnpm test` to verify)
-   - Feature highlights and CLI examples
-   - Project structure description
-
-5. **apps/web/app/page.tsx** (Landing page) - Keep in sync on every version bump or feature change:
-   - Version badge (e.g., `v0.13.2`) — must match `package.json` version
-   - Tool counts (total tools, "+N more tools")
-   - Test counts
-   - Feature descriptions and provider counts
-
-## CRITICAL: AI Model Information Rules
-
-**`docs/models.md` is the Single Source of Truth (SSOT) for all AI model information.**
-
-### Rules
-
-1. **NEVER duplicate model tables** - Other docs must link to `models.md`, not copy tables
-2. **Update models.md FIRST** - When adding/changing providers or models, update `models.md` before any code
-3. **Code comments reference models.md** - Provider files should include `// See docs/models.md`
-
-### Checklist for AI Provider Changes
-
-- [ ] Updated `docs/models.md` with new model/provider info
-- [ ] Verified no duplicate model tables in `docs/guide.md`
-- [ ] Added/updated code comments referencing `docs/models.md`
-- [ ] Updated environment variable documentation in `models.md`
-
-### What Goes Where
-
-| Information | Location | Notes |
-|-------------|----------|-------|
-| Model names, IDs, capabilities | `docs/models.md` | SSOT |
-| Environment variables | `docs/models.md` | SSOT |
-| CLI usage examples | `docs/guide.md` | Link to models.md for model info |
-| API implementation details | Code comments | Reference models.md |
-
-## Documentation Consistency Rules
-
-When writing or updating documentation (especially `docs/guide.md`):
-
-1. **Filename Consistency**: If an example generates a file, subsequent examples must use the SAME filename
-   - Bad: `generate image` → `sunset.png`, then `add a-sunset-landscape.png`
-   - Good: `generate image` → `sunset.png`, then `add sunset.png`
-
-2. **Version Numbers**: Use `0.2.x` format instead of exact versions to reduce maintenance
-
-3. **ID Examples**: When showing IDs like `source-1`, `clip-1`:
-   - Add a note that these are simplified examples
-   - Real IDs are timestamp-based: `1770107336723-xxxxxxxx`
-
-4. **Test Examples**: Before documenting a workflow, actually run it to verify:
-   - Commands work as shown
-   - Output messages match
-   - File names are consistent throughout
-
-5. **Cross-Reference**: When updating CLI commands, also update:
-   - `docs/guide.md` - User-facing documentation
-   - `docs/roadmap.md` - Feature status
-   - Command `--help` text
+1. **`ROADMAP.md`** - Mark completed items with `[x]`, add new CLI commands to status section
+2. **`MODELS.md`** - Update when adding/changing AI providers or models (SSOT — never duplicate model tables elsewhere)
+3. **`README.md`** - Keep tool counts, test counts, feature highlights in sync
+4. **`apps/web/app/page.tsx`** - Keep version badge and feature counts in sync
 
 ## CLI ↔ Agent Tool Synchronization
 
@@ -263,8 +234,7 @@ When adding new AI CLI commands:
 - `packages/cli/src/commands/ai.ts` - CLI command + exported function
 - `packages/cli/src/agent/tools/ai.ts` - Agent tool wrapper (if applicable)
 - `CLAUDE.md` - Update tool counts
-- `docs/roadmap.md` - Update Agent tools section
-- `docs/progress.md` - Document the change
+- `ROADMAP.md` - Mark `[x]` and update CLI status section
 
 ### Current Agent AI Tools (14)
 
@@ -369,7 +339,7 @@ Copy `.env.example` to `.env`. Each AI provider has its own API key:
 
 ## AI Provider Models
 
-See **[docs/models.md](docs/models.md)** for the complete SSOT (Single Source of Truth) on all AI models.
+See **[MODELS.md](MODELS.md)** for the complete SSOT (Single Source of Truth) on all AI models.
 
 Quick summary:
 - **Agent LLM**: OpenAI GPT-4o, Claude Sonnet 4.6, Gemini 2.0 Flash, xAI Grok-3, Ollama
