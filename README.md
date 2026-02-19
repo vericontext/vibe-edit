@@ -3,7 +3,7 @@
 **AI-native video editing. CLI-first. MCP-ready.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-281%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-264%20passing-brightgreen.svg)]()
 
 > Edit videos with natural language. No timeline clicking. No export dialogs. Just tell the AI what you want.
 
@@ -111,10 +111,7 @@ vibe ai script-to-video "A morning routine of a startup founder with 3 scenes...
 Extract the best moments from long-form content:
 
 ```bash
-vibe ai highlights interview.mp4 \
-  -d 90 \              # 90-second highlight reel
-  --criteria emotional \  # Focus on emotional moments
-  -p highlights.vibe.json
+vibe ai highlights interview.mp4 -d 90 --criteria emotional -p highlights.vibe.json
 ```
 
 ### B-Roll Matcher
@@ -198,7 +195,7 @@ Add to `.cursor/mcp.json` in your workspace:
 Then just ask your AI assistant:
 > "Create a new video project called 'Demo', add the intro.mp4 file, and trim it to 10 seconds"
 
-**13 Tools:** `project_create`, `project_info`, `timeline_add_source`, `timeline_add_clip`, `timeline_split_clip`, `timeline_trim_clip`, `timeline_move_clip`, `timeline_delete_clip`, `timeline_duplicate_clip`, `timeline_add_effect`, `timeline_add_track`, `timeline_list`
+**12 Tools:** `project_create`, `project_info`, `timeline_add_source`, `timeline_add_clip`, `timeline_split_clip`, `timeline_trim_clip`, `timeline_move_clip`, `timeline_delete_clip`, `timeline_duplicate_clip`, `timeline_add_effect`, `timeline_add_track`, `timeline_list`
 
 **5 Resources:** `vibe://project/current`, `vibe://project/clips`, `vibe://project/sources`, `vibe://project/tracks`, `vibe://project/settings`
 
@@ -266,7 +263,7 @@ vibe ai viral <project>              # Platform optimization
 |----------|-----------|---------|
 | **Agent LLM** | OpenAI, Claude, Gemini, xAI, Ollama | GPT-4o |
 | **Image** | Gemini, OpenAI, Stability | Gemini Nano Banana |
-| **Video** | Kling, Runway, Veo, xAI Grok | Kling v2.5 |
+| **Video** | Runway, Kling, Veo, xAI Grok | Runway Gen-4 |
 | **Audio** | ElevenLabs, Whisper | - |
 
 **Required API Keys:** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `ELEVENLABS_API_KEY`, `RUNWAY_API_SECRET`, `KLING_API_KEY`, `XAI_API_KEY`, `STABILITY_API_KEY`
@@ -283,7 +280,7 @@ vibeframe/
 ├── MODELS.md              # AI models reference (SSOT)
 ├── apps/web/              # Next.js web app (preview UI)
 ├── packages/
-│   ├── cli/               # Command-line interface (281 tests, 48 tools)
+│   ├── cli/               # Command-line interface (264 tests, 48 tools)
 │   ├── core/              # Timeline data structures
 │   ├── ai-providers/      # AI provider plugins
 │   ├── mcp-server/        # MCP server (npm: @vibeframe/mcp-server)
@@ -327,7 +324,7 @@ For teams and production workloads, **VibeFrame Cloud** (coming soon) will offer
 ```bash
 pnpm dev       # Start dev server
 pnpm build     # Build all packages
-pnpm test      # Run tests (281 passing)
+pnpm test      # Run tests (264 passing)
 pnpm lint      # Lint code
 ```
 
