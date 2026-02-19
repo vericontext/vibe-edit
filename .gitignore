@@ -41,6 +41,17 @@ demo-output/
 docker/test-output/
 promo/
 tiktok/
+test-output/
+viral-output/
+generated-*.png
+generated-*.mp4
+kling-*.mp4
+
+# Media files in wrong locations
+packages/cli/*.mp3
+
+# Docs media (regenerable)
+docs/*.mp4
 
 # Internal docs
 ROADMAP-CLOUD.md
