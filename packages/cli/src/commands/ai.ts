@@ -1180,7 +1180,7 @@ aiCommand
   .command("video")
   .description("Generate video using AI (Runway, Kling, or Veo)")
   .argument("<prompt>", "Text prompt describing the video")
-  .option("-p, --provider <provider>", "Provider: runway, kling, veo", "kling")
+  .option("-p, --provider <provider>", "Provider: runway, kling, veo", "runway")
   .option("-k, --api-key <key>", "API key (or set RUNWAY_API_SECRET / KLING_API_KEY / GOOGLE_API_KEY env)")
   .option("-o, --output <path>", "Output file path (downloads video)")
   .option("-i, --image <path>", "Reference image for image-to-video")
@@ -1349,10 +1349,12 @@ aiCommand
         const gemini = new GeminiProvider();
         await gemini.initialize({ apiKey });
 
+        // Veo 3.1 supports duration 6 or 8 seconds only
+        const veoDuration = parseInt(options.duration) <= 6 ? 6 : 8;
         result = await gemini.generateVideo(prompt, {
           prompt,
           referenceImage,
-          duration: parseInt(options.duration) as 5 | 8,
+          duration: veoDuration,
           aspectRatio: options.ratio as "16:9" | "9:16",
           model: "veo-3.1-fast-generate-preview",
         });
@@ -5594,7 +5596,35 @@ aiCommand
       }
 
       // Load project
-      const filePath = resolve(process.cwd(), projectPath);
+      let filePath = resolve(process.cwd(), projectPath);
+      // If directory, look for project.vibe.json inside
+      const { statSync } = await import("node:fs");
+      try {
+        if (statSync(filePath).isDirectory()) {
+          const candidates = ["project.vibe.json", ".vibe.json"];
+          let found = false;
+          for (const candidate of candidates) {
+            const candidatePath = resolve(filePath, candidate);
+            if (existsSync(candidatePath)) {
+              filePath = candidatePath;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            // Try any .vibe.json file in the directory
+            const { readdirSync } = await import("node:fs");
+            const files = readdirSync(filePath).filter((f: string) => f.endsWith(".vibe.json"));
+            if (files.length > 0) {
+              filePath = resolve(filePath, files[0]);
+            } else {
+              console.error(chalk.red(`No .vibe.json project file found in: ${filePath}`));
+              process.exit(1);
+            }
+          }
+        }
+      } catch { /* not a directory, treat as file */ }
+
       if (!existsSync(filePath)) {
         console.error(chalk.red(`Project file not found: ${filePath}`));
         process.exit(1);
@@ -6306,19 +6336,35 @@ Analyze both what is SHOWN (visual cues, actions, expressions) and what is SAID 
               process.exit(1);
             }
 
-            tempAudioPath = `/tmp/vibe_highlight_audio_${Date.now()}.wav`;
-            await execAsync(
-              `ffmpeg -i "${absPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${tempAudioPath}" -y`,
-              { maxBuffer: 50 * 1024 * 1024 }
+            // Check if video has an audio stream
+            const { stdout: probeOut } = await execAsync(
+              `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${absPath}"`
             );
-            audioPath = tempAudioPath;
+            const hasAudio = probeOut.trim().length > 0;
+
+            if (!hasAudio) {
+              audioSpinner.fail(chalk.yellow("Video has no audio track — cannot use Whisper transcription"));
+              console.log(chalk.yellow("\n⚠ This video has no audio stream."));
+              console.log(chalk.dim("  Use --use-gemini flag for visual-only analysis of videos without audio."));
+              console.log(chalk.dim("  Example: vibe ai highlights video.mp4 --use-gemini\n"));
+              process.exit(1);
+            } else {
+              tempAudioPath = `/tmp/vibe_highlight_audio_${Date.now()}.wav`;
+              await execAsync(
+                `ffmpeg -i "${absPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${tempAudioPath}" -y`,
+                { maxBuffer: 50 * 1024 * 1024 }
+              );
+              audioPath = tempAudioPath;
+            }
 
             // Get video duration
             const durationCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${absPath}"`;
             const { stdout: durationOut } = await execAsync(durationCmd);
             sourceDuration = parseFloat(durationOut.trim());
 
-            audioSpinner.succeed(chalk.green(`Extracted audio (${formatTime(sourceDuration)} total duration)`));
+            if (hasAudio) {
+              audioSpinner.succeed(chalk.green(`Extracted audio (${formatTime(sourceDuration)} total duration)`));
+            }
           } catch (error) {
             audioSpinner.fail(chalk.red("Failed to extract audio"));
             console.error(error);
@@ -7320,8 +7366,20 @@ aiCommand
 
       const absPath = resolve(process.cwd(), videoPath);
 
-      // Step 1: Extract audio
+      // Step 1: Check for audio stream
       const spinner = ora("Extracting audio...").start();
+
+      const { stdout: speedRampProbe } = await execAsync(
+        `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${absPath}"`
+      );
+      if (!speedRampProbe.trim()) {
+        spinner.fail(chalk.yellow("Video has no audio track — cannot use Whisper transcription"));
+        console.log(chalk.yellow("\n⚠ This video has no audio stream."));
+        console.log(chalk.dim("  Speed ramping requires audio for content-aware analysis."));
+        console.log(chalk.dim("  Please use a video with an audio track.\n"));
+        process.exit(1);
+      }
+
       const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
 
       await execAsync(`ffmpeg -i "${absPath}" -vn -acodec libmp3lame -q:a 2 "${tempAudio}" -y`);
@@ -7742,10 +7800,22 @@ Analyze both VISUALS (expressions, actions, scene changes) and AUDIO (speech, re
           process.exit(1);
         }
 
-        // Step 1: Extract audio and transcribe
+        // Step 1: Check for audio stream and extract
         const spinner = ora("Extracting audio...").start();
-        const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
 
+        // Check if video has an audio stream
+        const { stdout: autoShortsProbe } = await execAsync(
+          `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${absPath}"`
+        );
+        if (!autoShortsProbe.trim()) {
+          spinner.fail(chalk.yellow("Video has no audio track — cannot use Whisper transcription"));
+          console.log(chalk.yellow("\n⚠ This video has no audio stream."));
+          console.log(chalk.dim("  Use --use-gemini flag for visual-only analysis of videos without audio."));
+          console.log(chalk.dim("  Example: vibe ai auto-shorts video.mp4 --use-gemini\n"));
+          process.exit(1);
+        }
+
+        const tempAudio = absPath.replace(/(\.[^.]+)$/, "-temp-audio.mp3");
         await execAsync(`ffmpeg -i "${absPath}" -vn -acodec libmp3lame -q:a 2 "${tempAudio}" -y`);
 
         spinner.text = "Transcribing audio...";

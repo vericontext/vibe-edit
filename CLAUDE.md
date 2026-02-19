@@ -11,12 +11,13 @@ VibeFrame is an AI-native video editing tool. CLI-first, MCP-ready. It uses natu
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (220 passing)
+pnpm test             # Run all tests (264 passing)
 pnpm lint             # Lint all packages
 pnpm format           # Format code with Prettier
 
 # Run CLI directly
-pnpm vibe             # Start Agent mode (default)
+pnpm vibe             # Start Agent mode (default, no-args only)
+pnpm vibe agent       # Start Agent mode with options (e.g., -p gemini)
 pnpm vibe --help      # Show CLI commands
 
 # Run MCP server
@@ -46,7 +47,7 @@ AI Providers (pluggable: OpenAI, Claude, Gemini, ElevenLabs, Runway, Kling, xAI 
        ↓
 packages/cli/             CLI implementation (TypeScript/Commander.js)
        ↓
-scripts/install.sh        User installation via curl | bash
+scripts/install.sh        User installation via curl | bash (copied to apps/web/public/ on build)
        ↓
 Agent (vibe)              Natural language → LLM tool calling → autonomous execution
 ```
@@ -105,19 +106,18 @@ packages/cli/src/agent/
 
 **Usage:**
 ```bash
-vibe                           # Start Agent mode (default: OpenAI)
-vibe -p claude                 # Use Claude
-vibe -p gemini                 # Use Gemini
-vibe -p ollama                 # Use local Ollama
-vibe -p xai                    # Use xAI Grok
-vibe --confirm                 # Confirm before each tool execution
-vibe -i "query" -v             # Non-interactive mode with verbose output
-vibe agent                     # Explicit agent command (same as `vibe`)
+vibe agent                     # Start Agent mode (default: OpenAI)
+vibe agent -p claude           # Use Claude
+vibe agent -p gemini           # Use Gemini
+vibe agent -p ollama           # Use local Ollama
+vibe agent -p xai              # Use xAI Grok
+vibe agent --confirm           # Confirm before each tool execution
+vibe agent -i "query" -v       # Non-interactive mode with verbose output
 ```
 
 ### Package Structure
 
-- **.claude/skills/** - Claude Code Skills. Each skill has `SKILL.md` (API docs) + `scripts/` (Python helpers). Providers: openai-api, claude-api, gemini-image, elevenlabs-tts, stability-image, replicate-ai, runway-video, kling-video, remotion-motion.
+- **.claude/skills/** - Claude Code Skills. Each skill has `SKILL.md` (API docs) + `scripts/` (Python helpers). Providers: openai-api, claude-api, gemini-image, gemini-video, elevenlabs-tts, stability-image, replicate-ai, runway-video, kling-video, remotion-motion.
 - **packages/cli** - Main CLI interface. Entry: `src/index.ts`. Commands in `src/commands/`. Agent in `src/agent/`. REPL in `src/repl/` (deprecated). Config schema in `src/config/schema.ts`.
 - **packages/core** - Timeline data structures (`src/timeline/`), effects (`src/effects/`), FFmpeg export (`src/export/`). State managed with Zustand + Immer.
 - **packages/ai-providers** - Pluggable AI providers. Abstract interface in `src/interface/`. Registry for capability matching. Each provider in its own directory.
@@ -128,7 +128,7 @@ vibe agent                     # Explicit agent command (same as `vibe`)
 ### Key Conventions
 
 - **Monorepo**: Turborepo + pnpm workspaces. Use `workspace:*` for internal deps.
-- **ESM**: All packages use ES modules.
+- **ESM**: All packages use ES modules (`packages/ui` and `apps/web` rely on bundler/framework ESM handling).
 - **TypeScript**: Strict mode. Run `pnpm build` to compile.
 - **Project files**: `.vibe.json` format stores project state (sources, tracks, clips, effects).
 - **Time units**: All times in seconds (floats allowed).
@@ -372,7 +372,7 @@ Copy `.env.example` to `.env`. Each AI provider has its own API key:
 See **[docs/models.md](docs/models.md)** for the complete SSOT (Single Source of Truth) on all AI models.
 
 Quick summary:
-- **Agent LLM**: OpenAI GPT-4o, Claude Sonnet 4, Gemini 2.0 Flash, xAI Grok-3, Ollama
+- **Agent LLM**: OpenAI GPT-4o, Claude Sonnet 4.6, Gemini 2.0 Flash, xAI Grok-3, Ollama
 - **Text-to-Image**: OpenAI GPT Image 1.5, Gemini Nano Banana (Flash/Pro), Stability SDXL
 - **Text-to-Video**: Kling v2.5/v2.6, Veo 3.0/3.1, Runway Gen-4, xAI Grok Imagine
 - **Audio**: ElevenLabs (TTS, SFX), Whisper (transcription), Replicate (music)

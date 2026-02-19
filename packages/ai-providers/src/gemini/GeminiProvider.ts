@@ -185,7 +185,7 @@ export class GeminiProvider implements AIProvider {
         }],
         parameters: {
           aspectRatio: aspectRatioMap[options?.aspectRatio || "16:9"] || "16:9",
-          durationSeconds: options?.duration || 6,
+          durationSeconds: Math.max(4, Math.min(8, options?.duration || 8)),
         },
       };
 
@@ -208,11 +208,12 @@ export class GeminiProvider implements AIProvider {
       }
 
       const response = await fetch(
-        `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${model}:predictLongRunning`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "x-goog-api-key": this.apiKey,
           },
           body: JSON.stringify(requestBody),
         }

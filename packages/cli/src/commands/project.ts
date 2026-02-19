@@ -30,25 +30,39 @@ export const projectCommand = new Command("project")
 projectCommand
   .command("create")
   .description("Create a new project")
-  .argument("<name>", "Project name")
-  .option("-o, --output <path>", "Output file path", "./project.vibe.json")
+  .argument("<name>", "Project name or path (e.g., 'my-project' or 'output/my-project')")
+  .option("-o, --output <path>", "Output file path (overrides name-based path)")
   .option("-r, --ratio <ratio>", "Aspect ratio (16:9, 9:16, 1:1, 4:5)", "16:9")
   .option("-f, --fps <fps>", "Frame rate", "30")
   .action(async (name: string, options) => {
     const spinner = ora("Creating project...").start();
 
     try {
-      const project = new Project(name);
+      // If name contains a path separator, treat it as a directory path
+      const projectName = name.includes("/") ? name.split("/").pop()! : name;
+      const project = new Project(projectName);
       project.setAspectRatio(options.ratio);
       project.setFrameRate(parseInt(options.fps, 10));
 
-      const outputPath = resolve(process.cwd(), options.output);
+      let outputPath: string;
+      if (options.output) {
+        outputPath = resolve(process.cwd(), options.output);
+      } else if (name.includes("/")) {
+        // Name contains path — create directory and put project.vibe.json inside
+        const dirPath = resolve(process.cwd(), name);
+        const { mkdir } = await import("node:fs/promises");
+        await mkdir(dirPath, { recursive: true });
+        outputPath = resolve(dirPath, "project.vibe.json");
+      } else {
+        outputPath = resolve(process.cwd(), "project.vibe.json");
+      }
+
       const data = JSON.stringify(project.toJSON(), null, 2);
       await writeFile(outputPath, data, "utf-8");
 
       spinner.succeed(chalk.green(`Project created: ${outputPath}`));
       console.log();
-      console.log(chalk.dim("  Name:"), name);
+      console.log(chalk.dim("  Name:"), projectName);
       console.log(chalk.dim("  Aspect Ratio:"), options.ratio);
       console.log(chalk.dim("  Frame Rate:"), options.fps, "fps");
     } catch (error) {
