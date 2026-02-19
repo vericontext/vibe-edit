@@ -1180,7 +1180,7 @@ aiCommand
   .command("video")
   .description("Generate video using AI (Runway, Kling, or Veo)")
   .argument("<prompt>", "Text prompt describing the video")
-  .option("-p, --provider <provider>", "Provider: runway, kling, veo", "runway")
+  .option("-p, --provider <provider>", "Provider: kling, runway, veo", "kling")
   .option("-k, --api-key <key>", "API key (or set RUNWAY_API_SECRET / KLING_API_KEY / GOOGLE_API_KEY env)")
   .option("-o, --output <path>", "Output file path (downloads video)")
   .option("-i, --image <path>", "Reference image for image-to-video")

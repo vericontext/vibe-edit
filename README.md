@@ -243,7 +243,7 @@ vibe ai tts "text" -o voice.mp3      # Text-to-speech (ElevenLabs)
 vibe ai sfx "explosion" -o sfx.mp3   # Sound effects (ElevenLabs)
 vibe ai image "prompt" -o img.png    # Image (Gemini default, -p openai)
 vibe ai gemini-edit img.png "edit"   # Multi-image editing (Gemini)
-vibe ai video "prompt" -o vid.mp4    # Video (Runway default)
+vibe ai video "prompt" -o vid.mp4    # Video (Kling default)
 vibe ai kling "prompt" -o vid.mp4    # Video (Kling AI)
 
 # AI Pipelines
@@ -263,7 +263,7 @@ vibe ai viral <project>              # Platform optimization
 |----------|-----------|---------|
 | **Agent LLM** | OpenAI, Claude, Gemini, xAI, Ollama | GPT-4o |
 | **Image** | Gemini, OpenAI, Stability | Gemini Nano Banana |
-| **Video** | Runway, Kling, Veo, xAI Grok | Runway Gen-4 |
+| **Video** | Kling, Runway, Veo, xAI Grok | Kling v2.5 |
 | **Audio** | ElevenLabs, Whisper | - |
 
 **Required API Keys:** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `ELEVENLABS_API_KEY`, `RUNWAY_API_SECRET`, `KLING_API_KEY`, `XAI_API_KEY`, `STABILITY_API_KEY`
