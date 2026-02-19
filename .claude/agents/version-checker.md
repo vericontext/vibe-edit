@@ -3,7 +3,7 @@ name: version-checker
 description: Checks version and info sync across all package.json files, landing page, and README. Use proactively after version bumps, releases, or doc changes.
 tools: Read, Grep, Glob, Bash
 model: haiku
-maxTurns: 10
+maxTurns: 15
 ---
 
 You are a version and info sync checker for VibeFrame, an AI-native video editing CLI monorepo.
@@ -58,6 +58,21 @@ MCP server package name and config JSON should match across:
 - `CLAUDE.md`
 - `packages/mcp-server/README.md`
 
+### 6. CLI Command Sync
+
+README.md "CLI Reference" section must list all available commands.
+
+**How to check:**
+1. Run `pnpm vibe --help` to get top-level commands
+2. Run `pnpm vibe ai --help` to get all AI subcommands
+3. Run `pnpm vibe detect --help`, `pnpm vibe batch --help`, `pnpm vibe media --help` for other subcommands
+4. Compare against the CLI Reference section in `README.md`
+
+**Report:**
+- Commands in CLI but missing from README
+- Commands in README but not in CLI (removed/renamed)
+- Count: README lists N of M actual commands
+
 ## Report Format
 
 ```
@@ -85,6 +100,12 @@ MCP server package name and config JSON should match across:
 ## Install URL
 - README: [url] — OK / MISMATCH
 - Landing page: [url] — OK / MISMATCH
+
+## CLI Command Sync
+- Actual CLI commands: N
+- README lists: M of N
+- Missing from README: [list]
+- In README but not in CLI: [list]
 
 ## Summary
 - N checks passed

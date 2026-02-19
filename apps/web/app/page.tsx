@@ -272,7 +272,7 @@ export default function LandingPage() {
             <FeatureCard
               icon={<Terminal className="w-6 h-6" />}
               title="CLI-First"
-              description="Full video editing from the command line. 264 tests. Zero GUI required."
+              description="Full video editing from the command line. 256 tests. Zero GUI required."
               gradient="from-blue-500 to-cyan-500"
             />
             <FeatureCard
@@ -289,7 +289,7 @@ export default function LandingPage() {
             />
             <FeatureCard
               icon={<Layers className="w-6 h-6" />}
-              title="12 AI Providers"
+              title="11 AI Providers"
               description="OpenAI, Claude, Gemini, ElevenLabs, Runway, Kling, Veo, Stability, Replicate, xAI Grok, Ollama."
               gradient="from-green-500 to-emerald-500"
             />

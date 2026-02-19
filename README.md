@@ -3,7 +3,7 @@
 **AI-native video editing. CLI-first. MCP-ready.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-264%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-256%20passing-brightgreen.svg)]()
 
 > Edit videos with natural language. No timeline clicking. No export dialogs. Just tell the AI what you want.
 
@@ -208,6 +208,11 @@ Then just ask your AI assistant:
 ## CLI Reference
 
 ```bash
+# Agent (default entry point)
+vibe                                 # Start Agent mode (natural language)
+vibe agent -p claude                 # Use specific LLM provider
+vibe setup                           # Configure LLM provider & API keys
+
 # Project
 vibe project create <name>           # Create project
 vibe project info <file>             # Show info
@@ -222,10 +227,16 @@ vibe timeline move <project> <clip-id> -t <time>
 vibe timeline delete <project> <clip-id>
 vibe timeline list <project>
 
+# Media
+vibe media info <file>               # Media file information
+vibe media duration <file>           # Media duration in seconds
+
 # Batch
 vibe batch import <project> <dir>    # Import directory
 vibe batch concat <project> --all    # Concatenate clips
 vibe batch apply-effect <project> fadeIn --all
+vibe batch remove-clips <project>    # Remove multiple clips
+vibe batch info <project>            # Batch processing stats
 
 # Detection (FFmpeg-based, no API needed)
 vibe detect scenes <video>           # Scene detection
@@ -235,22 +246,71 @@ vibe detect beats <audio>            # Beat detection
 # Export
 vibe export <project> -o out.mp4 -p high
 
-# AI Commands
-vibe ai providers                    # List AI providers
-vibe ai transcribe <audio>           # Whisper transcription
-vibe ai edit <project> "instruction" # Natural language edit
+# AI — Generation
+vibe ai image "prompt" -o img.png    # Image (Gemini default, -p openai/stability)
+vibe ai gemini "prompt" -o img.png   # Image (Gemini Nano Banana)
+vibe ai sd "prompt" -o img.png       # Image (Stable Diffusion)
+vibe ai video "prompt" -o vid.mp4    # Video (Kling default, -p runway/veo)
+vibe ai kling "prompt" -o vid.mp4    # Video (Kling AI)
 vibe ai tts "text" -o voice.mp3      # Text-to-speech (ElevenLabs)
 vibe ai sfx "explosion" -o sfx.mp3   # Sound effects (ElevenLabs)
-vibe ai image "prompt" -o img.png    # Image (Gemini default, -p openai)
-vibe ai gemini-edit img.png "edit"   # Multi-image editing (Gemini)
-vibe ai video "prompt" -o vid.mp4    # Video (Kling default)
-vibe ai kling "prompt" -o vid.mp4    # Video (Kling AI)
+vibe ai music "prompt" -o bgm.mp3    # Music generation (Replicate)
+vibe ai motion "description"         # Motion graphics (Remotion)
+vibe ai storyboard "content"         # Script → storyboard (Claude)
+vibe ai thumbnail "description"      # Generate thumbnail (DALL-E)
+vibe ai background "description"     # Generate background (DALL-E)
 
-# AI Pipelines
+# AI — Image Editing
+vibe ai gemini-edit img.png "edit"   # Multi-image editing (Gemini)
+vibe ai sd-upscale <image>           # Upscale image (Stability)
+vibe ai sd-remove-bg <image>         # Remove background (Stability)
+vibe ai sd-img2img <image> "prompt"  # Image-to-image (Stability)
+vibe ai sd-replace <img> <s> <r>     # Search & replace objects (Stability)
+vibe ai sd-outpaint <image>          # Extend image canvas (Stability)
+
+# AI — Video Tools
+vibe ai video-extend <video-id>      # Extend video duration (Kling)
+vibe ai video-upscale <video>        # Upscale video resolution
+vibe ai video-interpolate <video>    # Slow motion / frame interpolation
+vibe ai video-inpaint <video>        # Remove objects from video
+vibe ai fill-gaps <project>          # Fill timeline gaps with AI video
+vibe ai style-transfer <video>       # Artistic style transfer (Replicate)
+vibe ai track-object <video>         # Object tracking (Replicate SAM-2)
+
+# AI — Audio Tools
+vibe ai voices                       # List ElevenLabs voices
+vibe ai voice-clone [samples...]     # Clone voice (ElevenLabs)
+vibe ai isolate <audio>              # Isolate vocals
+vibe ai audio-restore <audio>        # Denoise & enhance audio
+vibe ai duck <music>                 # Auto-duck music under voice
+vibe ai dub <media>                  # Dub to another language
+
+# AI — Video Post-Production
+vibe ai edit <project> "instruction" # Natural language edit
+vibe ai suggest <project> "query"    # AI edit suggestions (Gemini)
+vibe ai grade <video>                # AI color grading (Claude + FFmpeg)
+vibe ai text-overlay <video>         # Text overlays (FFmpeg drawtext)
+vibe ai reframe <video>              # Auto-reframe aspect ratio
+vibe ai speed-ramp <video>           # Content-aware speed ramping
+vibe ai narrate <input>              # AI narration for video
+vibe ai review <video>               # AI video review & auto-fix (Gemini)
+vibe ai regenerate-scene <dir>       # Regenerate scene in project
+
+# AI — Pipelines
 vibe ai script-to-video <script>     # Full video from text
 vibe ai highlights <media>           # Extract highlights
-vibe ai b-roll <narration>           # Match B-roll
+vibe ai auto-shorts <video>          # Auto-generate shorts
+vibe ai b-roll <narration>           # Match B-roll to narration
 vibe ai viral <project>              # Platform optimization
+
+# AI — Analysis & Status
+vibe ai providers                    # List AI providers
+vibe ai transcribe <audio>           # Whisper transcription
+vibe ai gemini-video <source> "q"    # Video analysis (Gemini)
+vibe ai video-status <task-id>       # Check Runway status
+vibe ai video-cancel <task-id>       # Cancel Runway generation
+vibe ai kling-status <task-id>       # Check Kling status
+vibe ai music-status <task-id>       # Check music generation status
 ```
 
 ---
@@ -280,7 +340,7 @@ vibeframe/
 ├── MODELS.md              # AI models reference (SSOT)
 ├── apps/web/              # Next.js web app (preview UI)
 ├── packages/
-│   ├── cli/               # Command-line interface (264 tests, 50 tools)
+│   ├── cli/               # Command-line interface (256 tests, 50 tools)
 │   ├── core/              # Timeline data structures
 │   ├── ai-providers/      # AI provider plugins
 │   ├── mcp-server/        # MCP server (npm: @vibeframe/mcp-server)
@@ -324,7 +384,7 @@ For teams and production workloads, **VibeFrame Cloud** (coming soon) will offer
 ```bash
 pnpm dev       # Start dev server
 pnpm build     # Build all packages
-pnpm test      # Run tests (264 passing)
+pnpm test      # Run tests (256 passing)
 pnpm lint      # Lint code
 ```
 
