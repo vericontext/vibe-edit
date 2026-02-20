@@ -9768,41 +9768,73 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
       await writeFile(srtPath, srtContent);
 
       // Step 4: Get video resolution for auto font size
-      const { height } = await getVideoResolution(videoPath);
+      const { width, height } = await getVideoResolution(videoPath);
       const fontSize = customFontSize || Math.round(height / 18);
 
       // Step 5: Check FFmpeg subtitle filter support
       const { stdout: filterList } = await execAsync("ffmpeg -filters 2>/dev/null", { maxBuffer: 10 * 1024 * 1024 });
       const hasSubtitles = filterList.includes("subtitles");
-      const hasDrawtext = filterList.includes("drawtext");
 
-      if (!hasSubtitles && !hasDrawtext) {
-        // Save SRT even though burn failed — user can still use it
-        const outputDir = dirname(outputPath);
-        const outputSrtPath = join(outputDir, basename(outputPath, extname(outputPath)) + ".srt");
-        await writeFile(outputSrtPath, srtContent);
-
-        const isM = process.platform === "darwin";
-        const fix = isM
-          ? "brew uninstall ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass --with-freetype"
-          : "sudo apt install libass-dev && sudo apt install --reinstall ffmpeg";
-        return {
-          success: false,
-          error: `FFmpeg missing subtitle support (libass/freetype).\nSRT saved to: ${outputSrtPath}\nFix: ${fix}`,
-        };
-      }
-
-      // Step 6: Burn captions with FFmpeg
-      const forceStyle = getCaptionForceStyle(style, fontSize, fontColor, position);
-      const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/:/g, "\\:");
-      let cmd: string;
+      // Step 6: Burn captions
       if (hasSubtitles) {
-        cmd = `ffmpeg -i "${videoPath}" -vf "subtitles=${escapedSrtPath}:force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
+        // Fast path: FFmpeg subtitles filter (requires libass)
+        const forceStyle = getCaptionForceStyle(style, fontSize, fontColor, position);
+        const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+        const cmd = `ffmpeg -i "${videoPath}" -vf "subtitles=${escapedSrtPath}:force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
+        await execAsync(cmd, { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
       } else {
-        // Fallback: drawtext filter reads SRT line by line (simpler styling)
-        cmd = `ffmpeg -i "${videoPath}" -vf "drawtext=textfile='${escapedSrtPath}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=h-th-${position === "top" ? "h*0.85" : "30"}:borderw=3:bordercolor=black" -c:a copy "${outputPath}" -y`;
+        // Remotion fallback: render captions as transparent overlay, composite with FFmpeg
+        console.log("FFmpeg missing subtitles filter (libass) — using Remotion fallback...");
+        const { generateCaptionComponent, renderAndComposite, ensureRemotionInstalled } = await import("../utils/remotion.js");
+
+        const remotionErr = await ensureRemotionInstalled();
+        if (remotionErr) {
+          // Save SRT so the user still gets something
+          const outputDir = dirname(outputPath);
+          const outputSrtPath = join(outputDir, basename(outputPath, extname(outputPath)) + ".srt");
+          await writeFile(outputSrtPath, srtContent);
+          return { success: false, error: `${remotionErr}\nSRT saved to: ${outputSrtPath}` };
+        }
+
+        const videoDuration = await getVideoDuration(videoPath);
+        const fps = 30;
+        const durationInFrames = Math.ceil(videoDuration * fps);
+
+        const { code, name } = generateCaptionComponent({
+          segments: transcriptResult.segments.map((s) => ({
+            start: s.startTime,
+            end: s.endTime,
+            text: s.text,
+          })),
+          style,
+          fontSize,
+          fontColor,
+          position,
+          width,
+          height,
+        });
+
+        const renderResult = await renderAndComposite(
+          {
+            componentCode: code,
+            componentName: name,
+            width,
+            height,
+            fps,
+            durationInFrames,
+            outputPath,
+          },
+          videoPath,
+          outputPath,
+        );
+
+        if (!renderResult.success) {
+          const outputDir = dirname(outputPath);
+          const outputSrtPath = join(outputDir, basename(outputPath, extname(outputPath)) + ".srt");
+          await writeFile(outputSrtPath, srtContent);
+          return { success: false, error: `${renderResult.error}\nSRT saved to: ${outputSrtPath}` };
+        }
       }
-      await execAsync(cmd, { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
 
       // Copy SRT to output directory for user reference
       const outputDir = dirname(outputPath);

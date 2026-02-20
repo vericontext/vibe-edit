@@ -229,6 +229,124 @@ export async function compositeOverlay(options: CompositeOptions): Promise<Rende
   }
 }
 
+// ── Caption Component Generator ───────────────────────────────────────────
+
+export interface CaptionSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export type CaptionStylePreset = "bold" | "minimal" | "outline" | "karaoke";
+
+export interface GenerateCaptionComponentOptions {
+  segments: CaptionSegment[];
+  style: CaptionStylePreset;
+  fontSize: number;
+  fontColor: string;
+  position: "top" | "center" | "bottom";
+  width: number;
+  height: number;
+}
+
+/**
+ * Generate a Remotion TSX component that renders styled captions.
+ * No LLM call — purely programmatic from SRT segments + style config.
+ */
+export function generateCaptionComponent(options: GenerateCaptionComponentOptions): {
+  code: string;
+  name: string;
+} {
+  const { segments, style, fontSize, fontColor, position, width, height } = options;
+  const name = "CaptionOverlay";
+
+  // Serialize segments as a JSON array embedded in the TSX
+  const segmentsJSON = JSON.stringify(
+    segments.map((s) => ({ start: s.start, end: s.end, text: s.text })),
+  );
+
+  // Build CSS styles per preset
+  const styleMap: Record<CaptionStylePreset, string> = {
+    bold: `
+      fontWeight: "bold" as const,
+      color: "${fontColor === "yellow" ? "#FFFF00" : "#FFFFFF"}",
+      textShadow: "3px 3px 6px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.7)",
+      WebkitTextStroke: "1px rgba(0,0,0,0.5)",
+    `,
+    minimal: `
+      fontWeight: "normal" as const,
+      color: "#FFFFFF",
+      textShadow: "1px 1px 3px rgba(0,0,0,0.5)",
+    `,
+    outline: `
+      fontWeight: "bold" as const,
+      color: "#FFFFFF",
+      WebkitTextStroke: "2px #FF0000",
+      textShadow: "none",
+    `,
+    karaoke: `
+      fontWeight: "bold" as const,
+      color: "#00FFFF",
+      textShadow: "2px 2px 4px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.6)",
+    `,
+  };
+
+  const justifyContent =
+    position === "top" ? "flex-start" : position === "center" ? "center" : "flex-end";
+  const paddingDir = position === "top" ? "paddingTop" : position === "bottom" ? "paddingBottom" : "";
+  const paddingVal = position === "center" ? "" : `${paddingDir}: 40,`;
+
+  const code = `import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+
+interface Segment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+const segments: Segment[] = ${segmentsJSON};
+
+export const ${name} = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const currentTime = frame / fps;
+
+  const activeSegment = segments.find(
+    (s) => currentTime >= s.start && currentTime < s.end
+  );
+
+  if (!activeSegment) return <AbsoluteFill />;
+
+  return (
+    <AbsoluteFill
+      style={{
+        display: "flex",
+        justifyContent: "${justifyContent}",
+        alignItems: "center",
+        ${paddingVal}
+      }}
+    >
+      <div
+        style={{
+          fontSize: ${fontSize},
+          fontFamily: "Arial, Helvetica, sans-serif",
+          textAlign: "center" as const,
+          maxWidth: "${Math.round(width * 0.9)}px",
+          lineHeight: 1.3,
+          padding: "8px 16px",
+          ${styleMap[style]}
+        }}
+      >
+        {activeSegment.text}
+      </div>
+    </AbsoluteFill>
+  );
+};
+`;
+
+  return { code, name };
+}
+
 /**
  * Full pipeline: render motion graphic → composite onto base video.
  * If no base video, just renders the motion graphic.
