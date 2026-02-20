@@ -436,7 +436,7 @@ export function wrapComponentWithVideo(
   componentName: string,
   videoFileName: string,
 ): { code: string; name: string } {
-  const wrappedName = `VideoWrapped_${componentName}`;
+  const wrappedName = "VideoComposite";
 
   const code = `import { AbsoluteFill, Video, staticFile } from "remotion";
 ${componentCode}
