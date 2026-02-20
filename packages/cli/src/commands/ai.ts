@@ -697,8 +697,8 @@ export async function executeMotion(options: MotionCommandOptions): Promise<Moti
     return { success: true, codePath, componentName: component.name };
   }
 
-  // Render (and optionally composite)
-  const { ensureRemotionInstalled, renderAndComposite } = await import("../utils/remotion.js");
+  // Render (and optionally composite onto video)
+  const { ensureRemotionInstalled, renderMotion, wrapComponentWithVideo, renderWithEmbeddedVideo } = await import("../utils/remotion.js");
 
   const notInstalled = await ensureRemotionInstalled();
   if (notInstalled) {
@@ -706,31 +706,48 @@ export async function executeMotion(options: MotionCommandOptions): Promise<Moti
   }
 
   const baseVideo = options.video ? resolve(process.cwd(), options.video) : undefined;
-  const renderResult = await renderAndComposite(
-    {
-      componentCode: component.code,
-      componentName: component.name,
+
+  if (baseVideo) {
+    // Embed video inside the component (no transparency needed)
+    const videoFileName = "source_video.mp4";
+    const wrapped = wrapComponentWithVideo(component.code, component.name, videoFileName);
+
+    const renderResult = await renderWithEmbeddedVideo({
+      componentCode: wrapped.code,
+      componentName: wrapped.name,
       width,
       height,
       fps,
       durationInFrames: component.durationInFrames,
+      videoPath: baseVideo,
+      videoFileName,
       outputPath,
-    },
-    baseVideo,
-    baseVideo ? outputPath : undefined,
-  );
+    });
+
+    if (!renderResult.success) {
+      return { success: false, codePath, componentName: component.name, error: renderResult.error };
+    }
+
+    return { success: true, codePath, componentName: component.name, compositedPath: renderResult.outputPath };
+  }
+
+  // No base video — render standalone
+  const renderResult = await renderMotion({
+    componentCode: component.code,
+    componentName: component.name,
+    width,
+    height,
+    fps,
+    durationInFrames: component.durationInFrames,
+    outputPath,
+    transparent: false,
+  });
 
   if (!renderResult.success) {
     return { success: false, codePath, componentName: component.name, error: renderResult.error };
   }
 
-  return {
-    success: true,
-    codePath,
-    componentName: component.name,
-    renderedPath: baseVideo ? undefined : renderResult.outputPath,
-    compositedPath: baseVideo ? renderResult.outputPath : undefined,
-  };
+  return { success: true, codePath, componentName: component.name, renderedPath: renderResult.outputPath };
 }
 
 aiCommand
@@ -9914,7 +9931,7 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
       } else {
         // Remotion fallback: embed video + captions in a single Remotion composition
         console.log("FFmpeg missing subtitles filter (libass) — using Remotion fallback...");
-        const { generateCaptionComponent, renderCaptionedVideo, ensureRemotionInstalled } = await import("../utils/remotion.js");
+        const { generateCaptionComponent, renderWithEmbeddedVideo, ensureRemotionInstalled } = await import("../utils/remotion.js");
 
         const remotionErr = await ensureRemotionInstalled();
         if (remotionErr) {
@@ -9945,7 +9962,7 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
           videoFileName,
         });
 
-        const renderResult = await renderCaptionedVideo({
+        const renderResult = await renderWithEmbeddedVideo({
           componentCode: code,
           componentName: name,
           width,

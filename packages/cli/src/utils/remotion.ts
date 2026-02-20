@@ -427,11 +427,41 @@ export async function renderAndComposite(
 }
 
 /**
- * Render a Remotion caption component that embeds the video directly.
- * No transparency needed — the component includes <Video> + caption text.
+ * Wrap any Remotion component code to embed a video as background.
+ * Adds `<Video src={staticFile(videoFileName)}>` behind the existing component.
+ * Returns wrapped code with a new component name (prefixed with "VideoWrapped_").
+ */
+export function wrapComponentWithVideo(
+  componentCode: string,
+  componentName: string,
+  videoFileName: string,
+): { code: string; name: string } {
+  const wrappedName = `VideoWrapped_${componentName}`;
+
+  const code = `import { AbsoluteFill, Video, staticFile } from "remotion";
+${componentCode}
+
+export const ${wrappedName}: React.FC = () => {
+  return (
+    <AbsoluteFill>
+      <Video src={staticFile("${videoFileName}")} style={{ width: "100%", height: "100%" }} />
+      <AbsoluteFill>
+        <${componentName} />
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+`;
+
+  return { code, name: wrappedName };
+}
+
+/**
+ * Render a Remotion component that embeds the video directly.
+ * No transparency needed — the component includes <Video> + overlay content.
  * After rendering, copies audio from the original video to the output.
  */
-export async function renderCaptionedVideo(options: {
+export async function renderWithEmbeddedVideo(options: {
   componentCode: string;
   componentName: string;
   width: number;
@@ -496,7 +526,7 @@ export async function renderCaptionedVideo(options: {
     return { success: true, outputPath: options.outputPath };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return { success: false, error: `Remotion caption render failed: ${msg}` };
+    return { success: false, error: `Remotion embedded video render failed: ${msg}` };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
