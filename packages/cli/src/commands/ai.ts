@@ -9775,7 +9775,7 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
       const forceStyle = getCaptionForceStyle(style, fontSize, fontColor, position);
       // Escape colons and backslashes in srtPath for FFmpeg filter syntax
       const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/:/g, "\\:");
-      const cmd = `ffmpeg -i "${videoPath}" -vf "subtitles='${escapedSrtPath}':force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
+      const cmd = `ffmpeg -i "${videoPath}" -vf "subtitles=${escapedSrtPath}:force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
       await execAsync(cmd, { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
 
       // Copy SRT to output directory for user reference

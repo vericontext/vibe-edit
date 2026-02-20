@@ -91,9 +91,9 @@ vibe export script-video.vibe.json final.mp4 -p high
 clear
 ```
 
-Download a sample video (TED Talk, ~2 min clip):
+Download a sample video (Tim Urban TED Talk — "Inside the Mind of a Procrastinator", ~2 min clip):
 ```bash
-curl -L -o /tmp/ted.mp4 "https://download.ted.com/talks/SimonSinek_2009X.mp4"
+curl -L -o /tmp/ted.mp4 "https://download.ted.com/talks/TimUrban_2016.mp4"
 ffmpeg -y -i /tmp/ted.mp4 -ss 00:00:30 -t 120 -c copy sample.mp4
 ```
 
@@ -102,8 +102,8 @@ ffmpeg -y -i /tmp/ted.mp4 -ss 00:00:30 -t 120 -c copy sample.mp4
 > **Other free sample videos to try:**
 > | Video | Content | Command |
 > |-------|---------|---------|
+> | Simon Sinek TED | How Great Leaders Inspire Action (~59MB) | `curl -L -o sample.mp4 "https://download.ted.com/talks/SimonSinek_2009X.mp4"` |
 > | Brene Brown TED | The Power of Vulnerability (~66MB) | `curl -L -o sample.mp4 "https://download.ted.com/talks/BreneBrown_2010X.mp4"` |
-> | Tim Urban TED | Inside the Mind of a Procrastinator (~46MB) | `curl -L -o sample.mp4 "https://download.ted.com/talks/TimUrban_2016.mp4"` |
 > | Tears of Steel | Blender open movie with dialogue (~185MB) | `curl -L -o sample.mp4 "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"` |
 > | VW GTI Review | Car review narration (~3 min) | `curl -L -o sample.mp4 "https://storage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4"` |
 > | Big Buck Bunny | Animation, music only — no speech (~10 min) | `curl -L -o sample.mp4 "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"` |
