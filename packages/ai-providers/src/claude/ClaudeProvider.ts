@@ -303,6 +303,10 @@ CRITICAL — Compositing Rules:
 
 Animation Best Practices:
 - Always use extrapolateLeft: "clamp" and extrapolateRight: "clamp" in interpolate() to prevent values overshooting.
+- CRITICAL: spring() REQUIRES fps. Always destructure fps from useVideoConfig() and pass it:
+  const { fps } = useVideoConfig();
+  spring({ frame, fps, config: { damping: 200 } })
+  Never call spring() without the fps parameter — it will crash at render time.
 - spring() config guide: { damping: 200 } = smooth/no bounce, { damping: 10-15 } = gentle bounce, { damping: 5-8 } = bouncy.
 - Use <Sequence from={frame} durationInFrames={n}> to stagger elements.
 - For enter/exit animations, calculate exit start frame from durationInFrames.
