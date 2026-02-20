@@ -53,7 +53,7 @@ export interface RenderResult {
  */
 export async function ensureRemotionInstalled(): Promise<string | null> {
   try {
-    await execAsync("npx remotion --version", { timeout: 30_000 });
+    await execAsync("npx remotion --help", { timeout: 30_000 });
     return null;
   } catch {
     return [
