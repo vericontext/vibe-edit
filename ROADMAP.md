@@ -147,6 +147,7 @@ Intelligence built into every interaction.
 - [x] Silence Cut - Remove silent segments from video (`vibe ai silence-cut`)
 - [x] Jump Cut - Remove filler words using Whisper word-level timestamps (`vibe ai jump-cut`)
 - [x] Auto Caption - Transcribe + burn styled captions (`vibe ai caption`)
+  - FFmpeg subtitles (fast path) or Remotion overlay fallback (no libass/freetype required)
 - [x] Noise Reduce - FFmpeg audio/video noise removal (`vibe ai noise-reduce`)
 - [x] Fade Effects - FFmpeg fade in/out for audio and video (`vibe ai fade`)
 - [x] Best-Frame Thumbnail - Gemini video analysis + FFmpeg frame extract (`vibe ai thumbnail --best-frame`)

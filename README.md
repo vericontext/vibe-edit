@@ -196,7 +196,7 @@ vibe ai text-overlay <video>         # Text overlays (FFmpeg drawtext)
 vibe ai fade <video>                 # Fade in/out effects (FFmpeg)
 vibe ai silence-cut <video>          # Remove silent segments (FFmpeg)
 vibe ai jump-cut <video>             # Remove filler words (Whisper + FFmpeg)
-vibe ai caption <video>              # Transcribe + burn styled captions
+vibe ai caption <video>              # Transcribe + burn captions (Remotion fallback, no libass needed)
 vibe ai reframe <video>              # Auto-reframe aspect ratio
 vibe ai speed-ramp <video>           # Content-aware speed ramping
 vibe ai narrate <input>              # AI narration for video
