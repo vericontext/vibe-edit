@@ -142,7 +142,8 @@ registerRoot(Root);
 
 /**
  * Render a Remotion composition to video.
- * Tries transparent VP9 WebM first; falls back to H264 MP4.
+ * When transparent: tries VP8, then VP9 (both support alpha). Fails if neither works.
+ * When opaque: renders H264 MP4.
  */
 export async function renderMotion(options: RenderMotionOptions): Promise<RenderResult> {
   const transparent = options.transparent !== false;
@@ -163,9 +164,10 @@ export async function renderMotion(options: RenderMotionOptions): Promise<Render
     const entryPoint = join(dir, "Root.tsx");
 
     if (transparent) {
-      // Try transparent WebM (VP8 with alpha — best Remotion support)
+      const webmOut = options.outputPath.replace(/\.\w+$/, ".webm");
+
+      // Try VP8 with alpha (best Remotion support)
       try {
-        const webmOut = options.outputPath.replace(/\.\w+$/, ".webm");
         const cmd = [
           "npx remotion render",
           `"${entryPoint}"`,
@@ -173,16 +175,36 @@ export async function renderMotion(options: RenderMotionOptions): Promise<Render
           `"${webmOut}"`,
           "--codec vp8",
           "--image-format png",
+          "--pixel-format yuva420p",
         ].join(" ");
 
         await execAsync(cmd, { cwd: dir, timeout: 300_000 });
         return { success: true, outputPath: webmOut };
       } catch {
-        // Fall through to non-transparent render
+        // VP8 failed, try VP9
+      }
+
+      // Try VP9 with alpha as fallback
+      try {
+        const cmd = [
+          "npx remotion render",
+          `"${entryPoint}"`,
+          options.componentName,
+          `"${webmOut}"`,
+          "--codec vp9",
+          "--image-format png",
+          "--pixel-format yuva420p",
+        ].join(" ");
+
+        await execAsync(cmd, { cwd: dir, timeout: 300_000 });
+        return { success: true, outputPath: webmOut };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return { success: false, error: `Transparent render failed (VP8 & VP9): ${msg}` };
       }
     }
 
-    // Non-transparent or fallback: H264 MP4
+    // Non-transparent: H264 MP4
     const mp4Out = options.outputPath.replace(/\.\w+$/, ".mp4");
     const cmd = [
       "npx remotion render",
@@ -247,6 +269,8 @@ export interface GenerateCaptionComponentOptions {
   position: "top" | "center" | "bottom";
   width: number;
   height: number;
+  /** When set, embed the video inside the component (no transparency needed) */
+  videoFileName?: string;
 }
 
 /**
@@ -257,8 +281,8 @@ export function generateCaptionComponent(options: GenerateCaptionComponentOption
   code: string;
   name: string;
 } {
-  const { segments, style, fontSize, fontColor, position, width, height } = options;
-  const name = "CaptionOverlay";
+  const { segments, style, fontSize, fontColor, position, width, height, videoFileName } = options;
+  const name = videoFileName ? "VideoCaptioned" : "CaptionOverlay";
 
   // Serialize segments as a JSON array embedded in the TSX
   const segmentsJSON = JSON.stringify(
@@ -296,7 +320,17 @@ export function generateCaptionComponent(options: GenerateCaptionComponentOption
   const paddingDir = position === "top" ? "paddingTop" : position === "bottom" ? "paddingBottom" : "";
   const paddingVal = position === "center" ? "" : `${paddingDir}: 40,`;
 
-  const code = `import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+  // Video import line (only when embedding video)
+  const videoImport = videoFileName
+    ? `, Video, staticFile`
+    : "";
+
+  // Video background element
+  const videoElement = videoFileName
+    ? `<Video src={staticFile("${videoFileName}")} style={{ width: "100%", height: "100%" }} />`
+    : "";
+
+  const code = `import { AbsoluteFill, useCurrentFrame, useVideoConfig${videoImport} } from "remotion";
 
 interface Segment {
   start: number;
@@ -315,30 +349,33 @@ export const ${name} = () => {
     (s) => currentTime >= s.start && currentTime < s.end
   );
 
-  if (!activeSegment) return <AbsoluteFill />;
-
   return (
-    <AbsoluteFill
-      style={{
-        display: "flex",
-        justifyContent: "${justifyContent}",
-        alignItems: "center",
-        ${paddingVal}
-      }}
-    >
-      <div
-        style={{
-          fontSize: ${fontSize},
-          fontFamily: "Arial, Helvetica, sans-serif",
-          textAlign: "center" as const,
-          maxWidth: "${Math.round(width * 0.9)}px",
-          lineHeight: 1.3,
-          padding: "8px 16px",
-          ${styleMap[style]}
-        }}
-      >
-        {activeSegment.text}
-      </div>
+    <AbsoluteFill>
+      ${videoElement}
+      {activeSegment && (
+        <AbsoluteFill
+          style={{
+            display: "flex",
+            justifyContent: "${justifyContent}",
+            alignItems: "center",
+            ${paddingVal}
+          }}
+        >
+          <div
+            style={{
+              fontSize: ${fontSize},
+              fontFamily: "Arial, Helvetica, sans-serif",
+              textAlign: "center" as const,
+              maxWidth: "${Math.round(width * 0.9)}px",
+              lineHeight: 1.3,
+              padding: "8px 16px",
+              ${styleMap[style]}
+            }}
+          >
+            {activeSegment.text}
+          </div>
+        </AbsoluteFill>
+      )}
     </AbsoluteFill>
   );
 };
@@ -387,4 +424,80 @@ export async function renderAndComposite(
   await rm(renderResult.outputPath, { force: true }).catch(() => {});
 
   return compositeResult;
+}
+
+/**
+ * Render a Remotion caption component that embeds the video directly.
+ * No transparency needed — the component includes <Video> + caption text.
+ * After rendering, copies audio from the original video to the output.
+ */
+export async function renderCaptionedVideo(options: {
+  componentCode: string;
+  componentName: string;
+  width: number;
+  height: number;
+  fps: number;
+  durationInFrames: number;
+  videoPath: string;
+  videoFileName: string;
+  outputPath: string;
+}): Promise<RenderResult> {
+  const dir = await scaffoldRemotionProject(
+    options.componentCode,
+    options.componentName,
+    {
+      width: options.width,
+      height: options.height,
+      fps: options.fps,
+      durationInFrames: options.durationInFrames,
+    },
+  );
+
+  try {
+    // Copy video to public/ so Remotion's staticFile() can access it
+    const publicDir = join(dir, "public");
+    await mkdir(publicDir, { recursive: true });
+    const { copyFile } = await import("node:fs/promises");
+    await copyFile(options.videoPath, join(publicDir, options.videoFileName));
+
+    const entryPoint = join(dir, "Root.tsx");
+    const mp4Out = options.outputPath.replace(/\.\w+$/, "_video_only.mp4");
+
+    // Render H264 (video-only from Remotion, no audio)
+    const renderCmd = [
+      "npx remotion render",
+      `"${entryPoint}"`,
+      options.componentName,
+      `"${mp4Out}"`,
+      "--codec h264",
+      "--crf 18",
+    ].join(" ");
+
+    await execAsync(renderCmd, { cwd: dir, timeout: 600_000, maxBuffer: 50 * 1024 * 1024 });
+
+    // Mux: take video from Remotion render, audio from original video
+    const muxCmd = [
+      "ffmpeg -y",
+      `-i "${mp4Out}"`,
+      `-i "${options.videoPath}"`,
+      "-map 0:v:0",
+      "-map 1:a:0?",
+      "-c:v copy",
+      "-c:a copy",
+      "-shortest",
+      `"${options.outputPath}"`,
+    ].join(" ");
+
+    await execAsync(muxCmd, { timeout: 120_000 });
+
+    // Cleanup temp video-only file
+    await rm(mp4Out, { force: true }).catch(() => {});
+
+    return { success: true, outputPath: options.outputPath };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: `Remotion caption render failed: ${msg}` };
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }

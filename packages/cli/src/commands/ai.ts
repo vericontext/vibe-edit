@@ -9912,9 +9912,9 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
         const cmd = `ffmpeg -i "${videoPath}" -vf "subtitles=${escapedSrtPath}:force_style='${forceStyle}'" -c:a copy "${outputPath}" -y`;
         await execAsync(cmd, { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
       } else {
-        // Remotion fallback: render captions as transparent overlay, composite with FFmpeg
+        // Remotion fallback: embed video + captions in a single Remotion composition
         console.log("FFmpeg missing subtitles filter (libass) — using Remotion fallback...");
-        const { generateCaptionComponent, renderAndComposite, ensureRemotionInstalled } = await import("../utils/remotion.js");
+        const { generateCaptionComponent, renderCaptionedVideo, ensureRemotionInstalled } = await import("../utils/remotion.js");
 
         const remotionErr = await ensureRemotionInstalled();
         if (remotionErr) {
@@ -9928,6 +9928,7 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
         const videoDuration = await getVideoDuration(videoPath);
         const fps = 30;
         const durationInFrames = Math.ceil(videoDuration * fps);
+        const videoFileName = "source_video.mp4";
 
         const { code, name } = generateCaptionComponent({
           segments: transcriptResult.segments.map((s) => ({
@@ -9941,21 +9942,20 @@ export async function executeCaption(options: CaptionOptions): Promise<CaptionRe
           position,
           width,
           height,
+          videoFileName,
         });
 
-        const renderResult = await renderAndComposite(
-          {
-            componentCode: code,
-            componentName: name,
-            width,
-            height,
-            fps,
-            durationInFrames,
-            outputPath,
-          },
+        const renderResult = await renderCaptionedVideo({
+          componentCode: code,
+          componentName: name,
+          width,
+          height,
+          fps,
+          durationInFrames,
           videoPath,
+          videoFileName,
           outputPath,
-        );
+        });
 
         if (!renderResult.success) {
           const outputDir = dirname(outputPath);
